@@ -8,7 +8,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-  initializeFirestore, persistentLocalCache, doc, setDoc, onSnapshot,
+  initializeFirestore, persistentLocalCache, doc, getDoc, setDoc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name}]
@@ -30,8 +30,13 @@ let customers = [];
 let appointments = [];
 let staff = [];
 
+// Tiap cabang punya data sendiri di users/{uid}/cabang/{id}/data/...
+// Daftar cabangnya tersimpan di users/{uid}/data/branches.
+let cabangList = []; // [{id, name}]
+let cabangId = null; // cabang yang sedang dibuka di perangkat ini
+
 function save(key, data) {
-  setDoc(doc(db, 'users', uid, 'data', key), { rows: data })
+  setDoc(doc(db, 'users', uid, 'cabang', cabangId, 'data', key), { rows: data })
     .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
 }
 
@@ -365,6 +370,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('editSheet').hidden) closeEdit();
   if (!$('doneSheet').hidden) closeDone();
+  if (!$('cabangSheet').hidden) closeCabangSheet();
 });
 
 $('editSave').addEventListener('click', () => {
@@ -606,7 +612,10 @@ function attachRowGestures(main, r) {
 function buildWhatsAppText() {
   const rows = filteredRows();
   if (!rows.length) return null;
-  let lines = ['*JADWAL TREATMENT* 💆'];
+  // Kalau cabang lebih dari satu, cantumkan nama cabang di judul
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  const judulCabang = cabangList.length > 1 && cabang ? ' ' + cabang.name.toUpperCase() : '';
+  let lines = ['*JADWAL TREATMENT' + judulCabang + '* 💆'];
   let lastDate = null;
   let n = 0;
   rows.forEach((r) => {
@@ -716,30 +725,132 @@ function ambilLokalLama(key) { // data versi lama (localStorage), untuk migrasi
   catch { return []; }
 }
 
-let stopSync = [];
+let stopCabangList = null;
+let stopData = [];
+
 function mulaiSync() {
-  const pasang = (key, terapkan) => onSnapshot(
-    doc(db, 'users', uid, 'data', key),
+  stopCabangList = onSnapshot(
+    doc(db, 'users', uid, 'data', 'branches'),
     (snap) => {
-      if (!snap.exists()) {
-        // Dokumen belum ada (login pertama di project ini): angkat data
-        // lama dari localStorage kalau ada, supaya tidak mulai dari nol.
-        const lama = ambilLokalLama('jt_' + key);
-        if (lama.length) { save(key, lama); return; }
-        terapkan([]);
-      } else {
-        terapkan(snap.data().rows || []);
+      if (!snap.exists() || !(snap.data().rows || []).length) {
+        buatCabangPertama();
+        return;
       }
+      cabangList = snap.data().rows;
+      // Cabang aktif: yang terakhir dipakai di perangkat ini, atau cabang pertama
+      if (!cabangList.some((c) => c.id === cabangId)) cabangId = null;
+      if (!cabangId) {
+        const tersimpan = localStorage.getItem('jt_cabang');
+        cabangId = (cabangList.some((c) => c.id === tersimpan) ? tersimpan : cabangList[0].id);
+        mulaiSyncData();
+      }
+      renderCabangBar();
+    },
+    (e) => toast('Gagal memuat daftar cabang: ' + e.message, true)
+  );
+}
+
+function mulaiSyncData() {
+  stopData.forEach((lepas) => lepas());
+  const pasang = (key, terapkan) => onSnapshot(
+    doc(db, 'users', uid, 'cabang', cabangId, 'data', key),
+    (snap) => {
+      terapkan(snap.exists() ? (snap.data().rows || []) : []);
       renderList();
     },
     (e) => toast('Gagal memuat data: ' + e.message, true)
   );
-  stopSync = [
+  stopData = [
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; }),
     pasang(KEY_APPOINTMENTS, (rows) => { appointments = rows; }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
   ];
 }
+
+// Login pertama: bikin cabang "Utama" dan angkat data lama ke dalamnya —
+// dari lokasi cloud versi sebelum-cabang kalau ada, atau dari localStorage.
+let migrasiJalan = false;
+async function buatCabangPertama() {
+  if (migrasiJalan) return;
+  migrasiJalan = true;
+  try {
+    const cabang = { id: buatId(), name: 'Utama' };
+    for (const key of [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF]) {
+      let rows = [];
+      try {
+        const lamaCloud = await getDoc(doc(db, 'users', uid, 'data', key));
+        if (lamaCloud.exists()) rows = lamaCloud.data().rows || [];
+      } catch { /* offline: lewati, coba localStorage saja */ }
+      if (!rows.length) rows = ambilLokalLama('jt_' + key);
+      if (rows.length) {
+        await setDoc(doc(db, 'users', uid, 'cabang', cabang.id, 'data', key), { rows });
+      }
+    }
+    await setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: [cabang] });
+  } catch (e) {
+    toast('Gagal menyiapkan cabang: ' + e.message, true);
+  }
+  migrasiJalan = false;
+}
+
+// ============================================================
+// Pilih & tambah cabang
+// ============================================================
+function renderCabangBar() {
+  const bar = $('cabangBar');
+  bar.innerHTML = '';
+  cabangList.forEach((c) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (c.id === cabangId ? ' active' : '');
+    b.textContent = '📍 ' + c.name;
+    b.addEventListener('click', () => pilihCabang(c.id));
+    bar.appendChild(b);
+  });
+  const tambah = document.createElement('button');
+  tambah.type = 'button';
+  tambah.className = 'chip chip-tambah';
+  tambah.title = 'Tambah cabang baru';
+  tambah.textContent = '+ Cabang';
+  tambah.addEventListener('click', () => {
+    $('cabangName').value = '';
+    $('cabangSheet').hidden = false;
+    $('cabangName').focus();
+  });
+  bar.appendChild(tambah);
+}
+
+function pilihCabang(id) {
+  if (id === cabangId) return;
+  cabangId = id;
+  localStorage.setItem('jt_cabang', id);
+  customers = []; appointments = []; staff = [];
+  if (selectMode) setSelectMode(false);
+  mulaiSyncData();
+  renderCabangBar();
+  renderList();
+}
+
+function closeCabangSheet() { $('cabangSheet').hidden = true; }
+$('cabangCancel').addEventListener('click', closeCabangSheet);
+$('cabangSheet').addEventListener('click', (e) => {
+  if (e.target === $('cabangSheet')) closeCabangSheet();
+});
+$('cabangSave').addEventListener('click', () => {
+  const name = $('cabangName').value.trim().replace(/\s+/g, ' ');
+  if (!name) { toast('Nama cabang wajib diisi.', true); return; }
+  if (cabangList.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+    toast('Cabang "' + name + '" sudah ada.', true);
+    return;
+  }
+  const cabang = { id: buatId(), name };
+  cabangList.push(cabang);
+  setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: cabangList })
+    .catch((e) => toast('Gagal menyimpan cabang: ' + e.message, true));
+  closeCabangSheet();
+  pilihCabang(cabang.id);
+  toast('Cabang "' + name + '" dibuat.');
+});
 
 if (!configTerisi) {
   $('loginSetup').hidden = false;
@@ -755,9 +866,12 @@ if (!configTerisi) {
       mulaiSync();
     } else {
       uid = null;
-      stopSync.forEach((lepas) => lepas());
-      stopSync = [];
+      if (stopCabangList) { stopCabangList(); stopCabangList = null; }
+      stopData.forEach((lepas) => lepas());
+      stopData = [];
       customers = []; appointments = []; staff = [];
+      cabangList = []; cabangId = null;
+      $('cabangBar').innerHTML = '';
       renderList();
       $('loginScreen').hidden = false;
     }

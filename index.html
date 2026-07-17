@@ -20,6 +20,8 @@
     </div>
   </header>
 
+  <div class="cabang-bar" id="cabangBar"></div>
+
   <section class="card">
     <div class="card-head">
       <h2>Tambah Jadwal</h2>
@@ -123,6 +125,17 @@
       <button type="button" class="primary" id="doneSave">Simpan</button>
     </div>
     <button type="button" class="undo-done" id="doneUndo" hidden>Batalkan tanda selesai</button>
+  </div>
+</div>
+<div class="sheet-backdrop" id="cabangSheet" hidden>
+  <div class="sheet">
+    <h2>Tambah Cabang</h2>
+    <label for="cabangName">Nama cabang</label>
+    <input id="cabangName" placeholder="mis. Cabang Bekasi" autocomplete="off">
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="cabangCancel">Batal</button>
+      <button type="button" class="primary" id="cabangSave">Simpan</button>
+    </div>
   </div>
 </div>
 <div class="login-backdrop" id="loginScreen">

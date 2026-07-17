@@ -256,6 +256,15 @@ button.primary:active { transform: scale(.985); }
 .data-btn:hover { color: var(--accent-deep); }
 .data-btn:active { transform: scale(.97); }
 
+/* ---- Pilih cabang ---- */
+.cabang-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 18px; }
+.cabang-bar:empty { display: none; }
+.chip-tambah {
+  background: none; border: 1.5px dashed var(--border); color: var(--muted);
+  padding: 6.5px 13.5px; /* kompensasi border biar setinggi chip lain */
+}
+.chip-tambah:hover { border-color: var(--accent); color: var(--accent-deep); }
+
 /* ---- Layar login ---- */
 .login-backdrop {
   position: fixed; inset: 0; z-index: 30; background: var(--bg);
