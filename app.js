@@ -733,7 +733,7 @@ function mulaiSync() {
     doc(db, 'users', uid, 'data', 'branches'),
     (snap) => {
       if (!snap.exists() || !(snap.data().rows || []).length) {
-        buatCabangPertama();
+        buatCabangDefault();
         return;
       }
       cabangList = snap.data().rows;
@@ -767,14 +767,15 @@ function mulaiSyncData() {
   ];
 }
 
-// Login pertama: bikin cabang "Utama" dan angkat data lama ke dalamnya —
-// dari lokasi cloud versi sebelum-cabang kalau ada, atau dari localStorage.
+// Login pertama: siapkan cabang default dan angkat data lama ke cabang
+// pertama — dari lokasi cloud versi sebelum-cabang kalau ada, atau localStorage.
+const CABANG_DEFAULT = ['Puri', 'Kemayoran', 'Bandung'];
 let migrasiJalan = false;
-async function buatCabangPertama() {
+async function buatCabangDefault() {
   if (migrasiJalan) return;
   migrasiJalan = true;
   try {
-    const cabang = { id: buatId(), name: 'Utama' };
+    const daftar = CABANG_DEFAULT.map((name) => ({ id: buatId(), name }));
     for (const key of [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF]) {
       let rows = [];
       try {
@@ -783,10 +784,10 @@ async function buatCabangPertama() {
       } catch { /* offline: lewati, coba localStorage saja */ }
       if (!rows.length) rows = ambilLokalLama('jt_' + key);
       if (rows.length) {
-        await setDoc(doc(db, 'users', uid, 'cabang', cabang.id, 'data', key), { rows });
+        await setDoc(doc(db, 'users', uid, 'cabang', daftar[0].id, 'data', key), { rows });
       }
     }
-    await setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: [cabang] });
+    await setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: daftar });
   } catch (e) {
     toast('Gagal menyiapkan cabang: ' + e.message, true);
   }

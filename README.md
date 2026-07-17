@@ -91,8 +91,9 @@ WA, tandai selesai + pegawai, export/import), ditambah:
 - **Offline tetap jalan**: Firestore menyimpan salinan lokal; saat sinyal
   hilang aplikasi tetap bisa dipakai dan tersinkron ulang otomatis.
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
-  pegawai). Ganti cabang lewat chip 📍 di bawah judul, tambah lewat
-  "+ Cabang". Data lama otomatis jadi cabang pertama bernama "Utama".
-  Pilihan cabang diingat per perangkat; export/import dan salinan WA
-  mengikuti cabang yang sedang dibuka (nama cabang ikut tercantum di
-  salinan WA kalau cabang lebih dari satu).
+  pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
+  masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,
+  tambah lewat "+ Cabang". Pilihan cabang diingat per perangkat — refresh
+  atau buka ulang tetap di cabang terakhir yang dipilih. Export/import dan
+  salinan WA mengikuti cabang yang sedang dibuka (nama cabang ikut
+  tercantum di salinan WA).
