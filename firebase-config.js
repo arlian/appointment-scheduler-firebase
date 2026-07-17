@@ -8,10 +8,11 @@
 // Panduan lengkap ada di README.md.
 // ============================================================
 window.FIREBASE_CONFIG = {
-  apiKey: 'ISI_DARI_CONSOLE',
-  authDomain: 'ISI_DARI_CONSOLE',
-  projectId: 'ISI_DARI_CONSOLE',
-  storageBucket: 'ISI_DARI_CONSOLE',
-  messagingSenderId: 'ISI_DARI_CONSOLE',
-  appId: 'ISI_DARI_CONSOLE',
+  apiKey: 'AIzaSyC7eEFzijPTJAheq3fkg90PtMhy1N-X2xs',
+  authDomain: 'appointment-scheduler-jojo.firebaseapp.com',
+  projectId: 'appointment-scheduler-jojo',
+  storageBucket: 'appointment-scheduler-jojo.firebasestorage.app',
+  messagingSenderId: '6337669358',
+  appId: '1:6337669358:web:3b92020fc64da253bdebff',
+  measurementId: 'G-881LHQBNXG',
 };
