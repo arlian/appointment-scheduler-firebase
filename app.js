@@ -1,20 +1,44 @@
 // ============================================================
-// Penyimpanan (localStorage)
+// Penyimpanan (Firestore) — data tersinkron antar perangkat.
+// Susunan: users/{uid}/data/{customers|appointments|staff},
+// tiap dokumen berisi { rows: [...] } meniru bentuk array lama.
 // ============================================================
-const KEY_CUSTOMERS = 'jt_customers';       // [{id, name}]
-const KEY_APPOINTMENTS = 'jt_appointments'; // [{id, customerId, date, time, done?, staff?}]
-const KEY_STAFF = 'jt_staff';               // ['Nama Pegawai', ...]
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+} from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+import {
+  initializeFirestore, persistentLocalCache, doc, setDoc, onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-function load(key) {
-  try { return JSON.parse(localStorage.getItem(key)) || []; }
-  catch { return []; }
+const KEY_CUSTOMERS = 'customers';       // [{id, name}]
+const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, done?, staff?}]
+const KEY_STAFF = 'staff';               // ['Nama Pegawai', ...]
+
+const configTerisi =
+  window.FIREBASE_CONFIG && !String(window.FIREBASE_CONFIG.apiKey).startsWith('ISI_');
+let db = null, auth = null, uid = null;
+if (configTerisi) {
+  const fbApp = initializeApp(window.FIREBASE_CONFIG);
+  // Cache lokal: aplikasi tetap bisa dibuka dan diubah saat offline,
+  // perubahan otomatis terkirim begitu online lagi.
+  db = initializeFirestore(fbApp, { localCache: persistentLocalCache() });
+  auth = getAuth(fbApp);
 }
-function save(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
 
-let customers = load(KEY_CUSTOMERS);
-let appointments = load(KEY_APPOINTMENTS);
-let staff = load(KEY_STAFF);
-const nextId = (arr) => arr.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+let customers = [];
+let appointments = [];
+let staff = [];
+
+function save(key, data) {
+  setDoc(doc(db, 'users', uid, 'data', key), { rows: data })
+    .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
+}
+
+// Id acak, bukan berurutan: dua perangkat yang offline bersamaan
+// tidak mungkin membuat id kembar
+const buatId = () =>
+  (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
 
 function addStaff(name) {
   const q = name.trim().toLowerCase();
@@ -168,7 +192,7 @@ $('form').addEventListener('submit', (e) => {
   let customer = findCustomerByName(cleanName);
   const isNew = !customer;
   if (isNew) {
-    customer = { id: nextId(customers), name: cleanName };
+    customer = { id: buatId(), name: cleanName };
     customers.push(customer);
     save(KEY_CUSTOMERS, customers);
   }
@@ -177,7 +201,7 @@ $('form').addEventListener('submit', (e) => {
     a.customerId === customer.id && a.date === date && a.time === time);
   if (dup) { toast(customer.name + ' sudah punya jadwal di tanggal dan jam yang sama.', true); return; }
 
-  const newId = nextId(appointments);
+  const newId = buatId();
   appointments.push({ id: newId, customerId: customer.id, date, time });
   save(KEY_APPOINTMENTS, appointments);
 
@@ -655,7 +679,7 @@ $('importFile').addEventListener('change', async () => {
     const name = c.name.trim().replace(/\s+/g, ' ');
     let existing = findCustomerByName(name);
     if (!existing) {
-      existing = { id: nextId(customers), name };
+      existing = { id: buatId(), name };
       customers.push(existing);
       newCust++;
     }
@@ -666,7 +690,7 @@ $('importFile').addEventListener('change', async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !/^\d{2}:\d{2}$/.test(a.time || '')) return;
     const cid = idMap.get(a.customerId);
     if (appointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
-    const appt = { id: nextId(appointments), customerId: cid, date: a.date, time: a.time };
+    const appt = { id: buatId(), customerId: cid, date: a.date, time: a.time };
     if (a.done === true) appt.done = true;
     if (typeof a.staff === 'string' && a.staff.trim()) {
       appt.staff = a.staff.trim().replace(/\s+/g, ' ');
@@ -683,6 +707,79 @@ $('importFile').addEventListener('change', async () => {
   renderList();
   toast('Import selesai: ' + newCust + ' customer baru, ' + newAppt + ' jadwal ditambahkan.');
 });
+
+// ============================================================
+// Login & sinkronisasi Firestore
+// ============================================================
+function ambilLokalLama(key) { // data versi lama (localStorage), untuk migrasi
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch { return []; }
+}
+
+let stopSync = [];
+function mulaiSync() {
+  const pasang = (key, terapkan) => onSnapshot(
+    doc(db, 'users', uid, 'data', key),
+    (snap) => {
+      if (!snap.exists()) {
+        // Dokumen belum ada (login pertama di project ini): angkat data
+        // lama dari localStorage kalau ada, supaya tidak mulai dari nol.
+        const lama = ambilLokalLama('jt_' + key);
+        if (lama.length) { save(key, lama); return; }
+        terapkan([]);
+      } else {
+        terapkan(snap.data().rows || []);
+      }
+      renderList();
+    },
+    (e) => toast('Gagal memuat data: ' + e.message, true)
+  );
+  stopSync = [
+    pasang(KEY_CUSTOMERS, (rows) => { customers = rows; }),
+    pasang(KEY_APPOINTMENTS, (rows) => { appointments = rows; }),
+    pasang(KEY_STAFF, (rows) => { staff = rows; }),
+  ];
+}
+
+if (!configTerisi) {
+  $('loginSetup').hidden = false;
+  $('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    toast('Isi dulu firebase-config.js — lihat README.', true);
+  });
+} else {
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      uid = user.uid;
+      $('loginScreen').hidden = true;
+      mulaiSync();
+    } else {
+      uid = null;
+      stopSync.forEach((lepas) => lepas());
+      stopSync = [];
+      customers = []; appointments = []; staff = [];
+      renderList();
+      $('loginScreen').hidden = false;
+    }
+  });
+
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('loginBtn');
+    btn.disabled = true; btn.textContent = 'Masuk…';
+    try {
+      await signInWithEmailAndPassword(auth, $('loginEmail').value.trim(), $('loginPass').value);
+      $('loginPass').value = '';
+    } catch (err) {
+      const salahKredensial = ['auth/invalid-credential', 'auth/wrong-password',
+        'auth/user-not-found', 'auth/invalid-email'].includes(err.code);
+      toast(salahKredensial ? 'Email atau password salah.' : 'Gagal masuk: ' + (err.code || err.message), true);
+    }
+    btn.disabled = false; btn.textContent = 'Masuk';
+  });
+
+  $('logoutBtn').addEventListener('click', () => signOut(auth));
+}
 
 // ============================================================
 // PWA & inisialisasi awal

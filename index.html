@@ -89,6 +89,7 @@
       <button type="button" class="data-btn" id="importBtn">⬆️ Import Data</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
+    <button type="button" class="logout-btn" id="logoutBtn">Keluar dari akun</button>
 </div>
 <div class="sheet-backdrop" id="editSheet" hidden>
   <div class="sheet">
@@ -124,8 +125,28 @@
     <button type="button" class="undo-done" id="doneUndo" hidden>Batalkan tanda selesai</button>
   </div>
 </div>
+<div class="login-backdrop" id="loginScreen">
+  <div class="login-card">
+    <div class="logo">💆</div>
+    <h2>Jadwal Treatment</h2>
+    <p class="login-sub">Masuk dengan akun salon untuk membuka jadwal.</p>
+    <form id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" required autocomplete="username">
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" required autocomplete="current-password">
+      <button class="primary" type="submit" id="loginBtn">Masuk</button>
+    </form>
+    <div class="login-setup" id="loginSetup" hidden>
+      <strong>Config Firebase belum diisi.</strong> Buka file
+      <code>firebase-config.js</code> dan tempel config dari console Firebase —
+      langkah-langkahnya ada di README.md.
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script src="firebase-config.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

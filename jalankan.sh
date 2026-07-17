@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-8010}"
 URL="http://localhost:$PORT"
 
 # Jalankan server di latar belakang (dengan header anti-cache agar

@@ -256,9 +256,36 @@ button.primary:active { transform: scale(.985); }
 .data-btn:hover { color: var(--accent-deep); }
 .data-btn:active { transform: scale(.97); }
 
+/* ---- Layar login ---- */
+.login-backdrop {
+  position: fixed; inset: 0; z-index: 30; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.login-backdrop[hidden] { display: none; }
+.login-card {
+  width: 100%; max-width: 360px; background: var(--card); border-radius: 20px;
+  padding: 26px 22px; box-shadow: var(--shadow); text-align: center;
+}
+.login-card .logo { margin: 0 auto 10px; }
+.login-card h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.01em; }
+.login-sub { color: var(--muted); font-size: .85rem; margin: 4px 0 18px; }
+.login-card form { text-align: left; }
+.login-setup {
+  margin-top: 16px; padding: 12px 14px; border-radius: 12px; text-align: left;
+  background: var(--red-soft); color: var(--red); font-size: .84rem; line-height: 1.5;
+}
+.login-setup code { font-family: ui-monospace, Consolas, monospace; font-size: .95em; }
+.logout-btn {
+  display: block; margin: 16px auto 0; padding: 6px 10px;
+  background: none; border: 0; cursor: pointer;
+  color: var(--muted); font-size: .82rem; font-family: inherit; text-decoration: underline;
+}
+.logout-btn:hover { color: var(--red); }
+
 /* ---- Toast ---- */
 .toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(6px);
+  z-index: 40; /* di atas layar login, biar error login kelihatan */
   background: var(--text); color: #fff; padding: 12px 20px; border-radius: 999px;
   font-size: .88rem; opacity: 0; transition: opacity .25s, transform .25s;
   pointer-events: none; max-width: calc(100vw - 32px); box-shadow: 0 10px 30px rgba(23,43,38,.25);

@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-set "PORT=8000"
+set "PORT=8010"
 if not "%~1"=="" set "PORT=%~1"
 set "URL=http://localhost:%PORT%"
 
