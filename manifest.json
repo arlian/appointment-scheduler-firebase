@@ -1,0 +1,25 @@
+{
+  "name": "Jadwal Treatment",
+  "short_name": "Jadwal",
+  "description": "Manajemen penjadwalan customer untuk treatment",
+  "lang": "id",
+  "id": "./",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f8f7",
+  "theme_color": "#0e9384",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tambah Jadwal",
+      "short_name": "Tambah",
+      "description": "Langsung buka form tambah jadwal",
+      "url": "./index.html?action=add",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

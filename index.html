@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jadwal Treatment</title>
+<meta name="theme-color" content="#0e9384">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">💆</div>
+    <div>
+      <h1>Jadwal Treatment</h1>
+      <p class="subtitle">Ketik nama customer — customer lama terdeteksi otomatis.</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Tambah Jadwal</h2>
+    </div>
+    <form id="form" autocomplete="off">
+        <label for="name">Nama Customer</label>
+        <div class="name-box">
+          <input id="name" placeholder="mis. Siti Rahma" required>
+          <div class="suggestions" id="sug"></div>
+        </div>
+        <div class="badge" id="badge"></div>
+        <div class="history" id="history">
+          <h3>Riwayat kunjungan</h3>
+          <ul id="historyList"></ul>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="date">Tanggal</label>
+            <input id="date" type="date" required>
+          </div>
+          <div>
+            <label for="time">Jam</label>
+            <input id="time" type="time" required>
+          </div>
+        </div>
+        <button class="primary" type="submit">Simpan Jadwal</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Daftar Jadwal</h2>
+        <div class="card-head-btns">
+          <button type="button" class="select-btn" id="selectBtn" title="Pilih beberapa jadwal untuk dihapus">Pilih</button>
+          <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">📋 Salin untuk WA</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button type="button" class="chip active" data-f="today">Hari Ini</button>
+        <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
+        <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
+        <span class="pick-date">
+          <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">📅 Pilih Tanggal</button>
+          <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
+        </span>
+        <button type="button" class="chip" data-f="week">Minggu Ini</button>
+        <button type="button" class="chip" data-f="all">Semua</button>
+        <span class="range-box">
+          <input type="date" id="filterStart" title="Dari tanggal">
+          <span class="range-sep">s.d.</span>
+          <input type="date" id="filterEnd" title="Sampai tanggal">
+        </span>
+      </div>
+      <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
+      <div id="list"></div>
+    </section>
+
+    <div class="select-bar" id="selectBar" hidden>
+      <span class="sel-count" id="selCount">0 dipilih</span>
+      <button type="button" class="sel-all" id="selAll">Pilih Semua</button>
+      <button type="button" class="sel-del" id="selDelete">Hapus</button>
+      <button type="button" class="sel-cancel" id="selCancel">Batal</button>
+    </div>
+
+    <div class="data-row">
+      <button type="button" class="data-btn" id="exportBtn">⬇️ Export Data</button>
+      <button type="button" class="data-btn" id="importBtn">⬆️ Import Data</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+</div>
+<div class="sheet-backdrop" id="editSheet" hidden>
+  <div class="sheet">
+    <h2>Ubah Jadwal</h2>
+    <div class="sheet-name" id="editName"></div>
+    <div class="row2">
+      <div>
+        <label for="editDate">Tanggal</label>
+        <input id="editDate" type="date">
+      </div>
+      <div>
+        <label for="editTime">Jam</label>
+        <input id="editTime" type="time">
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="editCancel">Batal</button>
+      <button type="button" class="primary" id="editSave">Simpan</button>
+    </div>
+  </div>
+</div>
+<div class="sheet-backdrop" id="doneSheet" hidden>
+  <div class="sheet">
+    <h2>Tandai Selesai</h2>
+    <div class="sheet-name" id="doneName"></div>
+    <label for="staffInput">Pegawai yang melakukan treatment</label>
+    <input id="staffInput" placeholder="mis. Rina" autocomplete="off">
+    <div class="staff-chips" id="staffChips"></div>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="doneCancel">Batal</button>
+      <button type="button" class="primary" id="doneSave">Simpan</button>
+    </div>
+    <button type="button" class="undo-done" id="doneUndo" hidden>Batalkan tanda selesai</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

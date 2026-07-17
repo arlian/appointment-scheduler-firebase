@@ -1,0 +1,4 @@
+# Data customer — jangan pernah di-push ke repo publik
+data-import.json
+jadwal-treatment-*.json
+data.db
