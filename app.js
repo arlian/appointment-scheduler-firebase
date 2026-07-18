@@ -854,6 +854,8 @@ $('cabangSave').addEventListener('click', () => {
 });
 
 if (!configTerisi) {
+  $('splashScreen').hidden = true;
+  $('loginScreen').hidden = false;
   $('loginSetup').hidden = false;
   $('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -861,6 +863,7 @@ if (!configTerisi) {
   });
 } else {
   onAuthStateChanged(auth, (user) => {
+    $('splashScreen').hidden = true; // sesi sudah dicek — baru tentukan layar
     if (user) {
       uid = user.uid;
       $('loginScreen').hidden = true;

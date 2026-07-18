@@ -266,6 +266,18 @@ button.primary:active { transform: scale(.985); }
 .chip-tambah:hover { border-color: var(--accent); color: var(--accent-deep); }
 
 /* ---- Layar login ---- */
+.splash {
+  position: fixed; inset: 0; z-index: 31; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+}
+.splash[hidden] { display: none; }
+.spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 3px solid var(--accent-soft); border-top-color: var(--accent);
+  animation: putar .8s linear infinite;
+}
+@keyframes putar { to { transform: rotate(360deg); } }
+
 .login-backdrop {
   position: fixed; inset: 0; z-index: 30; background: var(--bg);
   display: flex; align-items: center; justify-content: center; padding: 16px;
