@@ -8,7 +8,8 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-  initializeFirestore, persistentLocalCache, doc, getDoc, setDoc, onSnapshot,
+  initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromCache,
+  setDoc, deleteDoc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name}]
@@ -334,6 +335,9 @@ $('selAll').addEventListener('click', () => {
 $('selDelete').addEventListener('click', () => {
   if (!selected.size) return;
   if (!confirm('Hapus ' + selected.size + ' jadwal yang dipilih?')) return;
+  appointments.forEach((a) => {
+    if (selected.has(a.id)) (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
+  });
   appointments = appointments.filter((a) => !selected.has(a.id));
   save(KEY_APPOINTMENTS, appointments);
   const n = selected.size;
@@ -371,6 +375,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('editSheet').hidden) closeEdit();
   if (!$('doneSheet').hidden) closeDone();
   if (!$('cabangSheet').hidden) closeCabangSheet();
+  if (!$('fotoViewer').hidden) tutupFotoViewer();
 });
 
 $('editSave').addEventListener('click', () => {
@@ -416,6 +421,82 @@ function renderStaffChips() {
 
 $('staffInput').addEventListener('input', renderStaffChips);
 
+// --- Foto hasil treatment ---
+// Tiap foto utuh (terkompres ±1080px) jadi dokumen sendiri di koleksi photos;
+// appointment hanya membawa daftar thumbnail mini (photos: [{id, thumb}])
+// supaya daftar jadwal tetap ringan. Foto utuh baru diunduh saat dilihat,
+// lalu tersimpan di cache Firestore — pola yang sama seperti WhatsApp.
+const fotoRef = (id) => doc(db, 'users', uid, 'cabang', cabangId, 'photos', id);
+let fotoTetap = []; // [{id, thumb}] — foto tersimpan yang tidak dihapus user
+let fotoBaru = [];  // [{full, thumb}] — foto baru yang belum disimpan
+
+function bacaGambar(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bukan gambar')); };
+    img.src = url;
+  });
+}
+
+async function kompresFoto(file) {
+  const img = await bacaGambar(file);
+  const kecilkan = (maxSisi, mutu) => {
+    const skala = Math.min(1, maxSisi / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * skala));
+    c.height = Math.max(1, Math.round(img.naturalHeight * skala));
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', mutu);
+  };
+  return { full: kecilkan(1080, 0.75), thumb: kecilkan(24, 0.4) };
+}
+
+function renderFotoRow() {
+  const box = $('fotoRow');
+  box.innerHTML = '';
+  const pasang = (src, hapus) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'foto-item';
+    const img = document.createElement('img');
+    img.className = 'foto-preview';
+    img.src = src;
+    img.alt = 'Foto treatment';
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'foto-x';
+    x.title = 'Hapus foto ini';
+    x.textContent = '✕';
+    x.onclick = hapus;
+    wrap.append(img, x);
+    box.appendChild(wrap);
+  };
+  fotoTetap.forEach((p, i) => pasang(p.thumb, () => { fotoTetap.splice(i, 1); renderFotoRow(); }));
+  fotoBaru.forEach((p, i) => pasang(p.full, () => { fotoBaru.splice(i, 1); renderFotoRow(); }));
+  const tambah = document.createElement('button');
+  tambah.type = 'button';
+  tambah.className = 'foto-btn';
+  tambah.textContent = '📷 Tambah Foto';
+  tambah.onclick = () => $('fotoFile').click();
+  box.appendChild(tambah);
+}
+
+$('fotoFile').addEventListener('change', async () => {
+  const files = [...$('fotoFile').files];
+  $('fotoFile').value = '';
+  if (!files.length) return;
+  let gagal = 0;
+  for (const file of files) {
+    try { fotoBaru.push(await kompresFoto(file)); }
+    catch { gagal++; }
+  }
+  renderFotoRow();
+  if (gagal) toast(gagal + ' file bukan gambar — dilewati.', true);
+});
+
 function openDone(apptId) {
   const a = appointments.find((x) => x.id === apptId);
   if (!a) return;
@@ -423,7 +504,10 @@ function openDone(apptId) {
   $('doneName').textContent = nameOf(a.customerId) + ' — ' + hariBulan(a.date) + ' ' + a.time;
   $('staffInput').value = a.staff || '';
   $('doneUndo').hidden = !a.done;
+  fotoTetap = (a.photos || []).slice();
+  fotoBaru = [];
   renderStaffChips();
+  renderFotoRow();
   $('doneSheet').hidden = false;
   // Fokus ke input hanya saat belum ada daftar pegawai (pertama kali harus ketik manual);
   // selebihnya cukup tap chip tanpa keyboard muncul.
@@ -447,6 +531,18 @@ $('doneSave').addEventListener('click', () => {
   a.done = true;
   if (name) { a.staff = name; addStaff(name); }
   else delete a.staff;
+  // Foto yang dibuang user: hapus dokumennya di cloud
+  (a.photos || []).forEach((p) => {
+    if (!fotoTetap.some((t) => t.id === p.id)) deleteDoc(fotoRef(p.id)).catch(() => {});
+  });
+  fotoBaru.forEach((p) => {
+    const idFoto = buatId();
+    setDoc(fotoRef(idFoto), { data: p.full })
+      .catch((e) => toast('Gagal menyimpan foto: ' + e.message, true));
+    fotoTetap.push({ id: idFoto, thumb: p.thumb });
+  });
+  if (fotoTetap.length) a.photos = fotoTetap;
+  else delete a.photos;
   save(KEY_APPOINTMENTS, appointments);
   closeDone();
   renderList();
@@ -458,10 +554,80 @@ $('doneUndo').addEventListener('click', () => {
   if (!a) { closeDone(); return; }
   delete a.done;
   delete a.staff;
+  (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
+  delete a.photos;
   save(KEY_APPOINTMENTS, appointments);
   closeDone();
   renderList();
   toast('Tanda selesai dibatalkan.');
+});
+
+// ============================================================
+// Viewer foto — thumbnail buram dulu, foto utuh diunduh saat dibuka
+// lalu tersimpan di cache Firestore (tidak diunduh ulang lain kali)
+// ============================================================
+let muatFotoKe = 0;  // penanda: hasil unduhan lama tidak boleh menimpa viewer
+let viewerFotos = []; // daftar {id, thumb} milik appointment yang sedang dilihat
+let viewerIdx = 0;
+let viewerDate = '';
+
+function bukaFotoViewer(r, idx) {
+  viewerFotos = r.photos || [];
+  viewerDate = r.date;
+  $('fotoViewer').hidden = false;
+  tampilkanFoto(idx);
+}
+
+async function tampilkanFoto(idx) {
+  viewerIdx = idx;
+  const token = ++muatFotoKe;
+  const p = viewerFotos[idx];
+  const img = $('fotoViewerImg');
+  img.src = p.thumb;
+  img.className = 'memuat';
+  $('fotoViewerSpin').hidden = false;
+  $('fotoDownload').hidden = true;
+  $('fotoPrev').hidden = idx <= 0;
+  $('fotoNext').hidden = idx >= viewerFotos.length - 1;
+  $('fotoCounter').textContent = (idx + 1) + ' / ' + viewerFotos.length;
+  $('fotoCounter').hidden = viewerFotos.length < 2;
+  const ref = fotoRef(p.id);
+  try {
+    let snap;
+    try { snap = await getDocFromCache(ref); } // sudah pernah diunduh di perangkat ini?
+    catch { snap = await getDoc(ref); }        // belum — ambil dari cloud
+    if (token !== muatFotoKe) return;          // keburu ditutup / pindah foto
+    if (!snap.exists()) throw new Error('foto tidak ditemukan di cloud');
+    img.src = snap.data().data;
+    img.className = '';
+    $('fotoViewerSpin').hidden = true;
+    const unduh = $('fotoDownload');
+    unduh.href = img.src;
+    unduh.download = 'treatment-' + viewerDate + '-' + (idx + 1) + '.jpg';
+    unduh.hidden = false;
+  } catch (e) {
+    if (token !== muatFotoKe) return;
+    tutupFotoViewer();
+    toast('Gagal memuat foto: ' + e.message, true);
+  }
+}
+
+function tutupFotoViewer() {
+  muatFotoKe++;
+  $('fotoViewer').hidden = true;
+  $('fotoViewerImg').src = '';
+}
+
+$('fotoViewerClose').addEventListener('click', tutupFotoViewer);
+$('fotoViewer').addEventListener('click', (e) => {
+  if (e.target === $('fotoViewer')) tutupFotoViewer();
+});
+$('fotoPrev').addEventListener('click', () => tampilkanFoto(viewerIdx - 1));
+$('fotoNext').addEventListener('click', () => tampilkanFoto(viewerIdx + 1));
+document.addEventListener('keydown', (e) => {
+  if ($('fotoViewer').hidden) return;
+  if (e.key === 'ArrowLeft' && viewerIdx > 0) tampilkanFoto(viewerIdx - 1);
+  if (e.key === 'ArrowRight' && viewerIdx < viewerFotos.length - 1) tampilkanFoto(viewerIdx + 1);
 });
 
 // ============================================================
@@ -533,6 +699,19 @@ function renderList() {
         d.className = 'd';
         d.textContent = '✓ Selesai' + (r.staff ? ' · ' + r.staff : '');
         el.querySelector('.who').appendChild(d);
+        if (r.photos && r.photos.length) {
+          const rowFoto = document.createElement('div');
+          rowFoto.className = 'foto-mini-row';
+          r.photos.forEach((p, i) => {
+            const f = document.createElement('img');
+            f.className = 'foto-mini';
+            f.src = p.thumb;
+            f.alt = 'Foto treatment — tap untuk melihat';
+            f.onclick = () => bukaFotoViewer(r, i);
+            rowFoto.appendChild(f);
+          });
+          el.querySelector('.who').appendChild(rowFoto);
+        }
       }
       el.querySelector('.chk').onclick = () => openDone(r.id);
       el.querySelector('.edit').onclick = () => openEdit(r.id);
@@ -548,6 +727,7 @@ function renderList() {
 
 function confirmDelete(r) {
   if (!confirm('Hapus jadwal ' + nameOf(r.customerId) + ' pada ' + hariBulan(r.date) + ' ' + r.time + '?')) return;
+  (r.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
   appointments = appointments.filter((a) => a.id !== r.id);
   save(KEY_APPOINTMENTS, appointments);
   toast('Jadwal dihapus.');
@@ -571,7 +751,7 @@ function attachRowGestures(main, r) {
   main.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY; dx = 0; mode = null;
-    if (!e.target.closest('button')) {
+    if (!e.target.closest('button, .foto-mini')) {
       pressTimer = setTimeout(() => {
         pressTimer = null;
         mode = 'cancel';

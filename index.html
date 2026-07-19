@@ -120,6 +120,9 @@
     <label for="staffInput">Pegawai yang melakukan treatment</label>
     <input id="staffInput" placeholder="mis. Rina" autocomplete="off">
     <div class="staff-chips" id="staffChips"></div>
+    <label>Foto hasil treatment (opsional)</label>
+    <div class="foto-row" id="fotoRow"></div>
+    <input type="file" id="fotoFile" accept="image/*" multiple hidden>
     <div class="sheet-actions">
       <button type="button" class="ghost" id="doneCancel">Batal</button>
       <button type="button" class="primary" id="doneSave">Simpan</button>
@@ -160,6 +163,15 @@
       langkah-langkahnya ada di README.md.
     </div>
   </div>
+</div>
+<div class="foto-viewer" id="fotoViewer" hidden>
+  <img id="fotoViewerImg" alt="Foto treatment">
+  <div class="spinner" id="fotoViewerSpin" hidden></div>
+  <button type="button" class="foto-close" id="fotoViewerClose" aria-label="Tutup">✕</button>
+  <button type="button" class="foto-nav" id="fotoPrev" aria-label="Foto sebelumnya" hidden>‹</button>
+  <button type="button" class="foto-nav next" id="fotoNext" aria-label="Foto berikutnya" hidden>›</button>
+  <div class="foto-counter" id="fotoCounter" hidden></div>
+  <a class="foto-download" id="fotoDownload" hidden>⬇️ Simpan Foto</a>
 </div>
 <div class="toast" id="toast"></div>
 
