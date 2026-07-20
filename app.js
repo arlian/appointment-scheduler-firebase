@@ -430,6 +430,22 @@ const fotoRef = (id) => doc(db, 'users', uid, 'cabang', cabangId, 'photos', id);
 let fotoTetap = []; // [{id, thumb}] — foto tersimpan yang tidak dihapus user
 let fotoBaru = [];  // [{full, thumb}] — foto baru yang belum disimpan
 
+// Foto utuh yang sudah ada di perangkat ini (pernah diunduh / baru di-upload).
+// Dipakai supaya thumbnail tampil tajam tanpa mengunduh apa pun.
+const fotoUtuh = new Map(); // photoId -> dataURL foto utuh
+
+async function pasangFotoMini(img, p) {
+  if (fotoUtuh.has(p.id)) { img.src = fotoUtuh.get(p.id); return; }
+  img.src = p.thumb; // buram dulu; ganti tajam kalau ternyata ada di cache
+  try {
+    const snap = await getDocFromCache(fotoRef(p.id));
+    if (snap.exists()) {
+      fotoUtuh.set(p.id, snap.data().data);
+      img.src = fotoUtuh.get(p.id);
+    }
+  } catch { /* belum pernah diunduh — biarkan thumbnail buram */ }
+}
+
 function bacaGambar(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -474,7 +490,8 @@ function renderFotoRow() {
     wrap.append(img, x);
     box.appendChild(wrap);
   };
-  fotoTetap.forEach((p, i) => pasang(p.thumb, () => { fotoTetap.splice(i, 1); renderFotoRow(); }));
+  fotoTetap.forEach((p, i) =>
+    pasang(fotoUtuh.get(p.id) || p.thumb, () => { fotoTetap.splice(i, 1); renderFotoRow(); }));
   fotoBaru.forEach((p, i) => pasang(p.full, () => { fotoBaru.splice(i, 1); renderFotoRow(); }));
   const tambah = document.createElement('button');
   tambah.type = 'button';
@@ -539,6 +556,7 @@ $('doneSave').addEventListener('click', () => {
     const idFoto = buatId();
     setDoc(fotoRef(idFoto), { data: p.full })
       .catch((e) => toast('Gagal menyimpan foto: ' + e.message, true));
+    fotoUtuh.set(idFoto, p.full); // perangkat peng-upload langsung tajam
     fotoTetap.push({ id: idFoto, thumb: p.thumb });
   });
   if (fotoTetap.length) a.photos = fotoTetap;
@@ -583,39 +601,44 @@ async function tampilkanFoto(idx) {
   const token = ++muatFotoKe;
   const p = viewerFotos[idx];
   const img = $('fotoViewerImg');
-  img.src = p.thumb;
-  img.className = 'memuat';
-  $('fotoViewerSpin').hidden = false;
-  $('fotoDownload').hidden = true;
   $('fotoPrev').hidden = idx <= 0;
   $('fotoNext').hidden = idx >= viewerFotos.length - 1;
   $('fotoCounter').textContent = (idx + 1) + ' / ' + viewerFotos.length;
   $('fotoCounter').hidden = viewerFotos.length < 2;
-  const ref = fotoRef(p.id);
-  try {
-    let snap;
-    try { snap = await getDocFromCache(ref); } // sudah pernah diunduh di perangkat ini?
-    catch { snap = await getDoc(ref); }        // belum — ambil dari cloud
-    if (token !== muatFotoKe) return;          // keburu ditutup / pindah foto
-    if (!snap.exists()) throw new Error('foto tidak ditemukan di cloud');
-    img.src = snap.data().data;
-    img.className = '';
-    $('fotoViewerSpin').hidden = true;
-    const unduh = $('fotoDownload');
-    unduh.href = img.src;
-    unduh.download = 'treatment-' + viewerDate + '-' + (idx + 1) + '.jpg';
-    unduh.hidden = false;
-  } catch (e) {
-    if (token !== muatFotoKe) return;
-    tutupFotoViewer();
-    toast('Gagal memuat foto: ' + e.message, true);
+  if (!fotoUtuh.has(p.id)) { // belum ada di perangkat: buram dulu, unduh
+    img.src = p.thumb;
+    img.className = 'memuat';
+    $('fotoViewerSpin').hidden = false;
+    $('fotoDownload').hidden = true;
+    const ref = fotoRef(p.id);
+    try {
+      let snap;
+      try { snap = await getDocFromCache(ref); } // ada di cache Firestore?
+      catch { snap = await getDoc(ref); }        // belum — ambil dari cloud
+      if (token !== muatFotoKe) return;          // keburu ditutup / pindah foto
+      if (!snap.exists()) throw new Error('foto tidak ditemukan di cloud');
+      fotoUtuh.set(p.id, snap.data().data);
+    } catch (e) {
+      if (token !== muatFotoKe) return;
+      tutupFotoViewer();
+      toast('Gagal memuat foto: ' + e.message, true);
+      return;
+    }
   }
+  img.src = fotoUtuh.get(p.id);
+  img.className = '';
+  $('fotoViewerSpin').hidden = true;
+  const unduh = $('fotoDownload');
+  unduh.href = img.src;
+  unduh.download = 'treatment-' + viewerDate + '-' + (idx + 1) + '.jpg';
+  unduh.hidden = false;
 }
 
 function tutupFotoViewer() {
   muatFotoKe++;
   $('fotoViewer').hidden = true;
   $('fotoViewerImg').src = '';
+  renderList(); // thumbnail foto yang baru diunduh ikut jadi tajam
 }
 
 $('fotoViewerClose').addEventListener('click', tutupFotoViewer);
@@ -705,8 +728,8 @@ function renderList() {
           r.photos.forEach((p, i) => {
             const f = document.createElement('img');
             f.className = 'foto-mini';
-            f.src = p.thumb;
             f.alt = 'Foto treatment — tap untuk melihat';
+            pasangFotoMini(f, p);
             f.onclick = () => bukaFotoViewer(r, i);
             rowFoto.appendChild(f);
           });
