@@ -78,6 +78,10 @@ function searchCustomerList(q) {
 // Elemen & util tampilan
 // ============================================================
 const $ = (id) => document.getElementById(id);
+// Ikon garis dari sprite di index.html — menggantikan emoji supaya bentuknya
+// sama di semua perangkat dan ikut warna teks di sekitarnya.
+const ikon = (nama) =>
+  '<svg class="ico" aria-hidden="true"><use href="#i-' + nama + '"/></svg>';
 const nameInput = $('name'), sug = $('sug'), badge = $('badge');
 const historyBox = $('history'), historyList = $('historyList');
 let selectedCustomer = null; // {id, name, visits} jika cocok dengan customer lama
@@ -267,7 +271,7 @@ function setFilter(mode) {
   $('pickDateBtn').classList.toggle('active', mode === 'day');
   if (mode !== 'day') {
     $('filterDate').value = '';
-    $('pickDateBtn').textContent = '📅 Pilih Tanggal';
+    $('pickDateLabel').textContent = 'Pilih Tanggal';
   }
   const range = mode === 'date';
   $('filterStart').classList.toggle('active', range);
@@ -294,7 +298,7 @@ $('filterDate').addEventListener('change', () => {
   const v = $('filterDate').value;
   if (!v) { setFilter('today'); return; }
   setFilter('day');
-  $('pickDateBtn').textContent = '📅 ' + tglSingkat(v);
+  $('pickDateLabel').textContent = tglSingkat(v);
 });
 
 // ============================================================
@@ -485,7 +489,8 @@ function renderFotoRow() {
     x.type = 'button';
     x.className = 'foto-x';
     x.title = 'Hapus foto ini';
-    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Hapus foto ini');
+    x.innerHTML = ikon('silang');
     x.onclick = hapus;
     wrap.append(img, x);
     box.appendChild(wrap);
@@ -496,7 +501,7 @@ function renderFotoRow() {
   const tambah = document.createElement('button');
   tambah.type = 'button';
   tambah.className = 'foto-btn';
-  tambah.textContent = '📷 Tambah Foto';
+  tambah.innerHTML = ikon('kamera') + 'Tambah Foto';
   tambah.onclick = () => $('fotoFile').click();
   box.appendChild(tambah);
 }
@@ -695,7 +700,7 @@ function renderList() {
       el.classList.add('selectable');
       if (selected.has(r.id)) el.classList.add('selected');
       main.innerHTML =
-        '<span class="check">✓</span>' +
+        '<span class="check">' + ikon('cek') + '</span>' +
         '<div class="when"><div class="t"></div></div>' +
         '<div class="who"><div class="n"></div><div class="v"></div></div>';
       el.appendChild(main);
@@ -711,7 +716,8 @@ function renderList() {
       bg.textContent = 'Hapus';
       el.appendChild(bg);
       main.innerHTML =
-        '<button class="chk" title="Tandai treatment selesai">✓</button>' +
+        '<button class="chk" title="Tandai treatment selesai" ' +
+        'aria-label="Tandai treatment selesai">' + ikon('cek') + '</button>' +
         '<div class="when"><div class="t"></div></div>' +
         '<div class="who"><div class="n"></div><div class="v"></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
@@ -720,7 +726,8 @@ function renderList() {
       if (r.done) {
         const d = document.createElement('div');
         d.className = 'd';
-        d.textContent = '✓ Selesai' + (r.staff ? ' · ' + r.staff : '');
+        d.innerHTML = ikon('cek');
+        d.append('Selesai' + (r.staff ? ' · ' + r.staff : ''));
         el.querySelector('.who').appendChild(d);
         if (r.photos && r.photos.length) {
           const rowFoto = document.createElement('div');
@@ -1007,7 +1014,8 @@ function renderCabangBar() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'chip' + (c.id === cabangId ? ' active' : '');
-    b.textContent = '📍 ' + c.name;
+    b.innerHTML = ikon('lokasi');
+    b.append(c.name);
     b.addEventListener('click', () => pilihCabang(c.id));
     bar.appendChild(b);
   });
@@ -1015,7 +1023,7 @@ function renderCabangBar() {
   tambah.type = 'button';
   tambah.className = 'chip chip-tambah';
   tambah.title = 'Tambah cabang baru';
-  tambah.textContent = '+ Cabang';
+  tambah.innerHTML = ikon('plus') + 'Cabang';
   tambah.addEventListener('click', () => {
     $('cabangName').value = '';
     $('cabangSheet').hidden = false;

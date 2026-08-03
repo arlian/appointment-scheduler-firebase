@@ -11,10 +11,52 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- Ikon garis, dipakai lewat <use href="#i-…">. Menggantikan emoji supaya
+     tampilannya sama di semua perangkat dan tetap jalan offline. -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-logo" viewBox="0 0 24 24">
+    <path d="M12 21.5c-4.7 0-8.4-3.1-8.4-6.9 0-2.2 1.5-3.8 3.4-3.8 1.4 0 2.6.8 3.2 2 .2-3.7.8-7 1.8-9.3 1 2.3 1.6 5.6 1.8 9.3.6-1.2 1.8-2 3.2-2 1.9 0 3.4 1.6 3.4 3.8 0 3.8-3.7 6.9-8.4 6.9z"/>
+  </symbol>
+  <symbol id="i-salin" viewBox="0 0 24 24">
+    <rect x="8.25" y="8.25" width="12.5" height="12.5" rx="3"/>
+    <path d="M15.75 5.5A2.25 2.25 0 0 0 13.5 3.25h-8A2.25 2.25 0 0 0 3.25 5.5v8a2.25 2.25 0 0 0 2.25 2.25"/>
+  </symbol>
+  <symbol id="i-pilih" viewBox="0 0 24 24">
+    <path d="M4 7.5h3.5M4 12h3.5M4 16.5h3.5"/>
+    <path d="M11.5 7.5H20M11.5 12H20M11.5 16.5H20"/>
+  </symbol>
+  <symbol id="i-kalender" viewBox="0 0 24 24">
+    <rect x="3.25" y="5.25" width="17.5" height="15.5" rx="3"/>
+    <path d="M3.25 10h17.5M8 3v4.5M16 3v4.5"/>
+  </symbol>
+  <symbol id="i-unduh" viewBox="0 0 24 24">
+    <path d="M12 3.75v11.5M7.5 11l4.5 4.5 4.5-4.5M4 19.75h16"/>
+  </symbol>
+  <symbol id="i-unggah" viewBox="0 0 24 24">
+    <path d="M12 15.75V4.25M7.5 8.75 12 4.25l4.5 4.5M4 19.75h16"/>
+  </symbol>
+  <symbol id="i-kamera" viewBox="0 0 24 24">
+    <path d="M3.25 8.75A2.5 2.5 0 0 1 5.75 6.25h1.6l1.3-2.1h6.7l1.3 2.1h1.6a2.5 2.5 0 0 1 2.5 2.5v8.5a2.5 2.5 0 0 1-2.5 2.5H5.75a2.5 2.5 0 0 1-2.5-2.5z"/>
+    <circle cx="12" cy="13" r="3.6"/>
+  </symbol>
+  <symbol id="i-lokasi" viewBox="0 0 24 24">
+    <path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/>
+    <circle cx="12" cy="10.2" r="2.6"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-cek" viewBox="0 0 24 24"><path d="m5 12.75 4.75 4.75L19 6.5"/></symbol>
+  <symbol id="i-silang" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-kiri" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+  <symbol id="i-kanan" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-keluar" viewBox="0 0 24 24">
+    <path d="M15 8.25V5.5a2.25 2.25 0 0 0-2.25-2.25h-6.5A2.25 2.25 0 0 0 4 5.5v13a2.25 2.25 0 0 0 2.25 2.25h6.5A2.25 2.25 0 0 0 15 18.5v-2.75M10.5 12H20m0 0-3.25-3.25M20 12l-3.25 3.25"/>
+  </symbol>
+</svg>
+
 <div class="wrap">
   <header class="top">
-    <div class="logo">💆</div>
-    <div>
+    <span class="brand-mark"><svg class="ico" aria-hidden="true"><use href="#i-logo"/></svg></span>
+    <div class="brand-text">
       <h1>Jadwal Treatment</h1>
       <p class="subtitle">Ketik nama customer — customer lama terdeteksi otomatis.</p>
     </div>
@@ -27,72 +69,85 @@
       <h2>Tambah Jadwal</h2>
     </div>
     <form id="form" autocomplete="off">
-        <label for="name">Nama Customer</label>
-        <div class="name-box">
-          <input id="name" placeholder="mis. Siti Rahma" required>
-          <div class="suggestions" id="sug"></div>
+      <label for="name">Nama Customer</label>
+      <div class="name-box">
+        <input id="name" placeholder="mis. Siti Rahma" required>
+        <div class="suggestions" id="sug"></div>
+      </div>
+      <div class="badge" id="badge"></div>
+      <div class="history" id="history">
+        <h3>Riwayat kunjungan</h3>
+        <ul id="historyList"></ul>
+      </div>
+      <div class="row2">
+        <div>
+          <label for="date">Tanggal</label>
+          <input id="date" type="date" required>
         </div>
-        <div class="badge" id="badge"></div>
-        <div class="history" id="history">
-          <h3>Riwayat kunjungan</h3>
-          <ul id="historyList"></ul>
-        </div>
-        <div class="row2">
-          <div>
-            <label for="date">Tanggal</label>
-            <input id="date" type="date" required>
-          </div>
-          <div>
-            <label for="time">Jam</label>
-            <input id="time" type="time" required>
-          </div>
-        </div>
-        <button class="primary" type="submit">Simpan Jadwal</button>
-      </form>
-    </section>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>Daftar Jadwal</h2>
-        <div class="card-head-btns">
-          <button type="button" class="select-btn" id="selectBtn" title="Pilih beberapa jadwal untuk dihapus">Pilih</button>
-          <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">📋 Salin untuk WA</button>
+        <div>
+          <label for="time">Jam</label>
+          <input id="time" type="time" required>
         </div>
       </div>
-      <div class="filter-bar">
-        <button type="button" class="chip active" data-f="today">Hari Ini</button>
-        <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
-        <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
-        <span class="pick-date">
-          <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">📅 Pilih Tanggal</button>
-          <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
-        </span>
-        <button type="button" class="chip" data-f="week">Minggu Ini</button>
-        <button type="button" class="chip" data-f="all">Semua</button>
-        <span class="range-box">
-          <input type="date" id="filterStart" title="Dari tanggal">
-          <span class="range-sep">s.d.</span>
-          <input type="date" id="filterEnd" title="Sampai tanggal">
-        </span>
+      <button class="primary" type="submit">Simpan Jadwal</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Daftar Jadwal</h2>
+      <div class="card-head-btns">
+        <button type="button" class="select-btn" id="selectBtn" title="Pilih beberapa jadwal untuk dihapus">
+          <svg class="ico" aria-hidden="true"><use href="#i-pilih"/></svg>Pilih
+        </button>
+        <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">
+          <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin untuk WA
+        </button>
       </div>
-      <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
-      <div id="list"></div>
-    </section>
-
-    <div class="select-bar" id="selectBar" hidden>
-      <span class="sel-count" id="selCount">0 dipilih</span>
-      <button type="button" class="sel-all" id="selAll">Pilih Semua</button>
-      <button type="button" class="sel-del" id="selDelete">Hapus</button>
-      <button type="button" class="sel-cancel" id="selCancel">Batal</button>
     </div>
-
-    <div class="data-row">
-      <button type="button" class="data-btn" id="exportBtn">⬇️ Export Data</button>
-      <button type="button" class="data-btn" id="importBtn">⬆️ Import Data</button>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    <div class="filter-bar">
+      <button type="button" class="chip active" data-f="today">Hari Ini</button>
+      <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
+      <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
+      <span class="pick-date">
+        <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
+          <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
+        </button>
+        <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
+      </span>
+      <button type="button" class="chip" data-f="week">Minggu Ini</button>
+      <button type="button" class="chip" data-f="all">Semua</button>
+      <span class="range-box">
+        <input type="date" id="filterStart" title="Dari tanggal">
+        <span class="range-sep">s.d.</span>
+        <input type="date" id="filterEnd" title="Sampai tanggal">
+      </span>
     </div>
-    <button type="button" class="logout-btn" id="logoutBtn">Keluar dari akun</button>
+    <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
+    <div id="list"></div>
+  </section>
+
+  <div class="select-bar" id="selectBar" hidden>
+    <span class="sel-count" id="selCount">0 dipilih</span>
+    <button type="button" class="sel-all" id="selAll">Pilih Semua</button>
+    <button type="button" class="sel-del" id="selDelete">Hapus</button>
+    <button type="button" class="sel-cancel" id="selCancel">Batal</button>
+  </div>
+
+  <div class="data-row">
+    <button type="button" class="data-btn" id="exportBtn">
+      <svg class="ico" aria-hidden="true"><use href="#i-unduh"/></svg>Export Data
+    </button>
+    <button type="button" class="data-btn" id="importBtn">
+      <svg class="ico" aria-hidden="true"><use href="#i-unggah"/></svg>Import Data
+    </button>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+  </div>
+  <button type="button" class="logout-btn" id="logoutBtn">
+    <svg class="ico" aria-hidden="true"><use href="#i-keluar"/></svg>Keluar dari akun
+  </button>
 </div>
+
 <div class="sheet-backdrop" id="editSheet" hidden>
   <div class="sheet">
     <h2>Ubah Jadwal</h2>
@@ -142,12 +197,12 @@
   </div>
 </div>
 <div class="splash" id="splashScreen">
-  <div class="logo">💆</div>
+  <span class="brand-mark lg"><svg class="ico" aria-hidden="true"><use href="#i-logo"/></svg></span>
   <div class="spinner"></div>
 </div>
 <div class="login-backdrop" id="loginScreen" hidden>
   <div class="login-card">
-    <div class="logo">💆</div>
+    <span class="brand-mark lg"><svg class="ico" aria-hidden="true"><use href="#i-logo"/></svg></span>
     <h2>Jadwal Treatment</h2>
     <p class="login-sub">Masuk dengan akun salon untuk membuka jadwal.</p>
     <form id="loginForm">
@@ -167,11 +222,19 @@
 <div class="foto-viewer" id="fotoViewer" hidden>
   <img id="fotoViewerImg" alt="Foto treatment">
   <div class="spinner" id="fotoViewerSpin" hidden></div>
-  <button type="button" class="foto-close" id="fotoViewerClose" aria-label="Tutup">✕</button>
-  <button type="button" class="foto-nav" id="fotoPrev" aria-label="Foto sebelumnya" hidden>‹</button>
-  <button type="button" class="foto-nav next" id="fotoNext" aria-label="Foto berikutnya" hidden>›</button>
+  <button type="button" class="foto-close" id="fotoViewerClose" aria-label="Tutup">
+    <svg class="ico" aria-hidden="true"><use href="#i-silang"/></svg>
+  </button>
+  <button type="button" class="foto-nav" id="fotoPrev" aria-label="Foto sebelumnya" hidden>
+    <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg>
+  </button>
+  <button type="button" class="foto-nav next" id="fotoNext" aria-label="Foto berikutnya" hidden>
+    <svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
+  </button>
   <div class="foto-counter" id="fotoCounter" hidden></div>
-  <a class="foto-download" id="fotoDownload" hidden>⬇️ Simpan Foto</a>
+  <a class="foto-download" id="fotoDownload" hidden>
+    <svg class="ico" aria-hidden="true"><use href="#i-unduh"/></svg>Simpan Foto
+  </a>
 </div>
 <div class="toast" id="toast"></div>
 
