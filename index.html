@@ -17,6 +17,13 @@
   <symbol id="i-logo" viewBox="0 0 24 24">
     <path d="M12 21.5c-4.7 0-8.4-3.1-8.4-6.9 0-2.2 1.5-3.8 3.4-3.8 1.4 0 2.6.8 3.2 2 .2-3.7.8-7 1.8-9.3 1 2.3 1.6 5.6 1.8 9.3.6-1.2 1.8-2 3.2-2 1.9 0 3.4 1.6 3.4 3.8 0 3.8-3.7 6.9-8.4 6.9z"/>
   </symbol>
+  <symbol id="i-jadwal" viewBox="0 0 24 24">
+    <rect x="3.25" y="5.25" width="17.5" height="15.5" rx="3"/>
+    <path d="M3.25 10h17.5M8 3v4.5M16 3v4.5"/>
+  </symbol>
+  <symbol id="i-analitik" viewBox="0 0 24 24">
+    <path d="M4 20.25V13M10 20.25V6.5M16 20.25v-5M22 20.25H2"/>
+  </symbol>
   <symbol id="i-salin" viewBox="0 0 24 24">
     <rect x="8.25" y="8.25" width="12.5" height="12.5" rx="3"/>
     <path d="M15.75 5.5A2.25 2.25 0 0 0 13.5 3.25h-8A2.25 2.25 0 0 0 3.25 5.5v8a2.25 2.25 0 0 0 2.25 2.25"/>
@@ -64,89 +71,140 @@
 
   <div class="cabang-bar" id="cabangBar"></div>
 
-  <section class="card">
-    <div class="card-head">
-      <h2>Tambah Jadwal</h2>
-    </div>
-    <form id="form" autocomplete="off">
-      <label for="name">Nama Customer</label>
-      <div class="name-box">
-        <input id="name" placeholder="mis. Siti Rahma" required>
-        <div class="suggestions" id="sug"></div>
-      </div>
-      <div class="badge" id="badge"></div>
-      <div class="history" id="history">
-        <h3>Riwayat kunjungan</h3>
-        <ul id="historyList"></ul>
-      </div>
-      <div class="row2">
-        <div>
-          <label for="date">Tanggal</label>
-          <input id="date" type="date" required>
-        </div>
-        <div>
-          <label for="time">Jam</label>
-          <input id="time" type="time" required>
-        </div>
-      </div>
-      <button class="primary" type="submit">Simpan Jadwal</button>
-    </form>
-  </section>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Bagian aplikasi">
+    <button type="button" class="tab active" role="tab" data-tab="jadwal"
+            id="tabJadwal" aria-selected="true" aria-controls="panelJadwal">
+      <svg class="ico" aria-hidden="true"><use href="#i-jadwal"/></svg>Jadwal
+    </button>
+    <button type="button" class="tab" role="tab" data-tab="analitik"
+            id="tabAnalitik" aria-selected="false" aria-controls="panelAnalitik">
+      <svg class="ico" aria-hidden="true"><use href="#i-analitik"/></svg>Analitik
+    </button>
+  </nav>
 
-  <section class="card">
-    <div class="card-head">
-      <h2>Daftar Jadwal</h2>
-      <div class="card-head-btns">
-        <button type="button" class="select-btn" id="selectBtn" title="Pilih beberapa jadwal untuk dihapus">
-          <svg class="ico" aria-hidden="true"><use href="#i-pilih"/></svg>Pilih
-        </button>
-        <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">
-          <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin untuk WA
-        </button>
+  <div class="panel" id="panelJadwal" role="tabpanel" aria-labelledby="tabJadwal">
+    <section class="card">
+      <div class="card-head">
+        <h2>Tambah Jadwal</h2>
       </div>
-    </div>
-    <div class="filter-bar">
-      <button type="button" class="chip active" data-f="today">Hari Ini</button>
-      <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
-      <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
-      <span class="pick-date">
-        <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
-          <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
-        </button>
-        <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
-      </span>
-      <button type="button" class="chip" data-f="week">Minggu Ini</button>
-      <button type="button" class="chip" data-f="all">Semua</button>
-      <span class="range-box">
-        <input type="date" id="filterStart" title="Dari tanggal">
-        <span class="range-sep">s.d.</span>
-        <input type="date" id="filterEnd" title="Sampai tanggal">
-      </span>
-    </div>
-    <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
-    <div id="list"></div>
-  </section>
+      <form id="form" autocomplete="off">
+        <label for="name">Nama Customer</label>
+        <div class="name-box">
+          <input id="name" placeholder="mis. Siti Rahma" required>
+          <div class="suggestions" id="sug"></div>
+        </div>
+        <div class="badge" id="badge"></div>
+        <div class="history" id="history">
+          <h3>Riwayat kunjungan</h3>
+          <ul id="historyList"></ul>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="date">Tanggal</label>
+            <input id="date" type="date" required>
+          </div>
+          <div>
+            <label for="time">Jam</label>
+            <input id="time" type="time" required>
+          </div>
+        </div>
+        <button class="primary" type="submit">Simpan Jadwal</button>
+      </form>
+    </section>
 
-  <div class="select-bar" id="selectBar" hidden>
-    <span class="sel-count" id="selCount">0 dipilih</span>
-    <button type="button" class="sel-all" id="selAll">Pilih Semua</button>
-    <button type="button" class="sel-del" id="selDelete">Hapus</button>
-    <button type="button" class="sel-cancel" id="selCancel">Batal</button>
+    <section class="card">
+      <div class="card-head">
+        <h2>Daftar Jadwal</h2>
+        <div class="card-head-btns">
+          <button type="button" class="select-btn" id="selectBtn" title="Pilih beberapa jadwal untuk dihapus">
+            <svg class="ico" aria-hidden="true"><use href="#i-pilih"/></svg>Pilih
+          </button>
+          <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">
+            <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin untuk WA
+          </button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button type="button" class="chip active" data-f="today">Hari Ini</button>
+        <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
+        <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
+        <span class="pick-date">
+          <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
+            <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
+          </button>
+          <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
+        </span>
+        <button type="button" class="chip" data-f="week">Minggu Ini</button>
+        <button type="button" class="chip" data-f="all">Semua</button>
+        <span class="range-box">
+          <input type="date" id="filterStart" title="Dari tanggal">
+          <span class="range-sep">s.d.</span>
+          <input type="date" id="filterEnd" title="Sampai tanggal">
+        </span>
+      </div>
+      <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
+      <div id="list"></div>
+    </section>
+
+    <div class="select-bar" id="selectBar" hidden>
+      <span class="sel-count" id="selCount">0 dipilih</span>
+      <button type="button" class="sel-all" id="selAll">Pilih Semua</button>
+      <button type="button" class="sel-del" id="selDelete">Hapus</button>
+      <button type="button" class="sel-cancel" id="selCancel">Batal</button>
+    </div>
+
+    <div class="data-row">
+      <button type="button" class="data-btn" id="exportBtn">
+        <svg class="ico" aria-hidden="true"><use href="#i-unduh"/></svg>Export Data
+      </button>
+      <button type="button" class="data-btn" id="importBtn">
+        <svg class="ico" aria-hidden="true"><use href="#i-unggah"/></svg>Import Data
+      </button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <button type="button" class="logout-btn" id="logoutBtn">
+      <svg class="ico" aria-hidden="true"><use href="#i-keluar"/></svg>Keluar dari akun
+    </button>
   </div>
 
-  <div class="data-row">
-    <button type="button" class="data-btn" id="exportBtn">
-      <svg class="ico" aria-hidden="true"><use href="#i-unduh"/></svg>Export Data
+  <div class="panel" id="panelAnalitik" role="tabpanel" aria-labelledby="tabAnalitik" hidden>
+    <!-- Satu baris filter di atas, mengatur seluruh kartu di bawahnya -->
+    <div class="bulan-bar">
+      <button type="button" class="icon-btn" id="bulanPrev" aria-label="Bulan sebelumnya">
+        <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg>
+      </button>
+      <div class="bulan-tengah">
+        <div class="bulan-label" id="bulanLabel">—</div>
+        <button type="button" class="bulan-kini" id="bulanKini" hidden>Kembali ke bulan ini</button>
+      </div>
+      <button type="button" class="icon-btn" id="bulanNext" aria-label="Bulan berikutnya">
+        <svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
+      </button>
+    </div>
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <section class="card">
+      <div class="card-head"><h2>Kepadatan Harian</h2></div>
+      <p class="card-sub">Tiap kotak satu hari. Makin pekat warnanya, makin banyak treatment hari itu.</p>
+      <div class="heat" id="heat"></div>
+      <div class="heat-legend" id="heatLegend"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Jam Tersibuk</h2></div>
+      <p class="card-sub">Jumlah treatment per jam mulai, sepanjang bulan ini.</p>
+      <div class="chart" id="chartJam"></div>
+    </section>
+
+    <button type="button" class="data-btn wide" id="tabelToggle" aria-expanded="false">
+      Lihat angka dalam tabel
     </button>
-    <button type="button" class="data-btn" id="importBtn">
-      <svg class="ico" aria-hidden="true"><use href="#i-unggah"/></svg>Import Data
-    </button>
-    <input type="file" id="importFile" accept=".json,application/json" hidden>
+    <div class="tabel-wrap" id="tabelWrap" hidden></div>
   </div>
-  <button type="button" class="logout-btn" id="logoutBtn">
-    <svg class="ico" aria-hidden="true"><use href="#i-keluar"/></svg>Keluar dari akun
-  </button>
 </div>
+
+<div class="viz-tip" id="vizTip" role="status" hidden></div>
 
 <div class="sheet-backdrop" id="editSheet" hidden>
   <div class="sheet">

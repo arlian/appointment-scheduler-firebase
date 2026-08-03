@@ -753,6 +753,7 @@ function renderList() {
     el.querySelector('.v').textContent = visits > 1 ? 'customer lama · ' + visits + 'x kunjungan' : 'customer baru';
     list.appendChild(el);
   });
+  jadwalkanAnalitik();
 }
 
 function confirmDelete(r) {
@@ -1108,6 +1109,319 @@ if (!configTerisi) {
   });
 
   $('logoutBtn').addEventListener('click', () => signOut(auth));
+}
+
+// ============================================================
+// Tab Jadwal / Analitik
+// ============================================================
+function pilihTab(nama) {
+  document.querySelectorAll('.tab').forEach((t) => {
+    const aktif = t.dataset.tab === nama;
+    t.classList.toggle('active', aktif);
+    t.setAttribute('aria-selected', aktif ? 'true' : 'false');
+  });
+  $('panelJadwal').hidden = nama !== 'jadwal';
+  $('panelAnalitik').hidden = nama !== 'analitik';
+  // Mode pilih hanya berlaku di daftar jadwal — bar-nya mengambang di bawah
+  if (nama !== 'jadwal' && selectMode) setSelectMode(false);
+  tipSembunyi();
+  if (nama === 'analitik') renderAnalitik();
+}
+document.querySelectorAll('.tab').forEach((t) =>
+  t.addEventListener('click', () => pilihTab(t.dataset.tab)));
+
+// ============================================================
+// Analitik — ringkasan satu bulan untuk cabang yang sedang dibuka.
+// Semua grafik memakai satu skala warna turunan --accent; angka yang
+// tidak dilabeli langsung tetap terbaca lewat tooltip dan tabel di bawah.
+// ============================================================
+const hariSingkat = (iso) => new Date(iso + 'T00:00:00')
+  .toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
+const kunciBulan = (y, m) => y + '-' + String(m + 1).padStart(2, '0');
+const bulanSekarang = () => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; };
+let bln = bulanSekarang();
+
+// Analitik ikut ter-refresh setiap data berubah, tapi hanya kalau tabnya terbuka
+function jadwalkanAnalitik() {
+  if (!$('panelAnalitik').hidden) renderAnalitik();
+}
+
+function geserBulan(n) {
+  const d = new Date(bln.y, bln.m + n, 1);
+  bln = { y: d.getFullYear(), m: d.getMonth() };
+  renderAnalitik();
+}
+$('bulanPrev').addEventListener('click', () => geserBulan(-1));
+$('bulanNext').addEventListener('click', () => geserBulan(1));
+$('bulanKini').addEventListener('click', () => { bln = bulanSekarang(); renderAnalitik(); });
+
+// --- Tooltip bersama untuk semua grafik ---
+function tipTampil(el, html) {
+  const tip = $('vizTip');
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  const kiri = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
+  const atas = r.top - t.height - 8;
+  tip.style.left = kiri + 'px';
+  tip.style.top = (atas < 8 ? r.bottom + 8 : atas) + 'px';
+}
+function tipSembunyi() { $('vizTip').hidden = true; }
+function pasangTip(el, html) {
+  const buka = () => tipTampil(el, html);
+  el.addEventListener('mouseenter', buka);
+  el.addEventListener('focus', buka);
+  el.addEventListener('mouseleave', tipSembunyi);
+  el.addEventListener('blur', tipSembunyi);
+}
+addEventListener('scroll', tipSembunyi, { passive: true });
+
+// --- Perhitungan ---
+function ringkasBulan(kunci) {
+  const rows = appointments.filter((a) => a.date.slice(0, 7) === kunci);
+  return {
+    rows,
+    total: rows.length,
+    unik: new Set(rows.map((a) => a.customerId)).size,
+  };
+}
+
+// --- Deretan angka utama ---
+function renderKpi(kini, lalu) {
+  const box = $('kpiRow');
+  box.innerHTML = '';
+  [
+    ['Total treatment', kini.total, lalu.total],
+    ['Customer dilayani', kini.unik, lalu.unik],
+  ].forEach(([label, nilai, sebelum]) => {
+    const kartu = document.createElement('div');
+    kartu.className = 'kpi';
+    const l = document.createElement('div');
+    l.className = 'kpi-label';
+    l.textContent = label;
+    const v = document.createElement('div');
+    v.className = 'kpi-val';
+    v.textContent = String(nilai);
+    const beda = nilai - sebelum;
+    const d = document.createElement('div');
+    // Arah dibaca dari panah + angka, bukan dari warnanya saja
+    d.className = 'kpi-delta ' + (beda > 0 ? 'naik' : beda < 0 ? 'turun' : 'datar');
+    d.textContent = beda === 0
+      ? 'sama seperti bulan lalu'
+      : (beda > 0 ? '▲ +' : '▼ −') + Math.abs(beda) + ' vs bulan lalu';
+    kartu.append(l, v, d);
+    box.appendChild(kartu);
+  });
+}
+
+// --- Heatmap kepadatan harian (kalender sebulan) ---
+const tingkatWarna = (n, maks) => {
+  if (!n) return 0;
+  if (maks <= 4) return Math.min(n, 4);
+  return Math.min(4, Math.ceil(n / (maks / 4)));
+};
+
+function renderHeat(kini) {
+  const box = $('heat');
+  box.innerHTML = '';
+  ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((h) => {
+    const d = document.createElement('div');
+    d.className = 'heat-dow';
+    d.textContent = h;
+    box.appendChild(d);
+  });
+
+  const perHari = new Map();
+  kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
+  const maks = perHari.size ? Math.max(...perHari.values()) : 0;
+
+  const jmlHari = new Date(bln.y, bln.m + 1, 0).getDate();
+  const geser = (new Date(bln.y, bln.m, 1).getDay() + 6) % 7; // 0 = Senin
+  for (let i = 0; i < geser; i++) {
+    const kosong = document.createElement('div');
+    kosong.className = 'heat-sel luar';
+    box.appendChild(kosong);
+  }
+  for (let t = 1; t <= jmlHari; t++) {
+    const iso = kunciBulan(bln.y, bln.m) + '-' + String(t).padStart(2, '0');
+    const n = perHari.get(iso) || 0;
+    const sel = document.createElement('button');
+    sel.type = 'button';
+    sel.className = 'heat-sel' + (iso === today() ? ' kini' : '');
+    sel.dataset.l = String(tingkatWarna(n, maks));
+    sel.textContent = String(t);
+    const teks = n ? n + ' treatment' : 'Tidak ada jadwal';
+    sel.setAttribute('aria-label', teks + ' — ' + hariSingkat(iso) + '. Buka di daftar jadwal.');
+    pasangTip(sel, '<b>' + teks + '</b><br>' + hariSingkat(iso));
+    sel.addEventListener('click', () => bukaTanggal(iso));
+    box.appendChild(sel);
+  }
+
+  const legenda = $('heatLegend');
+  legenda.innerHTML = '';
+  const sepi = document.createElement('span');
+  sepi.textContent = 'Sepi';
+  legenda.appendChild(sepi);
+  for (let l = 0; l <= 4; l++) {
+    const k = document.createElement('i');
+    k.className = 'heat-key';
+    k.style.background = 'var(--h' + l + ')';
+    legenda.appendChild(k);
+  }
+  const ramai = document.createElement('span');
+  ramai.textContent = 'Ramai';
+  legenda.appendChild(ramai);
+  if (maks) {
+    const sisa = document.createElement('span');
+    sisa.className = 'sisa';
+    sisa.textContent = 'Terpadat ' + maks + ' treatment/hari';
+    legenda.appendChild(sisa);
+  }
+}
+
+// Klik satu kotak → langsung lihat jadwal hari itu di tab Jadwal
+function bukaTanggal(iso) {
+  $('filterDate').value = iso;
+  setFilter('day');
+  $('pickDateLabel').textContent = tglSingkat(iso);
+  pilihTab('jadwal');
+  scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- Jam tersibuk (kolom, satu seri) ---
+function renderJam(kini) {
+  const box = $('chartJam');
+  box.innerHTML = '';
+  if (!kini.rows.length) {
+    box.innerHTML = '<div class="empty">Belum ada jadwal di bulan ini.</div>';
+    return;
+  }
+  const per = new Map();
+  kini.rows.forEach((a) => {
+    const j = a.time.slice(0, 2);
+    per.set(j, (per.get(j) || 0) + 1);
+  });
+  const jam = [...per.keys()].map(Number).sort((a, b) => a - b);
+  const dari = jam[0], sampai = jam[jam.length - 1];
+  const nilaiMaks = Math.max(...per.values());
+  const jmlKolom = sampai - dari + 1;
+
+  const plot = document.createElement('div');
+  plot.className = 'jam-plot';
+  const sumbu = document.createElement('div');
+  sumbu.className = 'jam-axis';
+  for (let j = dari; j <= sampai; j++) {
+    const kunci = String(j).padStart(2, '0');
+    const n = per.get(kunci) || 0;
+    const kolom = document.createElement('div');
+    kolom.className = 'jam-col';
+    kolom.tabIndex = 0;
+    // Label langsung hanya di jam terpadat — sisanya lewat tooltip & tabel
+    if (n && n === nilaiMaks) {
+      const v = document.createElement('span');
+      v.className = 'jam-nilai';
+      v.textContent = String(n);
+      kolom.appendChild(v);
+    }
+    const bar = document.createElement('div');
+    bar.className = 'jam-bar';
+    bar.style.height = (n ? Math.max(3, Math.round(n / nilaiMaks * 108)) : 0) + 'px';
+    kolom.appendChild(bar);
+    kolom.setAttribute('aria-label', n + ' treatment pada jam ' + kunci + '.00');
+    pasangTip(kolom, '<b>' + n + ' treatment</b><br>jam ' + kunci + '.00');
+    plot.appendChild(kolom);
+
+    const tick = document.createElement('div');
+    tick.className = 'jam-tick';
+    // Kalau kolomnya banyak, cukup label selang-seling biar tidak berdempetan
+    tick.textContent = (jmlKolom > 10 && (j - dari) % 2) ? '' : kunci;
+    sumbu.appendChild(tick);
+  }
+  box.append(plot, sumbu);
+}
+
+// --- Tabel: padanan angka untuk tiap grafik ---
+function renderTabel(kini) {
+  const box = $('tabelWrap');
+  box.innerHTML = '';
+  const tambah = (judul, kepala, baris, kosong) => {
+    const h = document.createElement('h3');
+    h.textContent = judul;
+    box.appendChild(h);
+    if (!baris.length) {
+      const p = document.createElement('div');
+      p.className = 'empty';
+      p.textContent = kosong;
+      box.appendChild(p);
+      return;
+    }
+    const tabel = document.createElement('table');
+    const kepalaBaris = document.createElement('tr');
+    kepala.forEach((k, i) => {
+      const th = document.createElement('th');
+      th.textContent = k;
+      if (i) th.className = 'num';
+      kepalaBaris.appendChild(th);
+    });
+    const thead = document.createElement('thead');
+    thead.appendChild(kepalaBaris);
+    const tbody = document.createElement('tbody');
+    baris.forEach((r) => {
+      const tr = document.createElement('tr');
+      r.forEach((sel, i) => {
+        const td = document.createElement('td');
+        td.textContent = String(sel);
+        if (i) td.className = 'num';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tabel.append(thead, tbody);
+    box.appendChild(tabel);
+  };
+
+  const perHari = new Map();
+  kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
+  tambah('Per hari', ['Tanggal', 'Treatment'],
+    [...perHari.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([iso, n]) => [tglSingkat(iso), n]),
+    'Belum ada jadwal di bulan ini.');
+
+  const perJam = new Map();
+  kini.rows.forEach((a) => {
+    const j = a.time.slice(0, 2);
+    perJam.set(j, (perJam.get(j) || 0) + 1);
+  });
+  tambah('Per jam', ['Jam', 'Treatment'],
+    [...perJam.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([j, n]) => [j + '.00', n]),
+    'Belum ada jadwal di bulan ini.');
+}
+
+$('tabelToggle').addEventListener('click', () => {
+  const wrap = $('tabelWrap');
+  const buka = wrap.hidden;
+  wrap.hidden = !buka;
+  $('tabelToggle').setAttribute('aria-expanded', buka ? 'true' : 'false');
+  $('tabelToggle').textContent = buka ? 'Sembunyikan tabel' : 'Lihat angka dalam tabel';
+  if (buka) renderAnalitik();
+});
+
+function renderAnalitik() {
+  const kunci = kunciBulan(bln.y, bln.m);
+  $('bulanLabel').textContent = new Date(bln.y, bln.m, 1)
+    .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const ini = bulanSekarang();
+  $('bulanKini').hidden = bln.y === ini.y && bln.m === ini.m;
+
+  const kini = ringkasBulan(kunci);
+  const bulanLalu = new Date(bln.y, bln.m - 1, 1);
+  const lalu = ringkasBulan(kunciBulan(bulanLalu.getFullYear(), bulanLalu.getMonth()));
+
+  renderKpi(kini, lalu);
+  renderHeat(kini);
+  renderJam(kini);
+  if (!$('tabelWrap').hidden) renderTabel(kini);
 }
 
 // ============================================================

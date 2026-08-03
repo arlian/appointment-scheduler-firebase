@@ -90,6 +90,16 @@ WA, tandai selesai + pegawai, export/import), ditambah:
   dari akun" ada di bawah Export/Import.
 - **Offline tetap jalan**: Firestore menyimpan salinan lokal; saat sinyal
   hilang aplikasi tetap bisa dipakai dan tersinkron ulang otomatis.
+- **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
+  digeser ke bulan mana pun lewat panah di atas:
+  - dua angka utama (total treatment dan customer dilayani) lengkap dengan
+    selisih terhadap bulan sebelumnya;
+  - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
+    makin pekat makin ramai; tap satu kotak untuk langsung melihat jadwal hari
+    itu di tab Jadwal;
+  - **jam tersibuk** dalam bentuk batang;
+  - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
+    bergantung pada warna.
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,

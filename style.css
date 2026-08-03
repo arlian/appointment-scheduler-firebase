@@ -3,7 +3,7 @@
   --bg: #faf6f8; --card: #ffffff; --field: #f6f1f4;
   --border: #ece1e7; --border-kuat: #ddccd5;
 
-  /* Tinta */
+  /* Tinta — dipakai untuk semua teks, termasuk label grafik */
   --text: #241820; --text-2: #6b5560; --muted: #7d626b;
 
   /* Merek */
@@ -12,6 +12,17 @@
 
   /* Status */
   --red: #c9302c; --red-soft: #fbeeed;
+  --naik: #006300; --turun: #c0322f;
+
+  /* Ramp sequential satu hue untuk heatmap — diturunkan dari --accent di ruang
+     OKLCH (L 0.775 / 0.700 / 0.588 / 0.493), lolos cek ramp ordinal: lightness
+     monoton, jarak antar langkah >= 0.06, langkah teraterang 2.17:1 vs kartu
+     putih. Langkah ke-3 sengaja dipatok ke --accent supaya angka tanggal di
+     dalam kotak tetap lolos 4.5:1 (tinta di L1-L2, putih di L3-L4). */
+  --h0: #f4f0f2; --h1: #fd8faa; --h2: #f26a90; --h3: #d6336c; --h4: #ad1c53;
+
+  /* Kerangka grafik */
+  --baseline: #ddccd5; --grid: #f0e7ec;
 
   --shadow: 0 1px 2px rgba(36, 24, 32, .05);
   --shadow-lift: 0 6px 22px rgba(36, 24, 32, .10);
@@ -48,6 +59,21 @@ body {
 .brand-mark.lg { width: 54px; height: 54px; font-size: 28px; border-radius: 17px; }
 h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 .subtitle { color: var(--text-2); margin: 2px 0 0; font-size: .8125rem; line-height: 1.4; }
+
+/* ---- Tab Jadwal / Analitik ---- */
+.tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: var(--field); padding: 4px; border-radius: 14px; margin-bottom: 18px;
+}
+.tab {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 8px; border: 0; border-radius: 10px; background: transparent;
+  font-family: inherit; font-size: .875rem; font-weight: 600;
+  color: var(--text-2); cursor: pointer; transition: background .15s, color .15s;
+}
+.tab .ico { font-size: 1.05rem; }
+.tab.active { background: var(--card); color: var(--accent-deep); box-shadow: var(--shadow); }
+.panel[hidden] { display: none; }
 
 /* ---- Kartu ---- */
 .card {
@@ -301,6 +327,7 @@ button.primary:active { transform: scale(.985); }
 }
 .data-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
 .data-btn:active { transform: scale(.97); }
+.data-btn.wide { width: 100%; }
 .logout-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   margin: 16px auto 0; padding: 7px 12px;
@@ -317,6 +344,105 @@ button.primary:active { transform: scale(.985); }
   padding: 5.5px 11.5px; /* kompensasi border biar setinggi chip lain */
 }
 .chip-tambah:hover { border-color: var(--accent); color: var(--accent-deep); background: none; }
+
+/* ============================================================
+   Analitik
+   ============================================================ */
+/* Satu baris filter di atas semua kartu — bukan filter per grafik */
+.bulan-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.bulan-tengah { flex: 1; min-width: 0; text-align: center; }
+.bulan-label { font-size: .9375rem; font-weight: 700; letter-spacing: -.012em; }
+.bulan-kini {
+  margin-top: 1px; padding: 2px 6px; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: .72rem; font-weight: 600; color: var(--accent-deep);
+  border-radius: 6px;
+}
+.bulan-kini[hidden] { display: none; }
+.bulan-kini:hover { background: var(--accent-soft); }
+.icon-btn {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--border); background: var(--card); border-radius: 11px;
+  color: var(--text-2); font-size: 1.05rem; cursor: pointer; box-shadow: var(--shadow);
+}
+.icon-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
+.icon-btn:active { transform: scale(.95); }
+
+/* Deretan angka utama — stat tile, bukan grafik satu batang */
+.kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.kpi {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 13px; box-shadow: var(--shadow);
+}
+.kpi-label { font-size: .72rem; font-weight: 600; color: var(--muted); line-height: 1.3; }
+.kpi-val { font-size: 1.5rem; font-weight: 700; letter-spacing: -.025em; margin-top: 3px; }
+.kpi-delta { display: flex; align-items: center; gap: 3px; font-size: .72rem; font-weight: 600; margin-top: 1px; }
+.kpi-delta.naik { color: var(--naik); }
+.kpi-delta.turun { color: var(--turun); }
+.kpi-delta.datar { color: var(--muted); }
+
+/* Heatmap kepadatan harian */
+.heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.heat-dow {
+  font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); text-align: center; padding-bottom: 5px;
+}
+.heat-sel {
+  aspect-ratio: 1; min-height: 34px; padding: 0; border: 0; border-radius: 4px;
+  font-family: inherit; font-size: .78rem; font-weight: 600;
+  font-variant-numeric: tabular-nums; display: grid; place-items: center; cursor: pointer;
+}
+.heat-sel.luar { background: none; cursor: default; pointer-events: none; }
+/* Angka tanggal di dalam kotak: tinta gelap di dua langkah terang,
+   putih di dua langkah pekat — keduanya lolos 4.5:1 */
+.heat-sel[data-l="0"] { background: var(--h0); color: var(--muted); }
+.heat-sel[data-l="1"] { background: var(--h1); color: var(--text); }
+.heat-sel[data-l="2"] { background: var(--h2); color: var(--text); }
+.heat-sel[data-l="3"] { background: var(--h3); color: #fff; }
+.heat-sel[data-l="4"] { background: var(--h4); color: #fff; }
+.heat-sel.kini { outline: 2px solid var(--text); outline-offset: 1px; }
+.heat-legend {
+  display: flex; align-items: center; gap: 5px; margin-top: 13px;
+  font-size: .72rem; color: var(--muted);
+}
+.heat-legend .sisa { margin-left: auto; }
+.heat-key { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+
+/* Grafik batang — satu seri, satu warna; tanpa garis bantu yang ramai */
+.chart:empty { display: none; }
+.jam-plot {
+  display: flex; align-items: flex-end; gap: 2px; height: 140px;
+  border-bottom: 1px solid var(--baseline);
+}
+.jam-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; height: 100%; cursor: pointer; }
+.jam-nilai { font-size: .68rem; font-weight: 700; color: var(--text-2); margin-bottom: 3px;
+  font-variant-numeric: tabular-nums; }
+.jam-bar { width: 100%; max-width: 24px; background: var(--accent); border-radius: 4px 4px 0 0; }
+.jam-col:hover .jam-bar { background: var(--accent-deep); }
+.jam-axis { display: flex; gap: 2px; margin-top: 6px; }
+.jam-tick { flex: 1 1 0; min-width: 0; text-align: center; font-size: .66rem; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+
+/* Tabel: padanan setiap grafik, supaya angka tidak hanya lewat warna */
+.tabel-wrap { margin-top: 12px; }
+.tabel-wrap[hidden] { display: none; }
+.tabel-wrap h3 {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); margin: 18px 0 6px;
+}
+.tabel-wrap h3:first-child { margin-top: 0; }
+.tabel-wrap table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.tabel-wrap th, .tabel-wrap td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--border); }
+.tabel-wrap th { font-size: .7rem; font-weight: 600; color: var(--muted); }
+.tabel-wrap .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.viz-tip {
+  position: fixed; z-index: 50; background: var(--text); color: #fff;
+  padding: 6px 10px; border-radius: 9px; font-size: .76rem; font-weight: 500;
+  pointer-events: none; white-space: nowrap; box-shadow: var(--shadow-lift);
+}
+.viz-tip[hidden] { display: none; }
+.viz-tip b { font-weight: 700; }
 
 /* ---- Layar login ---- */
 .splash {
