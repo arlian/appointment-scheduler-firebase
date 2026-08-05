@@ -516,7 +516,7 @@ function openEdit(apptId) {
   if (!a) return;
   editingId = apptId;
   const c = customers.find((x) => x.id === a.customerId);
-  $('editName').textContent = c ? c.name : '?';
+  $('editName').value = c ? c.name : '';
   $('editDate').value = a.date;
   $('editTime').value = a.time;
   $('editSheet').hidden = false;
@@ -543,14 +543,37 @@ $('editSave').addEventListener('click', () => {
   const a = appointments.find((x) => x.id === editingId);
   if (!a) { closeEdit(); return; }
   const date = $('editDate').value, time = $('editTime').value;
-  if (!date || !time) { toast('Tanggal dan jam wajib diisi.', true); return; }
+  const cleanName = $('editName').value.trim().replace(/\s+/g, ' ');
+  if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
+
+  const c = customers.find((x) => x.id === a.customerId);
+
+  // Nama dipakai customer lain? Berarti bukan perbaikan typo, tapi tabrakan nama.
+  const bentrok = customers.find((x) =>
+    x.id !== a.customerId && x.name.toLowerCase() === cleanName.toLowerCase());
+  if (bentrok) {
+    toast('Nama "' + bentrok.name + '" sudah dipakai customer lain.', true);
+    return;
+  }
 
   const dup = appointments.find((x) =>
     x.id !== a.id && x.customerId === a.customerId && x.date === date && x.time === time);
   if (dup) {
-    const c = customers.find((x) => x.id === a.customerId);
-    toast((c ? c.name : 'Customer') + ' sudah punya jadwal di tanggal dan jam yang sama.', true);
+    toast(cleanName + ' sudah punya jadwal di tanggal dan jam yang sama.', true);
     return;
+  }
+
+  // Ganti nama berlaku untuk semua jadwal customer ini, karena yang disimpan cuma id-nya.
+  const namaBerubah = c && c.name !== cleanName;
+  if (namaBerubah) {
+    c.name = cleanName;
+    // Sapaannya ikut berubah? Gender dibaca ulang — kecuali sudah pernah
+    // dipilih manual, karena pilihan itu lebih tahu daripada tebakan.
+    if (!c.genderManual) {
+      const g = tebakGender(cleanName);
+      if (g === '?') delete c.gender; else c.gender = g;
+    }
+    save(KEY_CUSTOMERS, customers);
   }
 
   a.date = date;
@@ -558,7 +581,7 @@ $('editSave').addEventListener('click', () => {
   save(KEY_APPOINTMENTS, appointments);
   closeEdit();
   renderList();
-  toast('Jadwal berhasil diubah.');
+  toast(namaBerubah ? 'Nama dan jadwal berhasil diubah.' : 'Jadwal berhasil diubah.');
 });
 
 // ============================================================
