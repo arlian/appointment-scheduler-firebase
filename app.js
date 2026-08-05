@@ -56,8 +56,30 @@ function addStaff(name) {
   }
 }
 
-const visitCount = (customerId) =>
-  appointments.filter((a) => a.customerId === customerId).length;
+// Kunci bulan = 'YYYY-MM', dipotong langsung dari tanggal ISO.
+const kunciDari = (iso) => iso.slice(0, 7);
+const kunciKini = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+};
+const tglKunci = (kunci) => new Date(+kunci.slice(0, 4), +kunci.slice(5, 7) - 1, 1);
+// 'bulan ini' kalau memang bulan berjalan, selain itu sebut bulannya
+const labelBulan = (kunci) => (kunci === kunciKini()
+  ? 'bulan ini'
+  : tglKunci(kunci).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }));
+const labelBulanSingkat = (kunci) => (kunci === kunciKini()
+  ? 'bulan ini'
+  : tglKunci(kunci).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' }));
+
+// Tanpa `kunci`: total seumur hidup — dipakai untuk membedakan customer lama vs baru.
+// Dengan `kunci` ('YYYY-MM'): cuma kunjungan di bulan itu.
+const visitCount = (customerId, kunci) =>
+  appointments.filter((a) =>
+    a.customerId === customerId && (!kunci || kunciDari(a.date) === kunci)).length;
+
+// Badge & saran nama mengikuti bulan tanggal yang sedang diisi di form;
+// kalau tanggalnya belum dipilih, pakai bulan berjalan.
+const kunciForm = () => ($('date').value ? kunciDari($('date').value) : kunciKini());
 
 function findCustomerByName(name) {
   const q = name.trim().toLowerCase();
@@ -71,7 +93,7 @@ function searchCustomerList(q) {
     .filter((c) => c.name.toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name, 'id'))
     .slice(0, 8)
-    .map((c) => ({ ...c, visits: visitCount(c.id) }));
+    .map((c) => ({ ...c, visits: visitCount(c.id, kunciForm()) }));
 }
 
 // ============================================================
@@ -116,7 +138,7 @@ nameInput.addEventListener('input', () => {
 
   // Deteksi otomatis: nama persis sama dengan customer lama
   const exact = findCustomerByName(q);
-  if (exact) selectCustomer({ ...exact, visits: visitCount(exact.id) }, false);
+  if (exact) selectCustomer(exact, false);
   else updateBadge();
 
   renderSug(searchCustomerList(q).filter((r) => !exact || r.id !== exact.id));
@@ -130,7 +152,7 @@ function renderSug(rows) {
     const d = document.createElement('div');
     d.innerHTML = '<span></span><span class="meta"></span>';
     d.firstChild.textContent = r.name;
-    d.lastChild.textContent = r.visits + 'x kunjungan';
+    d.lastChild.textContent = r.visits + 'x ' + labelBulanSingkat(kunciForm());
     d.onmousedown = (e) => { e.preventDefault(); selectCustomer(r, true); };
     sug.appendChild(d);
   });
@@ -163,9 +185,10 @@ function selectCustomer(c, fill) {
 function updateBadge() {
   historyBox.classList.remove('show');
   if (selectedCustomer) {
+    const kunci = kunciForm(); // dihitung ulang tiap render, biar ikut tanggal yang dipilih
     badge.className = 'badge known';
     badge.textContent = '✓ Customer terdeteksi: ' + selectedCustomer.name +
-      ' (' + selectedCustomer.visits + 'x kunjungan)';
+      ' (' + visitCount(selectedCustomer.id, kunci) + 'x kunjungan ' + labelBulan(kunci) + ')';
   } else if (nameInput.value.trim().length >= 2) {
     badge.className = 'badge new';
     badge.textContent = 'Customer baru — akan otomatis tersimpan.';
@@ -691,7 +714,9 @@ function renderList() {
       list.appendChild(h);
       lastDate = r.date;
     }
-    const visits = visitCount(r.customerId);
+    // Lama/baru tetap dilihat dari seluruh riwayat; angkanya yang per bulan.
+    const totalVisits = visitCount(r.customerId);
+    const visitsBulan = visitCount(r.customerId, kunciDari(r.date));
     const el = document.createElement('div');
     el.className = 'appt';
     const main = document.createElement('div');
@@ -750,7 +775,9 @@ function renderList() {
     }
     el.querySelector('.t').textContent = r.time;
     el.querySelector('.n').textContent = nameOf(r.customerId);
-    el.querySelector('.v').textContent = visits > 1 ? 'customer lama · ' + visits + 'x kunjungan' : 'customer baru';
+    el.querySelector('.v').textContent = totalVisits > 1
+      ? 'customer lama · ' + visitsBulan + 'x ' + labelBulanSingkat(kunciDari(r.date))
+      : 'customer baru';
     list.appendChild(el);
   });
   jadwalkanAnalitik();
