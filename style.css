@@ -334,6 +334,13 @@ button.primary:active { transform: scale(.985); }
 .data-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
 .data-btn:active { transform: scale(.97); }
 .data-btn.wide { width: 100%; }
+/* Aksi utama tab Analitik — dibedakan tipis dari tombol "lihat tabel" di bawahnya */
+.salin-viz {
+  margin-bottom: 10px; color: var(--accent-deep);
+  background: var(--accent-soft); border-color: var(--accent-ring);
+}
+.salin-viz:hover { border-color: var(--accent); }
+.salin-viz[disabled] { opacity: .6; cursor: default; }
 .logout-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   margin: 16px auto 0; padding: 7px 12px;

@@ -99,6 +99,10 @@ WA, tandai selesai + pegawai, export/import), ditambah:
     itu di tab Jadwal;
   - **jam tersibuk** dalam bentuk batang;
   - **komposisi gender** (lihat bagian di bawah);
+  - tombol **"Salin sebagai Gambar"** — seluruh ringkasan bulan itu jadi satu
+    gambar PNG yang langsung masuk clipboard, tinggal paste di WhatsApp. Kalau
+    browsernya tidak bisa menyalin gambar, otomatis pindah ke share sheet HP,
+    dan kalau itu pun tidak ada, filenya diunduh;
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
 - **Centang cepat**: tap dua kali pada lingkaran centang di sebuah jadwal

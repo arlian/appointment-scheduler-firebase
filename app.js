@@ -1827,6 +1827,296 @@ function renderAnalitik() {
 }
 
 // ============================================================
+// Salin analitik sebagai gambar
+// ------------------------------------------------------------
+// Kartunya digambar ulang di canvas, bukan dijepret dari DOM. html2canvas
+// perlu pustaka luar (aplikasi ini sengaja tanpa build dan harus jalan offline),
+// sedangkan trik SVG foreignObject rapuh — font dan CSS-nya sering tidak ikut.
+// Angkanya toh sudah ada di tangan, jadi menggambar sendiri malah lebih ringan
+// sekaligus membebaskan tata letaknya ditata khusus untuk dikirim: potret,
+// teksnya lebih besar, tanpa tombol dan tanpa panel koreksi gender.
+// ============================================================
+const VIZ_W = 720;    // lebar gambar dalam satuannya sendiri
+const VIZ_PAD = 40;
+const VIZ_SKALA = 2;  // digambar 2x supaya tetap tajam saat di-zoom di HP
+const VIZ_FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+// Warnanya diambil dari CSS biar gambarnya ikut berubah kalau paletnya diganti
+function warnaViz() {
+  const s = getComputedStyle(document.documentElement);
+  const w = (n) => s.getPropertyValue(n).trim();
+  return {
+    bg: w('--bg'), card: w('--card'), border: w('--border'), field: w('--field'),
+    text: w('--text'), text2: w('--text-2'), muted: w('--muted'),
+    accent: w('--accent'), naik: w('--naik'), turun: w('--turun'),
+    h: [w('--h0'), w('--h1'), w('--h2'), w('--h3'), w('--h4')],
+    gen: { P: w('--gen-p'), L: w('--gen-l'), '?': w('--gen-x') },
+  };
+}
+
+function vizFont(ctx, ukuran, tebal) {
+  ctx.font = (tebal || 400) + ' ' + ukuran + 'px ' + VIZ_FONT;
+}
+function vizTeks(ctx, s, x, y, o) {
+  vizFont(ctx, o.ukuran || 14, o.tebal);
+  ctx.fillStyle = o.warna;
+  ctx.textAlign = o.rata || 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(s, x, y);
+}
+function vizLebar(ctx, s, ukuran, tebal) {
+  vizFont(ctx, ukuran, tebal);
+  return ctx.measureText(s).width;
+}
+function vizKotak(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+function vizPanel(ctx, C, x, y, w, h) {
+  ctx.fillStyle = C.card;
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 1;
+  vizKotak(ctx, x, y, w, h, 18);
+  ctx.fill();
+  ctx.stroke();
+}
+const vizDelta = (n) => n === 0 ? '±0' : (n > 0 ? '▲ +' : '▼ −') + Math.abs(n);
+const vizWarnaDelta = (C, n) => n > 0 ? C.naik : n < 0 ? C.turun : C.muted;
+
+// Digambar dua kali: sekali di canvas buangan untuk tahu tinggi totalnya,
+// sekali lagi di canvas sungguhan yang sudah pas ukurannya.
+function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
+  const C = warnaViz();
+  const L = VIZ_PAD, W = VIZ_W - VIZ_PAD * 2;
+  if (tinggiTotal) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, VIZ_W, tinggiTotal);
+  }
+
+  // --- Kepala ---
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  ctx.letterSpacing = '2.5px'; // diabaikan browser lama — cuma soal rapi
+  vizTeks(ctx, 'RINGKASAN BULANAN', L, 56, { ukuran: 12.5, tebal: 700, warna: C.accent });
+  ctx.letterSpacing = '0px';
+  vizTeks(ctx, new Date(bln.y, bln.m, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+    L, 100, { ukuran: 33, tebal: 700, warna: C.text });
+  vizTeks(ctx, cabang ? cabang.name : 'Jadwal Treatment',
+    L, 126, { ukuran: 14, warna: C.text2 });
+  let y = 154;
+
+  // --- Dua angka utama ---
+  const kpiH = 112, sela = 16, kpiW = (W - sela) / 2;
+  [
+    ['Total treatment', kini.total, lalu.total],
+    ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
+  ].forEach(([label, nilai, sebelum], i) => {
+    const x = L + i * (kpiW + sela);
+    vizPanel(ctx, C, x, y, kpiW, kpiH);
+    vizTeks(ctx, label, x + 20, y + 33, { ukuran: 13, tebal: 600, warna: C.muted });
+    vizTeks(ctx, String(nilai), x + 20, y + 78, { ukuran: 38, tebal: 700, warna: C.text });
+    const beda = nilai - sebelum;
+    vizTeks(ctx, beda === 0 ? 'sama seperti bulan lalu' : vizDelta(beda) + ' vs bulan lalu',
+      x + 20, y + 99, { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+  });
+  y += kpiH + 18;
+
+  // --- Komposisi gender ---
+  const barisG = URUT_G.filter((g) => g !== '?' || kini.treatmentG[g]);
+  const tinggiG = 62 + (kini.total ? barisG.length * 56 : 40) + 14;
+  vizPanel(ctx, C, L, y, W, tinggiG);
+  vizTeks(ctx, 'Komposisi Gender', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+  let gy = y + 64;
+  if (!kini.total) {
+    vizTeks(ctx, 'Belum ada jadwal di bulan ini.', L + 22, gy + 18, { ukuran: 14, warna: C.muted });
+  } else barisG.forEach((g) => {
+    const n = kini.treatmentG[g];
+    const persen = Math.round(n / kini.total * 100);
+    const beda = n - lalu.treatmentG[g];
+    vizTeks(ctx, LABEL_G[g], L + 22, gy + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+    vizTeks(ctx, vizDelta(beda), L + 22 + vizLebar(ctx, LABEL_G[g], 14.5, 600) + 10, gy + 14,
+      { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+    vizTeks(ctx, n + ' · ' + persen + '%', L + W - 22, gy + 14,
+      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+    // Panjang batang = porsi dari total bulan itu, sama seperti di layar
+    const jalur = W - 44;
+    ctx.fillStyle = C.field;
+    vizKotak(ctx, L + 22, gy + 27, jalur, 11, 6);
+    ctx.fill();
+    if (n) {
+      ctx.fillStyle = C.gen[g];
+      vizKotak(ctx, L + 22, gy + 27, Math.max(8, jalur * n / kini.total), 11, 6);
+      ctx.fill();
+    }
+    gy += 56;
+  });
+  y += tinggiG + 18;
+
+  // --- Kepadatan harian (kalender sebulan) ---
+  const perHari = new Map();
+  kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
+  const maksHari = perHari.size ? Math.max(...perHari.values()) : 0;
+  const jmlHari = new Date(bln.y, bln.m + 1, 0).getDate();
+  const geser = (new Date(bln.y, bln.m, 1).getDay() + 6) % 7; // 0 = Senin
+  const minggu = Math.ceil((geser + jmlHari) / 7);
+  const selSela = 7, selH = 44;
+  const selW = (W - 44 - selSela * 6) / 7;
+  const tinggiK = 98 + minggu * (selH + selSela) - selSela + 40;
+  vizPanel(ctx, C, L, y, W, tinggiK);
+  vizTeks(ctx, 'Kepadatan Harian', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+  vizTeks(ctx, 'Makin pekat warnanya, makin banyak treatment hari itu.',
+    L + 22, y + 62, { ukuran: 12.5, warna: C.muted });
+  ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((h, i) => {
+    vizTeks(ctx, h, L + 22 + i * (selW + selSela) + selW / 2, y + 86,
+      { ukuran: 11.5, tebal: 600, warna: C.muted, rata: 'center' });
+  });
+  for (let t = 1; t <= jmlHari; t++) {
+    const kotak = geser + t - 1;
+    const x = L + 22 + (kotak % 7) * (selW + selSela);
+    const ky = y + 98 + Math.floor(kotak / 7) * (selH + selSela);
+    const iso = kunciBulan(bln.y, bln.m) + '-' + String(t).padStart(2, '0');
+    const tingkat = tingkatWarna(perHari.get(iso) || 0, maksHari);
+    ctx.fillStyle = C.h[tingkat];
+    vizKotak(ctx, x, ky, selW, selH, 10);
+    ctx.fill();
+    // Dua langkah tergelap pakai tinta putih supaya angkanya tetap terbaca
+    vizTeks(ctx, String(t), x + selW / 2, ky + selH / 2 + 5,
+      { ukuran: 13, tebal: 600, warna: tingkat >= 3 ? '#ffffff' : C.text2, rata: 'center' });
+  }
+  const ly = y + tinggiK - 18;
+  vizTeks(ctx, 'Sepi', L + 22, ly + 4, { ukuran: 11.5, warna: C.muted });
+  let lx = L + 22 + vizLebar(ctx, 'Sepi', 11.5) + 8;
+  for (let l = 0; l <= 4; l++) {
+    ctx.fillStyle = C.h[l];
+    vizKotak(ctx, lx, ly - 8, 20, 12, 4);
+    ctx.fill();
+    lx += 24;
+  }
+  vizTeks(ctx, 'Ramai', lx + 2, ly + 4, { ukuran: 11.5, warna: C.muted });
+  if (maksHari) {
+    vizTeks(ctx, 'Terpadat ' + maksHari + ' treatment/hari', L + W - 22, ly + 4,
+      { ukuran: 11.5, warna: C.muted, rata: 'right' });
+  }
+  y += tinggiK + 18;
+
+  // --- Jam tersibuk ---
+  const perJam = new Map();
+  kini.rows.forEach((a) => {
+    const j = a.time.slice(0, 2);
+    perJam.set(j, (perJam.get(j) || 0) + 1);
+  });
+  const plotH = 132;
+  const tinggiJ = kini.total ? 84 + plotH + 42 : 84 + 34;
+  vizPanel(ctx, C, L, y, W, tinggiJ);
+  vizTeks(ctx, 'Jam Tersibuk', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+  vizTeks(ctx, 'Jumlah treatment per jam mulai, sepanjang bulan ini.',
+    L + 22, y + 62, { ukuran: 12.5, warna: C.muted });
+  if (!kini.total) {
+    vizTeks(ctx, 'Belum ada jadwal di bulan ini.', L + 22, y + 90, { ukuran: 14, warna: C.muted });
+  } else {
+    const jam = [...perJam.keys()].map(Number).sort((a, b) => a - b);
+    const dari = jam[0], sampai = jam[jam.length - 1];
+    const maksJam = Math.max(...perJam.values());
+    const jmlKolom = sampai - dari + 1;
+    const kolomW = (W - 44) / jmlKolom;
+    const barW = Math.min(kolomW - 8, 34);
+    const dasar = y + 84 + plotH;
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(L + 22, dasar + .5);
+    ctx.lineTo(L + W - 22, dasar + .5);
+    ctx.stroke();
+    for (let j = dari; j <= sampai; j++) {
+      const kunciJ = String(j).padStart(2, '0');
+      const n = perJam.get(kunciJ) || 0;
+      const tengah = L + 22 + (j - dari) * kolomW + kolomW / 2;
+      if (n) {
+        const h = Math.max(4, Math.round(n / maksJam * (plotH - 22)));
+        ctx.fillStyle = C.accent;
+        vizKotak(ctx, tengah - barW / 2, dasar - h, barW, h, 6);
+        ctx.fill();
+        // Angkanya dilabeli langsung hanya di jam terpadat, sama seperti di layar
+        if (n === maksJam) {
+          vizTeks(ctx, String(n), tengah, dasar - h - 8,
+            { ukuran: 12.5, tebal: 700, warna: C.text, rata: 'center' });
+        }
+      }
+      // Kalau kolomnya banyak, labelnya selang-seling biar tidak berdempetan
+      if (!(jmlKolom > 10 && (j - dari) % 2)) {
+        vizTeks(ctx, kunciJ, tengah, dasar + 20, { ukuran: 11.5, warna: C.muted, rata: 'center' });
+      }
+    }
+  }
+  y += tinggiJ + 16;
+
+  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), VIZ_W / 2, y + 20,
+    { ukuran: 11.5, warna: C.muted, rata: 'center' });
+  return y + 42;
+}
+
+function buatBlobAnalitik() {
+  const kunci = kunciBulan(bln.y, bln.m);
+  const kini = ringkasBulan(kunci);
+  const bulanLalu = new Date(bln.y, bln.m - 1, 1);
+  const lalu = ringkasBulan(kunciBulan(bulanLalu.getFullYear(), bulanLalu.getMonth()));
+
+  const tinggi = Math.round(lukisAnalitik(
+    document.createElement('canvas').getContext('2d'), kini, lalu));
+  const c = document.createElement('canvas');
+  c.width = VIZ_W * VIZ_SKALA;
+  c.height = tinggi * VIZ_SKALA;
+  const ctx = c.getContext('2d');
+  ctx.scale(VIZ_SKALA, VIZ_SKALA);
+  lukisAnalitik(ctx, kini, lalu, tinggi);
+  return new Promise((resolve, reject) => {
+    c.toBlob((b) => b ? resolve(b) : reject(new Error('canvas gagal jadi gambar')), 'image/png');
+  });
+}
+
+$('salinViz').addEventListener('click', () => {
+  const btn = $('salinViz');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const namaFile = 'analitik-' + kunciBulan(bln.y, bln.m) + '.png';
+  // Blob-nya sengaja tidak di-await dulu: Safari mencabut "izin dari ketukan
+  // user" begitu ada await sebelum clipboard.write, jadi janjinya yang
+  // diserahkan ke ClipboardItem, bukan hasilnya.
+  const janjiBlob = buatBlobAnalitik();
+  janjiBlob.catch(() => {}); // ditangani di bawah — ini cuma peredam unhandled rejection
+
+  const cadangan = async () => {
+    const blob = await janjiBlob;
+    const file = new File([blob], namaFile, { type: 'image/png' });
+    // Di HP, share sheet biasanya lebih berguna daripada clipboard
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); } catch { /* dibatalkan user */ }
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = namaFile;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Browser ini tidak bisa menyalin gambar — filenya diunduh.');
+  };
+
+  (async () => {
+    try {
+      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('tanpa clipboard gambar');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': janjiBlob })]);
+      toast('Gambar analitik tersalin — tinggal paste.');
+    } catch {
+      try { await cadangan(); }
+      catch (e) { toast('Gagal membuat gambar: ' + e.message, true); }
+    } finally {
+      btn.disabled = false;
+    }
+  })();
+});
+
+// ============================================================
 // PWA & inisialisasi awal
 // ============================================================
 if ('serviceWorker' in navigator) {
