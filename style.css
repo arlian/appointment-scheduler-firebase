@@ -21,6 +21,10 @@
      dalam kotak tetap lolos 4.5:1 (tinta di L1-L2, putih di L3-L4). */
   --h0: #f4f0f2; --h1: #fd8faa; --h2: #f26a90; --h3: #d6336c; --h4: #ad1c53;
 
+  /* Kategori gender — dua hue yang tetap terbedakan buat mata buta warna;
+     abu-abu dipakai untuk data yang belum lengkap, bukan untuk kategori. */
+  --gen-p: #d6336c; --gen-l: #1c7ed6; --gen-x: #adb5bd;
+
   /* Kerangka grafik */
   --baseline: #ddccd5; --grid: #f0e7ec;
 
@@ -423,6 +427,93 @@ button.primary:active { transform: scale(.985); }
 .jam-tick { flex: 1 1 0; min-width: 0; text-align: center; font-size: .66rem; color: var(--muted);
   font-variant-numeric: tabular-nums; }
 
+/* Komposisi gender — batang mendatar, satu baris per kategori.
+   Dua hue kategorikal yang lolos cek CVD (protan ΔE 17.5, tritan 34.0,
+   normal 30.3 di ruang OKLab); "belum diketahui" sengaja abu-abu netral
+   karena itu bukan kategori, tapi data yang masih bolong. */
+.gen-row { padding: 7px 0; }
+/* Label kiri, angka kanan, batang selebar kartu di bawahnya */
+.gen-atas { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.gen-label {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  font-size: .8125rem; font-weight: 600; color: var(--text-2);
+}
+/* Ikonnya boleh berwarna kategori; tulisannya tetap pakai tinta teks */
+.gen-label .ico { font-size: 1.05rem; stroke-width: 1.9; }
+.gen-label[data-g="P"] .ico { color: var(--gen-p); }
+.gen-label[data-g="L"] .ico { color: var(--gen-l); }
+.gen-label[data-g="?"] .ico { color: var(--muted); }
+.gen-track { height: 16px; background: var(--h0); border-radius: 4px; overflow: hidden; }
+/* Ujung kiri rata garis dasar, ujung data dibulatkan 4px */
+.gen-bar { height: 100%; border-radius: 0 4px 4px 0; transition: width .18s ease; }
+.gen-bar[data-g="P"] { background: var(--gen-p); }
+.gen-bar[data-g="L"] { background: var(--gen-l); }
+.gen-bar[data-g="?"] { background: var(--gen-x); }
+.gen-val {
+  flex: none; font-size: .875rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.gen-persen { font-weight: 600; font-size: .72rem; color: var(--muted); margin-left: 5px; }
+.gen-delta {
+  flex: none; min-width: 42px; text-align: right;
+  font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.gen-delta.naik { color: var(--naik); }
+.gen-delta.turun { color: var(--turun); }
+.gen-delta.datar { color: var(--muted); }
+
+.gen-koreksi { margin-top: 14px; }
+.gen-koreksi .data-btn { margin: 0; }
+.gen-koreksi .data-btn.perlu { color: var(--accent-deep); border-color: var(--accent-ring); }
+.gen-ket { margin: 12px 0 4px; }
+.gen-fix { max-height: 320px; overflow-y: auto; }
+.gen-fix-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.gen-fix-row:last-child { border-bottom: 0; }
+.gen-fix-nama {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  font-size: .8125rem; line-height: 1.35; overflow-wrap: anywhere;
+}
+.gen-fix-nama .ico { font-size: 1rem; color: var(--accent-deep); }
+.gen-fix-row.belum .gen-fix-nama { font-weight: 600; }
+.gen-seg { display: flex; flex: 0 0 auto; border: 1px solid var(--border-kuat); border-radius: 9px; overflow: hidden; }
+.gen-seg-btn {
+  padding: 6px 10px; border: 0; background: var(--card); cursor: pointer;
+  font-family: inherit; font-size: .72rem; font-weight: 600; color: var(--text-2);
+}
+.gen-seg-btn + .gen-seg-btn { border-left: 1px solid var(--border-kuat); }
+.gen-seg-btn:hover { background: var(--field); }
+/* Belum dipilih: ikonnya sudah berwarna kategori, jadi pilihannya terbaca
+   sebelum ditekan — tulisannya tetap tinta biasa supaya tidak ramai */
+.gen-seg-btn .ico { font-size: 1.05rem; stroke-width: 1.9; }
+.gen-seg-btn[data-g="P"] .ico { color: var(--gen-p); }
+.gen-seg-btn[data-g="L"] .ico { color: var(--gen-l); }
+.gen-seg-btn.aktif[data-g="P"] { background: var(--gen-p); color: #fff; }
+.gen-seg-btn.aktif[data-g="L"] { background: var(--gen-l); color: #fff; }
+.gen-seg-btn.aktif .ico { color: #fff; }
+
+/* Tombol ikon saja — dipakai di daftar koreksi yang barisnya sempit */
+.gen-seg-btn.ikon-saja { padding: 7px 11px; }
+.gen-seg-btn.ikon-saja .ico { font-size: 1.15rem; display: block; }
+
+/* Versi form pendaftaran: sasaran sentuh setinggi field lain di sekitarnya */
+.gen-seg.besar { display: flex; width: 100%; border-radius: 11px; }
+.gen-seg.besar .gen-seg-btn {
+  flex: 1; padding: 11px 12px; font-size: .8125rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+}
+/* Jarak atas dipasang di pembungkusnya, bukan di label-nya: begitu label masuk
+   ke dalam div ini ia jadi :first-child, dan aturan "form label:first-child"
+   menolkan margin atasnya. Jarak bawah sengaja lebih lega daripada antar-field
+   biasa — keterangannya teks kecil, tanpa jeda ini ia menempel ke label
+   "Tanggal" dan terbaca seolah miliknya. */
+.gender-field { margin-top: 14px; margin-bottom: 20px; }
+.gender-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+.gender-hint.perlu { color: var(--accent-deep); font-weight: 600; }
+.gender-hint:empty { display: none; }
+
 /* Tabel: padanan setiap grafik, supaya angka tidak hanya lewat warna */
 .tabel-wrap { margin-top: 12px; }
 .tabel-wrap[hidden] { display: none; }
@@ -443,6 +534,7 @@ button.primary:active { transform: scale(.985); }
 }
 .viz-tip[hidden] { display: none; }
 .viz-tip b { font-weight: 700; }
+.viz-tip .ico { font-size: 1rem; vertical-align: -3px; margin-right: 5px; }
 
 /* ---- Layar login ---- */
 .splash {

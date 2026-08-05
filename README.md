@@ -98,6 +98,7 @@ WA, tandai selesai + pegawai, export/import), ditambah:
     makin pekat makin ramai; tap satu kotak untuk langsung melihat jadwal hari
     itu di tab Jadwal;
   - **jam tersibuk** dalam bentuk batang;
+  - **komposisi gender** (lihat bagian di bawah);
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
@@ -107,3 +108,54 @@ WA, tandai selesai + pegawai, export/import), ditambah:
   atau buka ulang tetap di cabang terakhir yang dipilih. Export/import dan
   salinan WA mengikuti cabang yang sedang dibuka (nama cabang ikut
   tercantum di salinan WA).
+- **Gender customer** (lihat bagian di bawah).
+
+## Gender customer
+
+Versi awal aplikasi ini tidak punya kolom gender sama sekali. Yang menyelamatkan
+keadaan: nama customer selalu ditulis lengkap dengan sapaannya, dan sapaan itu
+sudah menunjukkan gendernya.
+
+**Saat mendaftar.** Di bawah nama ada pilihan **Perempuan / Laki-laki** yang
+terisi sendiri begitu namanya diketik — "Ci Lulu" langsung ke perempuan, "Ko
+Hans" ke laki-laki. Biasanya tidak perlu disentuh sama sekali. Kalau sapaannya
+tidak dikenali, pilihannya kosong dan jadwal tidak bisa disimpan sebelum
+gendernya dipilih, supaya tidak ada lagi data yang bolong.
+
+**Kamus sapaannya:**
+
+| | Sapaan |
+|---|---|
+| Perempuan | Ci, Cici, Cece, Ibu, Bu, Mama, Mami, Tante, Mbak, Nyonya, Nona, Istri |
+| Laki-laki | Ko, Koko, Pa, Pak, Bapa, Bapak, Om, Mas, Papa, Papi, Tuan, Suami, Ps (Pastur), Romo |
+| Tidak menunjuk gender | Anak, Cucu, Ponakan, Adik, Kakak, Temen, Pdt, Dr, Drg |
+
+Yang dibaca hanya **sapaan pertama**, karena nama sering menyebut orang lain di
+belakangnya — "Ko Roy Suami Ci Marinee" tetap laki-laki, "Ci Aling Mama Ko Hans"
+tetap perempuan. Kelompok ketiga sengaja menghentikan pembacaan: tanpa itu "Anak
+Ci Kiwi" akan terbaca perempuan, padahal "Ci" di situ ibunya. *Pdt* (Pendeta)
+tidak dianggap laki-laki karena pendeta perempuan itu biasa; *Ps* (Pastur)
+dianggap laki-laki.
+
+**Data lama.** Customer yang terdaftar sebelum ada kolom ini ikut terisi sendiri
+dengan kamus yang sama, dan hasilnya ditulis balik ke Firebase — jadi gender
+benar-benar tersimpan sebagai data, bukan ditebak ulang tiap kali dibuka. Dari
+84 customer di data awal, 83 langsung terisi; sisanya yang sapaannya tidak
+menunjuk gender dibiarkan kosong supaya kelihatan dan bisa dilengkapi manual.
+
+**Membacanya.** Kartu **Komposisi Gender** di tab Analitik menampilkan jumlah
+treatment per gender untuk bulan yang sedang dibuka, lengkap dengan persentase
+dan selisihnya terhadap bulan sebelumnya (▲ +12 / ▼ −3 / ±0). Panjang batangnya
+dihitung terhadap **total bulan itu**, bukan terhadap gender terbanyak — jadi
+batang yang terisi separuh memang berarti separuh dari semua treatment, sama
+dengan persen di sebelahnya, dan semua batang kalau dijumlah pas 100%. Arah naik-turun
+terbaca dari panah dan angkanya, bukan dari warna saja. Baris *Belum diketahui*
+cuma muncul kalau memang masih ada sisanya.
+
+**Mengoreksi.** Tombol **"Koreksi gender"** di bawah grafik Komposisi Gender
+menampilkan semua customer yang punya jadwal di bulan itu, yang belum ketahuan
+di urutan paling atas. Bisa juga langsung diperbaiki lewat pilihan gender di
+form saat membuat jadwal berikutnya. Pilihan manual ditandai khusus: ia tidak
+akan tertimpa tebakan kalau namanya diedit, dan tidak tertimpa saat import.
+Sebaliknya, gender yang masih hasil tebakan akan dibaca ulang kalau sapaan di
+namanya diperbaiki.

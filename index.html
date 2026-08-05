@@ -50,6 +50,21 @@
     <path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/>
     <circle cx="12" cy="10.2" r="2.6"/>
   </symbol>
+  <!-- Venus & Mars: simbol gender yang sudah umum dipakai di formulir,
+       digambar segaris dengan ikon lain (stroke, tanpa isian). -->
+  <symbol id="i-perempuan" viewBox="0 0 24 24">
+    <circle cx="12" cy="9" r="5.25"/>
+    <path d="M12 14.25v6.5M9 17.75h6"/>
+  </symbol>
+  <symbol id="i-lakilaki" viewBox="0 0 24 24">
+    <circle cx="10.5" cy="13.5" r="5.5"/>
+    <path d="M14.4 9.6 20 4M15 4h5v5"/>
+  </symbol>
+  <symbol id="i-tanya" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.75"/>
+    <path d="M9.6 9.3a2.4 2.4 0 1 1 3.4 2.2c-.7.35-1 .9-1 1.6v.4"/>
+    <path d="M12 16.2v.1"/>
+  </symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
   <symbol id="i-cek" viewBox="0 0 24 24"><path d="m5 12.75 4.75 4.75L19 6.5"/></symbol>
   <symbol id="i-silang" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
@@ -97,6 +112,20 @@
         <div class="history" id="history">
           <h3>Riwayat kunjungan</h3>
           <ul id="historyList"></ul>
+        </div>
+        <!-- Dibungkus supaya keterangan di bawahnya tetap terbaca milik gender,
+             bukan milik field Tanggal yang menyusul -->
+        <div class="gender-field">
+          <label id="genderLabel">Gender</label>
+          <div class="gen-seg besar" role="group" aria-labelledby="genderLabel" id="formGender">
+            <button type="button" class="gen-seg-btn" data-g="P">
+              <svg class="ico" aria-hidden="true"><use href="#i-perempuan"/></svg>Perempuan
+            </button>
+            <button type="button" class="gen-seg-btn" data-g="L">
+              <svg class="ico" aria-hidden="true"><use href="#i-lakilaki"/></svg>Laki-laki
+            </button>
+          </div>
+          <div class="gender-hint" id="genderHint"></div>
         </div>
         <div class="row2">
           <div>
@@ -183,6 +212,12 @@
     </div>
 
     <div class="kpi-row" id="kpiRow"></div>
+
+    <section class="card">
+      <div class="card-head"><h2>Komposisi Gender</h2></div>
+      <div class="chart" id="chartGender"></div>
+      <div class="gen-koreksi" id="genKoreksi"></div>
+    </section>
 
     <section class="card">
       <div class="card-head"><h2>Kepadatan Harian</h2></div>

@@ -12,7 +12,7 @@ import {
   setDoc, deleteDoc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-const KEY_CUSTOMERS = 'customers';       // [{id, name}]
+const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?}]
 const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, done?, staff?}]
 const KEY_STAFF = 'staff';               // ['Nama Pegawai', ...]
 
@@ -120,6 +120,74 @@ const tglSingkat = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('id-I
   { day: 'numeric', month: 'short', year: 'numeric' });
 const nameOf = (id) => (customers.find((c) => c.id === id) || { name: '?' }).name;
 
+// ============================================================
+// Gender customer
+// Gender disimpan di customer.gender, diisi saat mendaftar. Isiannya
+// ketebak sendiri dari sapaan di depan nama ("Ci Lulu" perempuan,
+// "Ko Hans" laki-laki) supaya tidak ada yang perlu diketik ulang, dan
+// tebakan yang sama dipakai untuk mengisi data lama yang belum punya
+// gender. Yang dipilih manual ditandai genderManual — penanda itu yang
+// menjaga pilihan operator tidak tertimpa tebakan saat nama diubah
+// atau saat data dari file di-import.
+// ============================================================
+const SAPAAN = new Map([
+  ['ci', 'P'], ['cici', 'P'], ['cicinya', 'P'], ['cik', 'P'], ['cece', 'P'],
+  ['ce', 'P'], ['cc', 'P'], ['ibu', 'P'], ['ibunya', 'P'], ['bu', 'P'],
+  ['mama', 'P'], ['mamanya', 'P'], ['mami', 'P'], ['tante', 'P'], ['tantenya', 'P'],
+  ['mbak', 'P'], ['mba', 'P'], ['nyonya', 'P'], ['ny', 'P'], ['nona', 'P'],
+  ['istri', 'P'], ['istrinya', 'P'], ['sis', 'P'], ['kakaknya', 'P'],
+
+  ['ko', 'L'], ['koko', 'L'], ['kokonya', 'L'], ['pa', 'L'], ['pak', 'L'],
+  ['bapa', 'L'], ['bapak', 'L'], ['om', 'L'], ['omnya', 'L'], ['mas', 'L'],
+  ['papa', 'L'], ['papanya', 'L'], ['papi', 'L'], ['tuan', 'L'], ['tn', 'L'],
+  ['suami', 'L'], ['suaminya', 'L'], ['abang', 'L'], ['bang', 'L'],
+  // "Ps" di data ini singkatan Pastur — jabatannya memang selalu laki-laki.
+  // "Pdt" (Pendeta) sengaja tidak ikut: pendeta perempuan itu biasa.
+  ['ps', 'L'], ['pastur', 'L'], ['romo', 'L'],
+
+  // Kata yang tidak menunjukkan gender tapi tetap dihitung sebagai sapaan,
+  // supaya pembacaan berhenti di situ. Tanpa ini "Anak Ci Kiwi" akan terbaca
+  // perempuan padahal "Ci" itu ibunya, bukan orang yang datang treatment.
+  ['anak', '?'], ['anaknya', '?'], ['cucu', '?'], ['cucunya', '?'],
+  ['ponakan', '?'], ['keponakan', '?'], ['adik', '?'], ['ade', '?'], ['dede', '?'],
+  ['kakak', '?'], ['temen', '?'], ['teman', '?'],
+  ['pdt', '?'], ['dr', '?'], ['drg', '?'], ['sdr', '?'],
+]);
+
+// Sapaan pertama yang dikenali menentukan gendernya — sapaan berikutnya
+// biasanya milik orang lain ("Ko Roy Suami Ci Marinee" tetap laki-laki).
+function tebakGender(nama) {
+  for (const kata of String(nama || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)) {
+    const g = SAPAAN.get(kata);
+    if (g) return g;
+  }
+  return '?';
+}
+const genderCust = (c) => (c && (c.gender || tebakGender(c.name))) || '?';
+
+// Data customer lama dibuat sebelum ada kolom gender. Tiap kali datanya masuk,
+// tebakan yang sudah pasti dituliskan sekalian ke Firebase supaya gender jadi
+// field beneran — bukan hasil tebak ulang tiap kali dibaca. Yang sapaannya
+// tidak dikenali sengaja dibiarkan kosong biar tetap muncul di daftar koreksi.
+// Aman dipanggil berulang: setelah tertulis sekali, tidak ada lagi yang berubah
+// sehingga snapshot berikutnya tidak memicu tulis ulang.
+function lengkapiGender() {
+  if (!db || !uid || !cabangId) return;
+  let ubah = 0;
+  customers.forEach((c) => {
+    if (c.gender) return;
+    const g = tebakGender(c.name);
+    if (g === '?') return;
+    c.gender = g;
+    ubah++;
+  });
+  if (ubah) save(KEY_CUSTOMERS, customers);
+}
+const genderById = (id) => genderCust(customers.find((c) => c.id === id));
+const LABEL_G = { P: 'Perempuan', L: 'Laki-laki', '?': 'Belum diketahui' };
+const IKON_G = { P: 'perempuan', L: 'lakilaki', '?': 'tanya' };
+const URUT_G = ['P', 'L', '?'];
+
 function toast(msg, isErr) {
   const t = $('toast');
   t.textContent = msg;
@@ -133,13 +201,15 @@ function toast(msg, isErr) {
 // ============================================================
 nameInput.addEventListener('input', () => {
   selectedCustomer = null;
+  // Nama berubah → sapaannya dibaca ulang, pilihan gender lama tidak berlaku lagi
+  genderDipilih = false;
   const q = nameInput.value.trim();
-  if (!q) { closeSug(); updateBadge(); return; }
+  if (!q) { closeSug(); updateBadge(); perbaruiGender(); return; }
 
   // Deteksi otomatis: nama persis sama dengan customer lama
   const exact = findCustomerByName(q);
   if (exact) selectCustomer(exact, false);
-  else updateBadge();
+  else { updateBadge(); perbaruiGender(); }
 
   renderSug(searchCustomerList(q).filter((r) => !exact || r.id !== exact.id));
 });
@@ -177,8 +247,9 @@ nameInput.addEventListener('blur', () => setTimeout(closeSug, 120));
 
 function selectCustomer(c, fill) {
   selectedCustomer = c;
-  if (fill) { nameInput.value = c.name; closeSug(); }
+  if (fill) { nameInput.value = c.name; closeSug(); genderDipilih = false; }
   updateBadge();
+  perbaruiGender();
   showHistory(c.id);
 }
 
@@ -196,6 +267,53 @@ function updateBadge() {
     badge.className = 'badge';
   }
 }
+
+// ============================================================
+// Gender di form — terisi sendiri begitu namanya diketik, jadi operator
+// cuma perlu menyentuhnya kalau sapaannya tidak dikenali atau salah.
+// ============================================================
+const genderSeg = $('formGender'), genderHint = $('genderHint');
+let genderForm = null;     // 'P' | 'L' | null kalau belum ketahuan
+let genderDipilih = false; // true kalau tombolnya ditekan sendiri, bukan hasil tebakan
+
+function perbaruiGender() {
+  const nama = nameInput.value.trim();
+  // Selama operator belum menekan tombolnya, isian ikut nama yang diketik
+  if (!genderDipilih) {
+    const g = selectedCustomer ? genderCust(selectedCustomer) : tebakGender(nama);
+    genderForm = g === '?' ? null : g;
+  }
+  [...genderSeg.children].forEach((b) => {
+    const aktif = b.dataset.g === genderForm;
+    b.classList.toggle('aktif', aktif);
+    b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
+  });
+
+  genderHint.className = 'gender-hint';
+  if (!nama) { genderHint.textContent = ''; return; }
+  if (genderDipilih) genderHint.textContent = 'Dipilih manual.';
+  else if (selectedCustomer && selectedCustomer.gender) genderHint.textContent = 'Diambil dari data customer.';
+  else if (genderForm) genderHint.textContent = 'Terdeteksi dari sapaan di depan nama.';
+  else {
+    genderHint.className = 'gender-hint perlu';
+    genderHint.textContent = 'Sapaan di depan nama tidak dikenali — pilih gendernya dulu.';
+  }
+}
+
+genderSeg.addEventListener('click', (e) => {
+  const b = e.target.closest('.gen-seg-btn');
+  if (!b) return;
+  genderForm = b.dataset.g;
+  genderDipilih = true;
+  perbaruiGender();
+});
+
+// Ganti tanggal di form → hitungan kunjungan ikut pindah ke bulan tanggal itu
+$('date').addEventListener('change', () => {
+  if (!selectedCustomer) return;
+  updateBadge();
+  showHistory(selectedCustomer.id);
+});
 
 function showHistory(customerId) {
   const rows = appointments
@@ -220,13 +338,27 @@ $('form').addEventListener('submit', (e) => {
   const cleanName = nameInput.value.trim().replace(/\s+/g, ' ');
   const date = $('date').value, time = $('time').value;
   if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
+  // Hampir selalu sudah terisi sendiri dari sapaannya; yang sampai ke sini
+  // cuma nama yang sapaannya tidak dikenali sama sekali.
+  if (!genderForm) {
+    toast('Pilih gender customer dulu — sapaan di depan namanya tidak dikenali.', true);
+    genderSeg.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return;
+  }
 
   // Auto-deteksi: pakai customer lama jika nama sudah ada (abaikan besar/kecil huruf)
   let customer = findCustomerByName(cleanName);
   const isNew = !customer;
   if (isNew) {
-    customer = { id: buatId(), name: cleanName };
+    customer = { id: buatId(), name: cleanName, gender: genderForm };
+    if (genderDipilih) customer.genderManual = true;
     customers.push(customer);
+    save(KEY_CUSTOMERS, customers);
+  } else if (customer.gender !== genderForm || (genderDipilih && !customer.genderManual)) {
+    // Customer lama yang gendernya diubah di form: sekalian jadi jalan koreksi
+    // tercepat, tanpa harus mampir ke tab Analitik.
+    customer.gender = genderForm;
+    if (genderDipilih) customer.genderManual = true;
     save(KEY_CUSTOMERS, customers);
   }
 
@@ -247,7 +379,9 @@ $('form').addEventListener('submit', (e) => {
   toast(msg);
   nameInput.value = ''; $('time').value = '';
   selectedCustomer = null;
+  genderDipilih = false;
   updateBadge();
+  perbaruiGender();
   renderList();
   nameInput.focus();
 });
@@ -930,6 +1064,14 @@ $('importFile').addEventListener('change', async () => {
       customers.push(existing);
       newCust++;
     }
+    // Gender ikut terbawa: koreksi manual dari file menang atas tebakan yang
+    // belum dikoreksi, tapi koreksi manual yang sudah ada di sini tidak pernah
+    // ditimpa. Tebakan lawan tebakan sama saja hasilnya, jadi tidak diapa-apakan.
+    if ((c.gender === 'P' || c.gender === 'L') && !existing.genderManual
+        && (!existing.gender || c.genderManual)) {
+      existing.gender = c.gender;
+      if (c.genderManual) existing.genderManual = true;
+    }
     idMap.set(c.id, existing.id);
   });
   data.appointments.forEach((a) => {
@@ -999,7 +1141,7 @@ function mulaiSyncData() {
     (e) => toast('Gagal memuat data: ' + e.message, true)
   );
   stopData = [
-    pasang(KEY_CUSTOMERS, (rows) => { customers = rows; }),
+    pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
     pasang(KEY_APPOINTMENTS, (rows) => { appointments = rows; }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
   ];
@@ -1206,10 +1348,21 @@ addEventListener('scroll', tipSembunyi, { passive: true });
 // --- Perhitungan ---
 function ringkasBulan(kunci) {
   const rows = appointments.filter((a) => a.date.slice(0, 7) === kunci);
+  // Dua angka per gender: berapa kali treatment, dan berapa orangnya —
+  // satu customer yang datang lima kali tidak boleh terbaca lima orang.
+  const treatmentG = { P: 0, L: 0, '?': 0 };
+  const custG = { P: new Set(), L: new Set(), '?': new Set() };
+  rows.forEach((a) => {
+    const g = genderById(a.customerId);
+    treatmentG[g]++;
+    custG[g].add(a.customerId);
+  });
   return {
     rows,
     total: rows.length,
-    unik: new Set(rows.map((a) => a.customerId)).size,
+    jumlahCustomer: new Set(rows.map((a) => a.customerId)).size,
+    treatmentG,
+    custG,
   };
 }
 
@@ -1219,7 +1372,7 @@ function renderKpi(kini, lalu) {
   box.innerHTML = '';
   [
     ['Total treatment', kini.total, lalu.total],
-    ['Customer dilayani', kini.unik, lalu.unik],
+    ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
   ].forEach(([label, nilai, sebelum]) => {
     const kartu = document.createElement('div');
     kartu.className = 'kpi';
@@ -1239,6 +1392,168 @@ function renderKpi(kini, lalu) {
     kartu.append(l, v, d);
     box.appendChild(kartu);
   });
+}
+
+// --- Komposisi gender (batang mendatar, dua kategori + sisa) ---
+// Identitas dibawa label baris, bukan warnanya, jadi tetap terbaca kalau
+// warnanya tidak bisa dibedakan.
+function renderGender(kini, lalu) {
+  const box = $('chartGender');
+  box.innerHTML = '';
+  if (!kini.rows.length) {
+    box.innerHTML = '<div class="empty">Belum ada jadwal di bulan ini.</div>';
+    renderKoreksi(kini);
+    return;
+  }
+  URUT_G.forEach((g) => {
+    const n = kini.treatmentG[g];
+    // Perempuan & laki-laki selalu tampil biar barisnya tidak loncat-loncat;
+    // baris "belum diketahui" cuma muncul kalau memang masih ada sisanya.
+    if (g === '?' && !n) return;
+    const orang = kini.custG[g].size;
+    const persen = Math.round(n / kini.total * 100);
+
+    const baris = document.createElement('div');
+    baris.className = 'gen-row';
+    baris.tabIndex = 0;
+
+    const label = document.createElement('div');
+    label.className = 'gen-label';
+    // Ikon + tulisan: warnanya cuma penguat, identitasnya tetap terbaca tanpa itu
+    label.dataset.g = g;
+    label.innerHTML = ikon(IKON_G[g]);
+    const teksLabel = document.createElement('span');
+    teksLabel.textContent = LABEL_G[g];
+    label.appendChild(teksLabel);
+
+    const nilai = document.createElement('div');
+    nilai.className = 'gen-val';
+    nilai.textContent = String(n);
+    const pct = document.createElement('span');
+    pct.className = 'gen-persen';
+    pct.textContent = persen + '%';
+    nilai.appendChild(pct);
+
+    // Selisih terhadap bulan lalu — arahnya dibaca dari panah + angka, bukan
+    // dari warnanya saja, sama seperti dua angka utama di atas.
+    const beda = n - lalu.treatmentG[g];
+    const delta = document.createElement('div');
+    delta.className = 'gen-delta ' + (beda > 0 ? 'naik' : beda < 0 ? 'turun' : 'datar');
+    delta.textContent = beda === 0 ? '±0' : (beda > 0 ? '▲ +' : '▼ −') + Math.abs(beda);
+
+    // Label dan angkanya duduk di atas batang, bukan di sampingnya: batangnya
+    // jadi dapat lebar penuh, dan label sepanjang "Belum diketahui" tidak
+    // terpotong betapapun sempitnya layar.
+    const atas = document.createElement('div');
+    atas.className = 'gen-atas';
+    atas.append(label, nilai, delta);
+
+    const track = document.createElement('div');
+    track.className = 'gen-track';
+    const bar = document.createElement('div');
+    bar.className = 'gen-bar';
+    bar.dataset.g = g;
+    // Dibagi total bulan itu, bukan kategori terbesar: panjang batang berarti
+    // porsi, jadi ia bicara hal yang sama dengan persen di sebelahnya. Kalau
+    // dibagi yang terbesar, kategori teratas selalu tampil penuh — terbaca
+    // "semuanya" padahal cuma 59%.
+    bar.style.width = (n ? Math.max(2, n / kini.total * 100) : 0) + '%';
+    track.appendChild(bar);
+
+    const kataBeda = beda === 0 ? 'sama seperti bulan lalu'
+      : (beda > 0 ? 'bertambah ' : 'berkurang ') + Math.abs(beda) + ' dari bulan lalu';
+    baris.append(atas, track);
+    baris.setAttribute('aria-label', LABEL_G[g] + ': ' + n + ' treatment (' + persen
+      + '%) dari ' + orang + ' customer, ' + kataBeda + '.');
+    pasangTip(baris, ikon(IKON_G[g]) + '<b>' + n + ' treatment</b> · ' + persen
+      + '%<br>dari ' + orang + ' customer<br>' + kataBeda);
+    box.appendChild(baris);
+  });
+  renderKoreksi(kini);
+}
+
+// --- Koreksi gender: satu-satunya tempat gender bisa diatur manual ---
+// Daftarnya dibatasi customer yang punya jadwal di bulan yang sedang dilihat,
+// supaya yang muncul cuma yang memang memengaruhi angka di atas.
+let koreksiBuka = false;
+function renderKoreksi(kini) {
+  const box = $('genKoreksi');
+  box.innerHTML = '';
+  const ids = [...new Set(kini.rows.map((a) => a.customerId))];
+  if (!ids.length) return;
+  const belum = ids.filter((id) => genderById(id) === '?').length;
+
+  const tombol = document.createElement('button');
+  tombol.type = 'button';
+  tombol.className = 'data-btn wide' + (belum ? ' perlu' : '');
+  tombol.setAttribute('aria-expanded', koreksiBuka ? 'true' : 'false');
+  tombol.textContent = koreksiBuka
+    ? 'Tutup koreksi gender'
+    : belum
+      ? 'Koreksi gender — ' + belum + ' customer belum ketahuan'
+      : 'Koreksi gender customer';
+  tombol.addEventListener('click', () => { koreksiBuka = !koreksiBuka; renderAnalitik(); });
+  box.appendChild(tombol);
+  if (!koreksiBuka) return;
+
+  const ket = document.createElement('p');
+  ket.className = 'card-sub gen-ket';
+  ket.textContent = 'Gender ditebak dari sapaan di depan nama. Kalau tebakannya meleset '
+    + 'atau sapaannya tidak dikenali, pilih sendiri di sini — pilihan manual dipakai seterusnya.';
+  box.appendChild(ket);
+
+  const daftar = document.createElement('div');
+  daftar.className = 'gen-fix';
+  // Yang belum ketahuan naik ke atas — itu yang perlu dikerjakan duluan
+  ids.map((id) => customers.find((c) => c.id === id)).filter(Boolean)
+    .sort((a, b) => {
+      const ga = genderCust(a) === '?' ? 0 : 1, gb = genderCust(b) === '?' ? 0 : 1;
+      return ga - gb || a.name.localeCompare(b.name, 'id');
+    })
+    .forEach((c) => {
+      const g = genderCust(c);
+      const baris = document.createElement('div');
+      baris.className = 'gen-fix-row' + (g === '?' ? ' belum' : '');
+      const nama = document.createElement('span');
+      nama.className = 'gen-fix-nama';
+      // Tanda tanya cuma di baris yang belum ketahuan — itu yang perlu dikerjakan
+      if (g === '?') nama.innerHTML = ikon('tanya');
+      const teksNama = document.createElement('span');
+      teksNama.textContent = c.name;
+      nama.appendChild(teksNama);
+      const grup = document.createElement('div');
+      grup.className = 'gen-seg';
+      grup.setAttribute('role', 'group');
+      grup.setAttribute('aria-label', 'Gender ' + c.name);
+      // Cuma ikonnya — nama customer di sebelahnya sering panjang, dan urutan
+      // ♀ lalu ♂ sudah dijelaskan grafik tepat di atasnya. Namanya tetap
+      // terbaca pembaca layar lewat aria-label.
+      ['P', 'L'].forEach((pilih) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'gen-seg-btn ikon-saja' + (g === pilih ? ' aktif' : '');
+        b.dataset.g = pilih;
+        b.innerHTML = ikon(IKON_G[pilih]);
+        b.title = LABEL_G[pilih];
+        b.setAttribute('aria-label', LABEL_G[pilih]);
+        b.setAttribute('aria-pressed', g === pilih ? 'true' : 'false');
+        b.addEventListener('click', () => setGender(c.id, pilih));
+        grup.appendChild(b);
+      });
+      baris.append(nama, grup);
+      daftar.appendChild(baris);
+    });
+  box.appendChild(daftar);
+}
+
+function setGender(customerId, g) {
+  const c = customers.find((x) => x.id === customerId);
+  if (!c || (c.gender === g && c.genderManual)) return;
+  c.gender = g;
+  c.genderManual = true;
+  save(KEY_CUSTOMERS, customers);
+  renderAnalitik();
+  toast(c.name + ' diatur sebagai ' + LABEL_G[g].toLowerCase() + '.');
 }
 
 // --- Heatmap kepadatan harian (kalender sebulan) ---
@@ -1368,7 +1683,7 @@ function renderJam(kini) {
 }
 
 // --- Tabel: padanan angka untuk tiap grafik ---
-function renderTabel(kini) {
+function renderTabel(kini, lalu) {
   const box = $('tabelWrap');
   box.innerHTML = '';
   const tambah = (judul, kepala, baris, kosong) => {
@@ -1406,6 +1721,13 @@ function renderTabel(kini) {
     tabel.append(thead, tbody);
     box.appendChild(tabel);
   };
+
+  const bedaTeks = (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n);
+  tambah('Per gender', ['Gender', 'Treatment', 'Customer', 'vs bulan lalu'],
+    URUT_G.filter((g) => g !== '?' || kini.treatmentG[g])
+      .map((g) => [LABEL_G[g], kini.treatmentG[g], kini.custG[g].size,
+        bedaTeks(kini.treatmentG[g] - lalu.treatmentG[g])]),
+    'Belum ada jadwal di bulan ini.');
 
   const perHari = new Map();
   kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
@@ -1446,9 +1768,10 @@ function renderAnalitik() {
   const lalu = ringkasBulan(kunciBulan(bulanLalu.getFullYear(), bulanLalu.getMonth()));
 
   renderKpi(kini, lalu);
+  renderGender(kini, lalu);
   renderHeat(kini);
   renderJam(kini);
-  if (!$('tabelWrap').hidden) renderTabel(kini);
+  if (!$('tabelWrap').hidden) renderTabel(kini, lalu);
 }
 
 // ============================================================
