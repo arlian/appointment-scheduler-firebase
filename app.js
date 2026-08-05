@@ -1936,7 +1936,11 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     vizTeks(ctx, LABEL_G[g], L + 22, gy + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
     vizTeks(ctx, vizDelta(beda), L + 22 + vizLebar(ctx, LABEL_G[g], 14.5, 600) + 10, gy + 14,
       { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
-    vizTeks(ctx, n + ' · ' + persen + '%', L + W - 22, gy + 14,
+    // Jumlah dan persen dipisah kurung dan beda bobot — "41 · 57%" terbaca
+    // seperti satu bilangan desimal. Persennya turunan, jadi ia yang mengalah.
+    const teksPersen = '(' + persen + '%)';
+    vizTeks(ctx, teksPersen, L + W - 22, gy + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+    vizTeks(ctx, String(n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, gy + 14,
       { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
     // Panjang batang = porsi dari total bulan itu, sama seperti di layar
     const jalur = W - 44;
