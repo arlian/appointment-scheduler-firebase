@@ -101,6 +101,11 @@ WA, tandai selesai + pegawai, export/import), ditambah:
   - **komposisi gender** (lihat bagian di bawah);
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
+- **Centang cepat**: tap dua kali pada lingkaran centang di sebuah jadwal
+  langsung menandainya selesai — atau melepas centangnya kalau sudah selesai —
+  tanpa membuka apa pun. Tap sekali tetap membuka isian pegawai dan foto.
+  Melepas centang lewat ketukan ganda tidak menghapus pegawai maupun fotonya;
+  yang menghapus foto hanya tombol "Batalkan tanda selesai" di dalam isian.
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,

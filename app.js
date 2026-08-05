@@ -752,6 +752,34 @@ $('doneSave').addEventListener('click', () => {
   toast(name ? 'Ditandai selesai — oleh ' + name + '.' : 'Ditandai selesai.');
 });
 
+// Centang cepat: dua ketukan beruntun langsung menandai selesai tanpa isi
+// pegawai. Satu ketukan tetap membuka sheet (isi pegawai, foto, dll) — karena
+// itu ketukan pertama ditahan sebentar dulu, menunggu kemungkinan ketukan kedua.
+function toggleCentangCepat(apptId) {
+  const a = appointments.find((x) => x.id === apptId);
+  if (!a) return;
+  const jadiSelesai = !a.done;
+  // Sengaja tidak menyentuh a.staff dan a.photos: ketukan ganda hanya melepas
+  // centangnya, tidak membuang data. Kalau dicentang lagi, pegawai dan fotonya
+  // kembali utuh. Yang benar-benar menghapus foto cuma tombol "Batalkan tanda
+  // selesai" di dalam sheet — jalur eksplisit yang harus dibuka dulu.
+  if (jadiSelesai) a.done = true; else delete a.done;
+  save(KEY_APPOINTMENTS, appointments);
+  renderList();
+  if (navigator.vibrate) navigator.vibrate(15);
+  toast(jadiSelesai
+    ? 'Ditandai selesai. Tap centangnya lagi kalau mau isi pegawai.'
+    : 'Centang dilepas. Pegawai dan fotonya masih tersimpan.');
+}
+
+function pasangAksiCentang(btn, r) {
+  let tunggu = null;
+  btn.onclick = () => {
+    if (tunggu) { clearTimeout(tunggu); tunggu = null; toggleCentangCepat(r.id); return; }
+    tunggu = setTimeout(() => { tunggu = null; openDone(r.id); }, 260);
+  };
+}
+
 $('doneUndo').addEventListener('click', () => {
   const a = appointments.find((x) => x.id === doneId);
   if (!a) { closeDone(); return; }
@@ -898,7 +926,8 @@ function renderList() {
       bg.textContent = 'Hapus';
       el.appendChild(bg);
       main.innerHTML =
-        '<button class="chk" title="Tandai treatment selesai" ' +
+        '<button class="chk" title="Tap: isi pegawai · Tap dua kali: ' +
+        (r.done ? 'lepas centang' : 'langsung selesai') + '" ' +
         'aria-label="Tandai treatment selesai">' + ikon('cek') + '</button>' +
         '<div class="when"><div class="t"></div></div>' +
         '<div class="who"><div class="n"></div><div class="v"></div></div>' +
@@ -925,7 +954,7 @@ function renderList() {
           el.querySelector('.who').appendChild(rowFoto);
         }
       }
-      el.querySelector('.chk').onclick = () => openDone(r.id);
+      pasangAksiCentang(el.querySelector('.chk'), r);
       el.querySelector('.edit').onclick = () => openEdit(r.id);
       el.querySelector('.del').onclick = () => confirmDelete(r);
       attachRowGestures(main, r);
