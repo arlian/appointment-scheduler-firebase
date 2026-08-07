@@ -52,7 +52,17 @@ function setSambung(on) {
   $('offlineBar').hidden = on || !uid;
 }
 
+// Gerbang untuk semua perubahan data. Menulis tanpa sambungan berarti mengirim
+// seluruh array versi layar ini, yang bisa saja sudah tertinggal — jadi
+// perubahannya ditolak di depan, sebelum apa pun ikut berubah di memori.
+function bolehUbah() {
+  if (tersambung) return true;
+  toast('Belum tersambung ke server — perubahan tidak bisa disimpan dulu.', true);
+  return false;
+}
+
 function save(key, data) {
+  if (!tersambung) return; // jaring terakhir; pemanggilnya sudah lewat bolehUbah()
   setDoc(doc(db, 'users', uid, 'cabang', cabangId, 'data', key), { rows: data })
     .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
 }
@@ -188,7 +198,7 @@ const genderCust = (c) => (c && (c.gender || tebakGender(c.name))) || '?';
 // Aman dipanggil berulang: setelah tertulis sekali, tidak ada lagi yang berubah
 // sehingga snapshot berikutnya tidak memicu tulis ulang.
 function lengkapiGender() {
-  if (!db || !uid || !cabangId) return;
+  if (!db || !uid || !cabangId || !tersambung) return;
   let ubah = 0;
   customers.forEach((c) => {
     if (c.gender) return;
@@ -351,6 +361,7 @@ function showHistory(customerId) {
 // ============================================================
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!bolehUbah()) return;
   const cleanName = nameInput.value.trim().replace(/\s+/g, ' ');
   const date = $('date').value, time = $('time').value;
   if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
@@ -511,6 +522,7 @@ $('selAll').addEventListener('click', () => {
 
 $('selDelete').addEventListener('click', () => {
   if (!selected.size) return;
+  if (!bolehUbah()) return;
   if (!confirm('Hapus ' + selected.size + ' jadwal yang dipilih?')) return;
   appointments.forEach((a) => {
     if (selected.has(a.id)) (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
@@ -558,6 +570,7 @@ document.addEventListener('keydown', (e) => {
 $('editSave').addEventListener('click', () => {
   const a = appointments.find((x) => x.id === editingId);
   if (!a) { closeEdit(); return; }
+  if (!bolehUbah()) return;
   const date = $('editDate').value, time = $('editTime').value;
   const cleanName = $('editName').value.trim().replace(/\s+/g, ' ');
   if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
@@ -740,6 +753,7 @@ $('doneSheet').addEventListener('click', (e) => {
 $('doneSave').addEventListener('click', () => {
   const a = appointments.find((x) => x.id === doneId);
   if (!a) { closeDone(); return; }
+  if (!bolehUbah()) return; // foto ikut ditahan: jangan sampai terunggah tanpa induknya
   const name = $('staffInput').value.trim().replace(/\s+/g, ' ');
   a.done = true;
   if (name) { a.staff = name; addStaff(name); }
@@ -769,6 +783,7 @@ $('doneSave').addEventListener('click', () => {
 function toggleCentangCepat(apptId) {
   const a = appointments.find((x) => x.id === apptId);
   if (!a) return;
+  if (!bolehUbah()) return;
   const jadiSelesai = !a.done;
   // Sengaja tidak menyentuh a.staff dan a.photos: ketukan ganda hanya melepas
   // centangnya, tidak membuang data. Kalau dicentang lagi, pegawai dan fotonya
@@ -794,6 +809,7 @@ function pasangAksiCentang(btn, r) {
 $('doneUndo').addEventListener('click', () => {
   const a = appointments.find((x) => x.id === doneId);
   if (!a) { closeDone(); return; }
+  if (!bolehUbah()) return;
   delete a.done;
   delete a.staff;
   (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
@@ -979,6 +995,7 @@ function renderList() {
 }
 
 function confirmDelete(r) {
+  if (!bolehUbah()) return;
   if (!confirm('Hapus jadwal ' + nameOf(r.customerId) + ' pada ' + hariBulan(r.date) + ' ' + r.time + '?')) return;
   (r.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
   appointments = appointments.filter((a) => a.id !== r.id);
@@ -1112,6 +1129,7 @@ $('importFile').addEventListener('change', async () => {
   if (!Array.isArray(data.customers) || !Array.isArray(data.appointments)) {
     toast('Format file tidak dikenali.', true); return;
   }
+  if (!bolehUbah()) return;
 
   // Gabungkan: customer dicocokkan berdasarkan nama, jadwal duplikat dilewati
   let newCust = 0, newAppt = 0;
@@ -1299,6 +1317,7 @@ $('cabangSheet').addEventListener('click', (e) => {
 $('cabangSave').addEventListener('click', () => {
   const name = $('cabangName').value.trim().replace(/\s+/g, ' ');
   if (!name) { toast('Nama cabang wajib diisi.', true); return; }
+  if (!bolehUbah()) return;
   if (cabangList.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     toast('Cabang "' + name + '" sudah ada.', true);
     return;
@@ -1628,6 +1647,7 @@ function renderKoreksi(kini) {
 function setGender(customerId, g) {
   const c = customers.find((x) => x.id === customerId);
   if (!c || (c.gender === g && c.genderManual)) return;
+  if (!bolehUbah()) return;
   c.gender = g;
   c.genderManual = true;
   save(KEY_CUSTOMERS, customers);
