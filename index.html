@@ -268,6 +268,25 @@
     </div>
   </div>
 </div>
+<!-- Nama yang belum ada di sistem belum tentu orang baru — banyak customer lama
+     yang selama ini cuma tercatat di buku. Ditanya dulu sebelum jadwalnya masuk. -->
+<div class="sheet-backdrop" id="newCustSheet" hidden>
+  <div class="sheet">
+    <h2>Nama ini belum ada di sistem</h2>
+    <div class="sheet-name" id="newCustName"></div>
+    <p class="sheet-sub">Benar-benar customer baru, atau sebenarnya sudah lama
+      datang tapi belum pernah dicatat di sini?</p>
+    <div class="mirip" id="newCustMirip" hidden>
+      <h3>Mirip dengan yang sudah terdaftar</h3>
+      <div id="newCustMiripList"></div>
+    </div>
+    <div class="sheet-actions tumpuk">
+      <button type="button" class="primary" id="newCustBaru">Customer baru</button>
+      <button type="button" class="ghost" id="newCustLama">Customer lama, baru dicatat</button>
+    </div>
+    <button type="button" class="sheet-batal" id="newCustBatal">Batal</button>
+  </div>
+</div>
 <div class="sheet-backdrop" id="cabangSheet" hidden>
   <div class="sheet">
     <h2>Tambah Cabang</h2>

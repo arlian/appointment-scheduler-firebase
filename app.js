@@ -19,7 +19,7 @@ import {
   setDoc, deleteDoc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?}]
+const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?}]
 const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time}]
 // Pegawai cuma dipakai fitur "tandai selesai" yang sedang dinonaktifkan. Datanya
 // tetap ikut disinkronkan dan ikut terbawa export/import supaya utuh saat fiturnya
@@ -105,6 +105,15 @@ const labelBulanSingkat = (kunci) => (kunci === kunciKini()
 const visitCount = (customerId, kunci) =>
   appointments.filter((a) =>
     a.customerId === customerId && (!kunci || kunciDari(a.date) === kunci)).length;
+
+// "Customer lama" tidak selalu terbaca dari jumlah kunjungan: ada yang sudah
+// bertahun-tahun datang tapi baru hari ini masuk sistem. Penanda sudahLama
+// dijawab operator sendiri di sheet konfirmasi saat namanya pertama disimpan.
+const sudahLamaDatang = (customerId, totalVisits) => {
+  const c = customers.find((x) => x.id === customerId);
+  return (totalVisits != null ? totalVisits : visitCount(customerId)) > 1
+    || !!(c && c.sudahLama);
+};
 
 // Badge & saran nama mengikuti bulan tanggal yang sedang diisi di form;
 // kalau tanggalnya belum dipilih, pakai bulan berjalan.
@@ -291,7 +300,7 @@ function updateBadge() {
       ' (' + visitCount(selectedCustomer.id, kunci) + 'x kunjungan ' + labelBulan(kunci) + ')';
   } else if (nameInput.value.trim().length >= 2) {
     badge.className = 'badge new';
-    badge.textContent = 'Customer baru — akan otomatis tersimpan.';
+    badge.textContent = 'Belum ada di sistem — dipastikan dulu waktu disimpan.';
   } else {
     badge.className = 'badge';
   }
@@ -376,17 +385,34 @@ $('form').addEventListener('submit', (e) => {
     return;
   }
 
-  // Auto-deteksi: pakai customer lama jika nama sudah ada (abaikan besar/kecil huruf)
-  let customer = findCustomerByName(cleanName);
+  // Auto-deteksi: pakai customer lama jika nama sudah ada (abaikan besar/kecil huruf).
+  // Kalau namanya belum ada, jadwalnya belum langsung disimpan — operator
+  // dipastikan dulu lewat sheet konfirmasi.
+  const customer = findCustomerByName(cleanName);
+  if (customer) simpanJadwal(customer, cleanName, date, time, null);
+  else bukaKonfirmasiBaru(cleanName, date, time);
+});
+
+// status: null (customer memang sudah terdaftar) | 'baru' | 'lama'
+function simpanJadwal(customer, cleanName, date, time, status) {
+  if (!bolehUbah()) return;
   const isNew = !customer;
   if (isNew) {
     customer = { id: buatId(), name: cleanName, gender: genderForm };
     if (genderDipilih) customer.genderManual = true;
+    // Jawaban operator di sheet konfirmasi. Tanpa penanda ini orangnya akan
+    // terbaca "customer baru" di daftar jadwal sampai kunjungan keduanya,
+    // padahal sebenarnya sudah lama datang — cuma belum pernah dicatat.
+    if (status === 'lama') customer.sudahLama = true;
     customers.push(customer);
     save(KEY_CUSTOMERS, customers);
-  } else if (customer.gender !== genderForm || (genderDipilih && !customer.genderManual)) {
+  } else if (customer.name.toLowerCase() === cleanName.toLowerCase()
+      && (customer.gender !== genderForm || (genderDipilih && !customer.genderManual))) {
     // Customer lama yang gendernya diubah di form: sekalian jadi jalan koreksi
-    // tercepat, tanpa harus mampir ke tab Analitik.
+    // tercepat, tanpa harus mampir ke tab Analitik. Cuma berlaku kalau nama di
+    // form memang nama customer itu — pilihan gender di layar dibaca dari
+    // sapaan nama yang diketik, jadi ia tidak berhak menimpa orang lain yang
+    // dipilih dari daftar "nama mirip".
     customer.gender = genderForm;
     if (genderDipilih) customer.genderManual = true;
     save(KEY_CUSTOMERS, customers);
@@ -400,9 +426,11 @@ $('form').addEventListener('submit', (e) => {
   appointments.push({ id: newId, customerId: customer.id, date, time });
   save(KEY_APPOINTMENTS, appointments);
 
-  let msg = isNew
-    ? 'Jadwal tersimpan. ' + customer.name + ' terdaftar sebagai customer baru.'
-    : 'Jadwal tersimpan untuk ' + customer.name + ' (customer lama).';
+  let msg = !isNew
+    ? 'Jadwal tersimpan untuk ' + customer.name + ' (customer lama).'
+    : status === 'lama'
+      ? 'Jadwal tersimpan. ' + customer.name + ' dicatat sebagai customer lama yang baru masuk sistem.'
+      : 'Jadwal tersimpan. ' + customer.name + ' terdaftar sebagai customer baru.';
   if (!filteredRows().some((a) => a.id === newId)) {
     msg += ' Pilih "Semua" untuk melihatnya.';
   }
@@ -410,10 +438,141 @@ $('form').addEventListener('submit', (e) => {
   nameInput.value = ''; $('time').value = '';
   selectedCustomer = null;
   genderDipilih = false;
+  closeSug();
   updateBadge();
   perbaruiGender();
   renderList();
   nameInput.focus();
+}
+
+// ============================================================
+// Konfirmasi customer baru
+// ------------------------------------------------------------
+// Nama yang belum ada di sistem belum tentu orang baru: banyak customer lama
+// yang selama ini cuma tercatat di buku. Bedanya penting — label "customer
+// baru" di daftar jadwal jadi tidak ada artinya kalau semua nama yang baru
+// diketik ikut terhitung baru.
+//
+// Sekalian ditampilkan nama yang mirip. Salah ketik satu huruf atau sapaan
+// yang beda ("Ci Lulu" vs "Cici Lulu") diam-diam melahirkan customer kembar,
+// dan riwayat kunjungannya ikut terbelah dua. Dari sini jadwalnya bisa
+// langsung ditempelkan ke customer yang sudah ada.
+// ============================================================
+let pendingJadwal = null; // {nama, date, time} yang menunggu jawaban konfirmasi
+
+// Nama dilucuti jadi bagian intinya: huruf kecil, tanpa tanda baca, tanpa
+// sapaan — supaya "Ci Lulu" dan "Cici Lulu" terbaca sebagai orang yang sama.
+// Yang dibuang cuma sapaan bergender dan gelar netral. Kata hubungan seperti
+// "Anak"/"Cucu" justru bagian dari identitasnya: tanpa itu "Anak Ci Kiwi"
+// jadi persis sama dengan "Ci Kiwi", padahal itu ibunya.
+const GELAR = new Set(['pdt', 'dr', 'drg', 'sdr']);
+const intiNama = (s) => String(s).toLowerCase()
+  .replace(/[^a-z0-9\s]/g, ' ')
+  .split(/\s+/)
+  .filter((k) => k && !GELAR.has(k) && SAPAAN.get(k) !== 'P' && SAPAAN.get(k) !== 'L')
+  .join(' ');
+
+// Jarak edit (Levenshtein) satu baris — cukup untuk menangkap salah ketik
+// sepanjang nama orang, tanpa perlu matriks penuh.
+function jarakEdit(a, b) {
+  if (a === b) return 0;
+  const baris = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let pojok = baris[0];
+    baris[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const simpan = baris[j];
+      baris[j] = Math.min(baris[j] + 1, baris[j - 1] + 1,
+        pojok + (a[i - 1] === b[j - 1] ? 0 : 1));
+      pojok = simpan;
+    }
+  }
+  return baris[b.length];
+}
+
+function cariMirip(nama) {
+  const inti = intiNama(nama);
+  if (!inti) return [];
+  const kata = new Set(inti.split(' ').filter((k) => k.length >= 3));
+  return customers
+    .map((c) => {
+      const lain = intiNama(c.name);
+      if (!lain) return null;
+      // Satu memuat yang lain — "Lulu" vs "Lulu Wijaya". Paling sering benar,
+      // jadi ia yang naik paling atas.
+      if (lain.includes(inti) || inti.includes(lain)) return { c, skor: 0 };
+      // Ada kata yang sama persis: nama depannya sama, sisanya beda tulis.
+      if (lain.split(' ').some((k) => kata.has(k))) return { c, skor: 1 };
+      // Salah ketik: beda satu-dua huruf saja. Nama pendek dibatasi lebih
+      // ketat — pada nama 4 huruf, beda 2 huruf sudah orang lain.
+      const jarak = jarakEdit(inti, lain);
+      return jarak <= (inti.length <= 5 ? 1 : 2) ? { c, skor: 2 + jarak } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.skor - b.skor || a.c.name.localeCompare(b.c.name, 'id'))
+    .slice(0, 5)
+    .map((x) => x.c);
+}
+
+function bukaKonfirmasiBaru(nama, date, time) {
+  pendingJadwal = { nama, date, time };
+  $('newCustName').textContent = nama;
+
+  const daftar = $('newCustMiripList');
+  daftar.innerHTML = '';
+  const mirip = cariMirip(nama);
+  $('newCustMirip').hidden = !mirip.length;
+  mirip.forEach((c) => {
+    const baris = document.createElement('div');
+    baris.className = 'mirip-row';
+    const nm = document.createElement('div');
+    nm.className = 'mirip-nama';
+    nm.textContent = c.name;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    const n = visitCount(c.id);
+    meta.textContent = n ? n + 'x kunjungan tercatat' : 'belum ada kunjungan tercatat';
+    nm.appendChild(meta);
+    const pakai = document.createElement('button');
+    pakai.type = 'button';
+    pakai.className = 'mirip-pakai';
+    pakai.textContent = 'Ini orangnya';
+    pakai.addEventListener('click', () => pilihMirip(c));
+    baris.append(nm, pakai);
+    daftar.appendChild(baris);
+  });
+
+  $('newCustSheet').hidden = false;
+}
+
+function tutupKonfirmasiBaru() {
+  pendingJadwal = null;
+  $('newCustSheet').hidden = true;
+}
+
+function jawabKonfirmasi(status) {
+  const p = pendingJadwal;
+  if (!p) return;
+  tutupKonfirmasiBaru();
+  // Perangkat lain bisa saja mendaftarkan nama yang sama selagi sheet terbuka —
+  // pakai yang sudah ada daripada membuat kembar.
+  simpanJadwal(findCustomerByName(p.nama), p.nama, p.date, p.time, status);
+}
+
+// Ternyata orangnya sudah terdaftar, cuma beda tulis: jadwalnya menempel ke
+// customer yang lama dan nama di form tidak jadi didaftarkan.
+function pilihMirip(c) {
+  const p = pendingJadwal;
+  if (!p) return;
+  tutupKonfirmasiBaru();
+  simpanJadwal(c, c.name, p.date, p.time, null);
+}
+
+$('newCustBaru').addEventListener('click', () => jawabKonfirmasi('baru'));
+$('newCustLama').addEventListener('click', () => jawabKonfirmasi('lama'));
+$('newCustBatal').addEventListener('click', tutupKonfirmasiBaru);
+$('newCustSheet').addEventListener('click', (e) => {
+  if (e.target === $('newCustSheet')) tutupKonfirmasiBaru();
 });
 
 // ============================================================
@@ -563,6 +722,7 @@ $('editSheet').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('editSheet').hidden) closeEdit();
+  if (!$('newCustSheet').hidden) tutupKonfirmasiBaru();
   if (!$('cabangSheet').hidden) closeCabangSheet();
 });
 
@@ -675,7 +835,7 @@ function renderList() {
       main.innerHTML =
         '<span class="check">' + ikon('cek') + '</span>' +
         '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"></div><div class="v"></div></div>';
+        '<div class="who"><div class="n"><span class="nama"></span></div><div class="v"></div></div>';
       el.appendChild(main);
       el.onclick = () => {
         if (selected.has(r.id)) selected.delete(r.id); else selected.add(r.id);
@@ -689,7 +849,7 @@ function renderList() {
       el.appendChild(bg);
       main.innerHTML =
         '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"></div><div class="v"></div></div>' +
+        '<div class="who"><div class="n"><span class="nama"></span></div><div class="v"></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
         '<button class="del" title="Hapus jadwal">Hapus</button>';
       el.appendChild(main);
@@ -698,10 +858,19 @@ function renderList() {
       attachRowGestures(main, r);
     }
     el.querySelector('.t').textContent = r.time;
-    el.querySelector('.n').textContent = nameOf(r.customerId);
-    el.querySelector('.v').textContent = totalVisits > 1
-      ? 'customer lama · ' + visitsBulan + 'x ' + labelBulanSingkat(kunciDari(r.date))
-      : 'customer baru';
+    el.querySelector('.nama').textContent = nameOf(r.customerId);
+    if (sudahLamaDatang(r.customerId, totalVisits)) {
+      el.querySelector('.v').textContent =
+        'customer lama · ' + visitsBulan + 'x ' + labelBulanSingkat(kunciDari(r.date));
+    } else {
+      // Customer baru dapat tanda di sebelah namanya, bukan keterangan kecil di
+      // bawahnya: ini yang perlu langsung kelihatan waktu daftar dibaca sekilas.
+      const tanda = document.createElement('span');
+      tanda.className = 'tanda-baru';
+      tanda.textContent = 'Baru';
+      tanda.title = 'Customer baru';
+      el.querySelector('.n').appendChild(tanda);
+    }
     list.appendChild(el);
   });
   jadwalkanAnalitik();
@@ -781,6 +950,7 @@ function buildWhatsAppText() {
   let lines = ['*JADWAL TREATMENT' + judulCabang + '* 💆'];
   let lastDate = null;
   let n = 0;
+  let adaBaru = false;
   rows.forEach((r) => {
     if (r.date !== lastDate) {
       lines.push('', '📅 *' + hariBulan(r.date) + '*');
@@ -788,8 +958,13 @@ function buildWhatsAppText() {
       n = 0;
     }
     n++;
-    lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId));
+    const baru = !sudahLamaDatang(r.customerId);
+    if (baru) adaBaru = true;
+    lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId) + (baru ? ' 🆕' : ''));
   });
+  // Keterangannya cuma dicantumkan kalau memang ada tandanya — yang membaca di
+  // WhatsApp tidak perlu disodori kunci untuk simbol yang tidak muncul.
+  if (adaBaru) lines.push('', '🆕 customer baru');
   return lines.join('\n');
 }
 
@@ -854,6 +1029,10 @@ $('importFile').addEventListener('change', async () => {
       customers.push(existing);
       newCust++;
     }
+    // Penanda "sudah lama datang, baru masuk sistem" ikut terbawa. Sekali
+    // seseorang diakui customer lama, tidak ada file yang bisa mencabutnya —
+    // ketiadaan penanda di file cuma berarti file itu belum tahu.
+    if (c.sudahLama) existing.sudahLama = true;
     // Gender ikut terbawa: koreksi manual dari file menang atas tebakan yang
     // belum dikoreksi, tapi koreksi manual yang sudah ada di sini tidak pernah
     // ditimpa. Tebakan lawan tebakan sama saja hasilnya, jadi tidak diapa-apakan.

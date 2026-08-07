@@ -109,6 +109,7 @@ WA, export/import), ditambah:
     dan kalau itu pun tidak ada, filenya diunduh;
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
+- **Konfirmasi customer baru** (lihat bagian di bawah).
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,
@@ -131,6 +132,40 @@ koleksi `photos` — tetap utuh di Firestore dan tetap ikut export/import, jadi
 fiturnya bisa dipasang lagi kapan saja tanpa ada yang perlu diisi ulang. Satu
 hal yang tetap jalan diam-diam: foto ikut terhapus kalau jadwal induknya
 dihapus, supaya tidak ada foto yatim yang menumpuk tanpa bisa dijangkau.
+
+## Customer baru atau customer lama yang belum tercatat
+
+Nama yang belum ada di sistem belum tentu orang baru — banyak customer lama
+yang selama ini cuma tercatat di buku. Kalau semuanya ikut terhitung baru,
+label "customer baru" di daftar jadwal jadi tidak ada artinya.
+
+Karena itu, begitu **Simpan Jadwal** ditekan untuk nama yang belum dikenal,
+muncul dulu satu panel dengan dua pilihan:
+
+- **Customer baru** — memang benar-benar baru.
+- **Customer lama, baru dicatat** — sudah lama datang, cuma belum pernah masuk
+  sistem. Jawaban ini tersimpan di data customer (`sudahLama`), jadi jadwalnya
+  langsung tertulis "customer lama" sejak kunjungan pertama yang tercatat,
+  bukan menunggu kunjungan kedua.
+
+Nama yang **mirip** ikut ditampilkan di panel itu, lengkap dengan jumlah
+kunjungannya, dan bisa langsung dipakai lewat tombol "Ini orangnya". Ini
+penjaga terhadap customer kembar: salah ketik satu huruf atau sapaan yang beda
+("Ci Lulu" vs "Cici Lulu") diam-diam membuat orang yang sama jadi dua data, dan
+riwayat kunjungannya ikut terbelah. Kemiripan dinilai setelah sapaan dan tanda
+baca dibuang: nama yang satu memuat yang lain, ada kata yang sama persis, atau
+bedanya cuma satu-dua huruf (nama pendek dibatasi satu huruf — pada nama empat
+huruf, beda dua huruf sudah orang lain).
+
+Nama yang sudah terdaftar tidak lewat panel ini sama sekali; alurnya persis
+seperti sebelumnya, langsung tersimpan.
+
+**Menandainya.** Di daftar jadwal, customer baru dapat tanda **Baru** di sebelah
+namanya — bukan keterangan kecil di bawahnya, supaya langsung kelihatan waktu
+daftarnya dibaca sekilas. Customer lama tetap memakai baris keterangan berisi
+jumlah kunjungan bulan itu. Di salinan WhatsApp tandanya jadi 🆕 di ujung baris,
+dengan satu baris keterangan "🆕 customer baru" di bawah — dan keterangan itu
+cuma ikut kalau memang ada yang ditandai.
 
 ## Gender customer
 
