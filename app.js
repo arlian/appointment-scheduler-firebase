@@ -1,14 +1,21 @@
 // ============================================================
-// Penyimpanan (Firestore) — data tersinkron antar perangkat.
+// Penyimpanan (Firestore) — server satu-satunya sumber kebenaran.
 // Susunan: users/{uid}/data/{customers|appointments|staff},
 // tiap dokumen berisi { rows: [...] } meniru bentuk array lama.
+//
+// Tiap dokumen ditulis utuh sekali kirim, jadi yang menulis terakhir menang
+// dengan membawa seluruh isinya. Selama masih ada salinan lokal yang menetap,
+// perangkat yang lama tidak dibuka bisa mengirim array versi lamanya dan
+// menghapus semua yang ditambahkan perangkat lain — persis yang menghilangkan
+// 24 customer pada 7 Agustus 2026. Karena itu: tidak ada cache yang menetap,
+// dan perubahan hanya boleh jalan saat benar-benar tersambung.
 // ============================================================
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-  initializeFirestore, persistentLocalCache, doc, getDoc, getDocFromCache,
+  initializeFirestore, memoryLocalCache, doc, getDoc,
   setDoc, deleteDoc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
@@ -21,9 +28,9 @@ const configTerisi =
 let db = null, auth = null, uid = null;
 if (configTerisi) {
   const fbApp = initializeApp(window.FIREBASE_CONFIG);
-  // Cache lokal: aplikasi tetap bisa dibuka dan diubah saat offline,
-  // perubahan otomatis terkirim begitu online lagi.
-  db = initializeFirestore(fbApp, { localCache: persistentLocalCache() });
+  // Cache memori saja: begitu tab ditutup tidak ada sisa data maupun antrean
+  // tulisan yang bisa terkirim belakangan dan menimpa data yang lebih baru.
+  db = initializeFirestore(fbApp, { localCache: memoryLocalCache() });
   auth = getAuth(fbApp);
 }
 
@@ -609,7 +616,7 @@ $('staffInput').addEventListener('input', renderStaffChips);
 // Tiap foto utuh (terkompres ±1080px) jadi dokumen sendiri di koleksi photos;
 // appointment hanya membawa daftar thumbnail mini (photos: [{id, thumb}])
 // supaya daftar jadwal tetap ringan. Foto utuh baru diunduh saat dilihat,
-// lalu tersimpan di cache Firestore — pola yang sama seperti WhatsApp.
+// lalu dipegang di memori selama sesi ini saja.
 const fotoRef = (id) => doc(db, 'users', uid, 'cabang', cabangId, 'photos', id);
 let fotoTetap = []; // [{id, thumb}] — foto tersimpan yang tidak dihapus user
 let fotoBaru = [];  // [{full, thumb}] — foto baru yang belum disimpan
@@ -618,16 +625,11 @@ let fotoBaru = [];  // [{full, thumb}] — foto baru yang belum disimpan
 // Dipakai supaya thumbnail tampil tajam tanpa mengunduh apa pun.
 const fotoUtuh = new Map(); // photoId -> dataURL foto utuh
 
-async function pasangFotoMini(img, p) {
-  if (fotoUtuh.has(p.id)) { img.src = fotoUtuh.get(p.id); return; }
-  img.src = p.thumb; // buram dulu; ganti tajam kalau ternyata ada di cache
-  try {
-    const snap = await getDocFromCache(fotoRef(p.id));
-    if (snap.exists()) {
-      fotoUtuh.set(p.id, snap.data().data);
-      img.src = fotoUtuh.get(p.id);
-    }
-  } catch { /* belum pernah diunduh — biarkan thumbnail buram */ }
+// Tajam kalau fotonya sudah ada di memori sesi ini (baru di-upload atau pernah
+// dibuka di viewer); selebihnya biarkan buram. Mengunduh foto utuh cuma demi
+// thumbnail 24px jelas mubazir.
+function pasangFotoMini(img, p) {
+  img.src = fotoUtuh.has(p.id) ? fotoUtuh.get(p.id) : p.thumb;
 }
 
 function bacaGambar(file) {
@@ -795,7 +797,7 @@ $('doneUndo').addEventListener('click', () => {
 
 // ============================================================
 // Viewer foto — thumbnail buram dulu, foto utuh diunduh saat dibuka
-// lalu tersimpan di cache Firestore (tidak diunduh ulang lain kali)
+// lalu dipegang di memori sampai tab ditutup
 // ============================================================
 let muatFotoKe = 0;  // penanda: hasil unduhan lama tidak boleh menimpa viewer
 let viewerFotos = []; // daftar {id, thumb} milik appointment yang sedang dilihat
@@ -825,9 +827,7 @@ async function tampilkanFoto(idx) {
     $('fotoDownload').hidden = true;
     const ref = fotoRef(p.id);
     try {
-      let snap;
-      try { snap = await getDocFromCache(ref); } // ada di cache Firestore?
-      catch { snap = await getDoc(ref); }        // belum — ambil dari cloud
+      const snap = await getDoc(ref);
       if (token !== muatFotoKe) return;          // keburu ditutup / pindah foto
       if (!snap.exists()) throw new Error('foto tidak ditemukan di cloud');
       fotoUtuh.set(p.id, snap.data().data);
