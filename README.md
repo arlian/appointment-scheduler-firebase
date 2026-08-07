@@ -3,8 +3,9 @@
 Versi eksperimen dari [appointment-scheduler](https://github.com/arlian/appointment-scheduler)
 yang menyimpan data di **Cloud Firestore**, bukan localStorage — jadi data yang
 sama bisa dibuka dari HP, tablet, dan komputer mana pun setelah login dengan
-akun salon. Tetap bisa dipakai offline; perubahan menyusul terkirim begitu
-online lagi.
+akun salon. Firestore adalah satu-satunya sumber kebenaran: tidak ada salinan
+data yang menetap di perangkat, dan tanpa sambungan aplikasi hanya bisa dilihat
+— perubahan ditahan sampai sambungan pulih.
 
 ## Setup Firebase (sekali saja, ±10 menit)
 
@@ -88,8 +89,11 @@ WA, tandai selesai + pegawai, export/import), ditambah:
   ikut berubah tanpa refresh.
 - **Login akun salon** — data hanya bisa dibuka setelah login; tombol "Keluar
   dari akun" ada di bawah Export/Import.
-- **Offline tetap jalan**: Firestore menyimpan salinan lokal; saat sinyal
-  hilang aplikasi tetap bisa dipakai dan tersinkron ulang otomatis.
+- **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
+  di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
+  supaya perangkat yang datanya tertinggal tidak bisa menimpa data terbaru.
+  Tiap dokumen ditulis utuh sekali kirim, jadi tulisan dari layar yang basi
+  akan menghapus apa pun yang ditambahkan perangkat lain.
 - **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
   digeser ke bulan mana pun lewat panah di atas:
   - dua angka utama (total treatment dan customer dilayani) lengkap dengan
