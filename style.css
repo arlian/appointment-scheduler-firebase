@@ -349,6 +349,17 @@ button.primary:active { transform: scale(.985); }
 }
 .logout-btn:hover { color: var(--red); background: var(--red-soft); }
 
+/* ---- Palang "belum tersambung" ---- */
+.offline-bar {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: -4px 0 14px; padding: 10px 13px;
+  border: 1px solid #f0cfcd; border-radius: 12px;
+  background: var(--red-soft); color: var(--red);
+  font-size: .84rem; line-height: 1.45;
+}
+.offline-bar[hidden] { display: none; }
+.offline-bar .ico { flex: none; margin-top: 1px; }
+
 /* ---- Pilih cabang ---- */
 .cabang-bar { display: flex; flex-wrap: wrap; gap: 7px; margin: -4px 0 16px; }
 .cabang-bar:empty { display: none; }

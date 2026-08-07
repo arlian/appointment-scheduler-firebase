@@ -43,6 +43,15 @@ let staff = [];
 let cabangList = []; // [{id, name}]
 let cabangId = null; // cabang yang sedang dibuka di perangkat ini
 
+// Status sambungan, dibaca dari metadata snapshot Firestore. Selama snapshot
+// masih fromCache, isi layar belum tentu sama dengan isi server.
+let tersambung = false;
+
+function setSambung(on) {
+  tersambung = on;
+  $('offlineBar').hidden = on || !uid;
+}
+
 function save(key, data) {
   setDoc(doc(db, 'users', uid, 'cabang', cabangId, 'data', key), { rows: data })
     .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
@@ -1161,10 +1170,21 @@ let stopCabangList = null;
 let stopData = [];
 
 function mulaiSync() {
+  setSambung(false); // dianggap belum tersambung sampai server yang bilang lain
   stopCabangList = onSnapshot(
     doc(db, 'users', uid, 'data', 'branches'),
+    // includeMetadataChanges: tanpa ini listener diam saja waktu sambungan
+    // putus, dan status di layar ikut basi.
+    { includeMetadataChanges: true },
     (snap) => {
+      // Satu sambungan dipakai bersama seluruh listener, jadi metadata dari
+      // dokumen yang selalu aktif ini sudah mewakili status aplikasi.
+      setSambung(!snap.metadata.fromCache);
       if (!snap.exists() || !(snap.data().rows || []).length) {
+        // Kosong menurut cache belum tentu benar-benar kosong. Kalau ini
+        // diteruskan, perangkat yang dibuka tanpa sinyal akan membuat ulang
+        // cabang default dan menimpa daftar cabang asli begitu tersambung.
+        if (snap.metadata.fromCache) return;
         buatCabangDefault();
         return;
       }
@@ -1178,7 +1198,10 @@ function mulaiSync() {
       }
       renderCabangBar();
     },
-    (e) => toast('Gagal memuat daftar cabang: ' + e.message, true)
+    (e) => {
+      setSambung(false);
+      toast('Gagal memuat daftar cabang: ' + e.message, true);
+    }
   );
 }
 
@@ -1190,7 +1213,10 @@ function mulaiSyncData() {
       terapkan(snap.exists() ? (snap.data().rows || []) : []);
       renderList();
     },
-    (e) => toast('Gagal memuat data: ' + e.message, true)
+    (e) => {
+      setSambung(false);
+      toast('Gagal memuat data: ' + e.message, true);
+    }
   );
   stopData = [
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
@@ -1213,7 +1239,7 @@ async function buatCabangDefault() {
       try {
         const lamaCloud = await getDoc(doc(db, 'users', uid, 'data', key));
         if (lamaCloud.exists()) rows = lamaCloud.data().rows || [];
-      } catch { /* offline: lewati, coba localStorage saja */ }
+      } catch { /* tidak terbaca: coba localStorage versi lama saja */ }
       if (!rows.length) rows = ambilLokalLama('jt_' + key);
       if (rows.length) {
         await setDoc(doc(db, 'users', uid, 'cabang', daftar[0].id, 'data', key), { rows });
@@ -1306,6 +1332,7 @@ if (!configTerisi) {
       if (stopCabangList) { stopCabangList(); stopCabangList = null; }
       stopData.forEach((lepas) => lepas());
       stopData = [];
+      setSambung(false); // palang ikut disembunyikan karena uid sudah kosong
       customers = []; appointments = []; staff = [];
       cabangList = []; cabangId = null;
       $('cabangBar').innerHTML = '';
