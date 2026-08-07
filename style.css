@@ -234,37 +234,6 @@ button.primary:active { transform: scale(.985); }
 .appt button.del { background: var(--red-soft); color: var(--red); }
 .appt button:active { transform: scale(.95); }
 
-/* ---- Tanda selesai ---- */
-.appt button.chk {
-  width: 25px; height: 25px; padding: 0; border-radius: 50%;
-  border: 1.5px solid var(--border-kuat); background: var(--card); color: transparent;
-  display: grid; place-items: center; font-size: .7rem;
-  /* ketukan ganda di sini artinya "langsung selesai", bukan zoom */
-  touch-action: manipulation; user-select: none;
-}
-.appt button.chk .ico { width: 14px; height: 14px; stroke-width: 2.6; }
-.appt.done button.chk { background: var(--accent); border-color: var(--accent); color: #fff; }
-.appt .who .d {
-  display: flex; align-items: center; gap: 4px;
-  font-size: .75rem; color: var(--accent-deep); font-weight: 600; margin-top: 1px;
-}
-.appt .who .d .ico { stroke-width: 2.6; }
-.undo-done {
-  margin-top: 12px; width: 100%; padding: 12px; font-size: .86rem; font-weight: 600;
-  font-family: inherit; color: var(--red); background: var(--red-soft);
-  border: 0; border-radius: 12px; cursor: pointer;
-}
-.undo-done:active { transform: scale(.985); }
-.staff-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
-.staff-chips:empty { display: none; }
-.staff-chip {
-  padding: 7px 13px; font-size: .8125rem; font-weight: 600; cursor: pointer;
-  color: var(--text-2); background: var(--field); border: 0; border-radius: 999px;
-  font-family: inherit;
-}
-.staff-chip.active { color: #fff; background: var(--accent); }
-.staff-chip:active { transform: scale(.96); }
-
 /* ---- Mode pilih (hapus banyak) ---- */
 .appt.selectable { cursor: pointer; }
 .appt.selectable .appt-main { border-radius: 11px; padding-left: 4px; padding-right: 4px; }
@@ -587,60 +556,6 @@ button.primary:active { transform: scale(.985); }
   background: var(--red-soft); color: var(--red); font-size: .8125rem; line-height: 1.5;
 }
 .login-setup code { font-family: ui-monospace, Consolas, monospace; font-size: .95em; }
-
-/* ---- Foto treatment ---- */
-.foto-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 4px; }
-.foto-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 13px; border-radius: 11px; cursor: pointer; font-family: inherit;
-  font-size: .84rem; font-weight: 600; border: 1.5px dashed var(--accent);
-  background: var(--accent-soft); color: var(--accent-deep);
-}
-.foto-item { position: relative; }
-.foto-preview {
-  display: block; width: 62px; height: 62px; object-fit: cover; border-radius: 11px;
-  border: 1px solid var(--border);
-}
-.foto-x {
-  position: absolute; top: -6px; right: -6px; width: 21px; height: 21px;
-  display: grid; place-items: center;
-  border: 0; border-radius: 50%; background: var(--red); color: #fff;
-  font-size: 10px; cursor: pointer;
-}
-.foto-x .ico { width: 11px; height: 11px; stroke-width: 2.6; }
-.foto-mini-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.foto-mini {
-  display: block; width: 44px; height: 44px; object-fit: cover;
-  border-radius: 9px; border: 1px solid var(--border); cursor: pointer;
-}
-.foto-viewer {
-  position: fixed; inset: 0; z-index: 35; background: rgba(26, 14, 20, .94);
-  display: flex; align-items: center; justify-content: center;
-}
-.foto-viewer[hidden] { display: none; }
-.foto-viewer img { max-width: 92vw; max-height: 82vh; border-radius: 11px; }
-/* Saat foto utuh belum terunduh: thumbnail mini diperbesar + blur, ala WhatsApp */
-.foto-viewer img.memuat { width: min(78vw, 320px); height: auto; filter: blur(14px); opacity: .85; }
-#fotoViewerSpin { position: absolute; }
-.foto-close, .foto-nav {
-  position: absolute; display: grid; place-items: center;
-  border: 0; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff;
-  cursor: pointer;
-}
-.foto-close { top: 16px; right: 16px; width: 40px; height: 40px; font-size: 17px; }
-.foto-nav { top: 50%; left: 10px; transform: translateY(-50%); width: 44px; height: 44px; font-size: 22px; }
-.foto-nav.next { left: auto; right: 10px; }
-.foto-download {
-  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-  display: inline-flex; align-items: center; gap: 7px;
-  background: rgba(255, 255, 255, .16); color: #fff; padding: 10px 17px;
-  border-radius: 999px; text-decoration: none; font-size: .875rem; font-weight: 600;
-}
-.foto-counter {
-  position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-  background: rgba(255, 255, 255, .14); color: #fff; padding: 4px 12px;
-  border-radius: 999px; font-size: .84rem; font-variant-numeric: tabular-nums;
-}
 
 /* ---- Toast ---- */
 .toast {

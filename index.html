@@ -42,10 +42,6 @@
   <symbol id="i-unggah" viewBox="0 0 24 24">
     <path d="M12 15.75V4.25M7.5 8.75 12 4.25l4.5 4.5M4 19.75h16"/>
   </symbol>
-  <symbol id="i-kamera" viewBox="0 0 24 24">
-    <path d="M3.25 8.75A2.5 2.5 0 0 1 5.75 6.25h1.6l1.3-2.1h6.7l1.3 2.1h1.6a2.5 2.5 0 0 1 2.5 2.5v8.5a2.5 2.5 0 0 1-2.5 2.5H5.75a2.5 2.5 0 0 1-2.5-2.5z"/>
-    <circle cx="12" cy="13" r="3.6"/>
-  </symbol>
   <symbol id="i-lokasi" viewBox="0 0 24 24">
     <path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/>
     <circle cx="12" cy="10.2" r="2.6"/>
@@ -67,7 +63,6 @@
   </symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
   <symbol id="i-cek" viewBox="0 0 24 24"><path d="m5 12.75 4.75 4.75L19 6.5"/></symbol>
-  <symbol id="i-silang" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-kiri" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
   <symbol id="i-kanan" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
   <symbol id="i-keluar" viewBox="0 0 24 24">
@@ -273,23 +268,6 @@
     </div>
   </div>
 </div>
-<div class="sheet-backdrop" id="doneSheet" hidden>
-  <div class="sheet">
-    <h2>Tandai Selesai</h2>
-    <div class="sheet-name" id="doneName"></div>
-    <label for="staffInput">Pegawai yang melakukan treatment</label>
-    <input id="staffInput" placeholder="mis. Rina" autocomplete="off">
-    <div class="staff-chips" id="staffChips"></div>
-    <label>Foto hasil treatment (opsional)</label>
-    <div class="foto-row" id="fotoRow"></div>
-    <input type="file" id="fotoFile" accept="image/*" multiple hidden>
-    <div class="sheet-actions">
-      <button type="button" class="ghost" id="doneCancel">Batal</button>
-      <button type="button" class="primary" id="doneSave">Simpan</button>
-    </div>
-    <button type="button" class="undo-done" id="doneUndo" hidden>Batalkan tanda selesai</button>
-  </div>
-</div>
 <div class="sheet-backdrop" id="cabangSheet" hidden>
   <div class="sheet">
     <h2>Tambah Cabang</h2>
@@ -323,23 +301,6 @@
       langkah-langkahnya ada di README.md.
     </div>
   </div>
-</div>
-<div class="foto-viewer" id="fotoViewer" hidden>
-  <img id="fotoViewerImg" alt="Foto treatment">
-  <div class="spinner" id="fotoViewerSpin" hidden></div>
-  <button type="button" class="foto-close" id="fotoViewerClose" aria-label="Tutup">
-    <svg class="ico" aria-hidden="true"><use href="#i-silang"/></svg>
-  </button>
-  <button type="button" class="foto-nav" id="fotoPrev" aria-label="Foto sebelumnya" hidden>
-    <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg>
-  </button>
-  <button type="button" class="foto-nav next" id="fotoNext" aria-label="Foto berikutnya" hidden>
-    <svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
-  </button>
-  <div class="foto-counter" id="fotoCounter" hidden></div>
-  <a class="foto-download" id="fotoDownload" hidden>
-    <svg class="ico" aria-hidden="true"><use href="#i-unduh"/></svg>Simpan Foto
-  </a>
 </div>
 <div class="toast" id="toast"></div>
 

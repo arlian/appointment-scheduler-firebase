@@ -83,7 +83,7 @@ versi ini.
 ## Fitur
 
 Sama dengan versi asli (auto-deteksi customer, filter jadwal, salin format
-WA, tandai selesai + pegawai, export/import), ditambah:
+WA, export/import), ditambah:
 
 - **Sinkron antar perangkat** real-time: ubah jadwal di HP, layar komputer
   ikut berubah tanpa refresh.
@@ -109,11 +109,6 @@ WA, tandai selesai + pegawai, export/import), ditambah:
     dan kalau itu pun tidak ada, filenya diunduh;
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
-- **Centang cepat**: tap dua kali pada lingkaran centang di sebuah jadwal
-  langsung menandainya selesai — atau melepas centangnya kalau sudah selesai —
-  tanpa membuka apa pun. Tap sekali tetap membuka isian pegawai dan foto.
-  Melepas centang lewat ketukan ganda tidak menghapus pegawai maupun fotonya;
-  yang menghapus foto hanya tombol "Batalkan tanda selesai" di dalam isian.
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,
@@ -122,6 +117,20 @@ WA, tandai selesai + pegawai, export/import), ditambah:
   salinan WA mengikuti cabang yang sedang dibuka (nama cabang ikut
   tercantum di salinan WA).
 - **Gender customer** (lihat bagian di bawah).
+
+## Tandai selesai — sedang dimatikan
+
+Fitur centang selesai (pegawai yang menangani + foto hasil treatment) untuk
+sementara dihilangkan dari layar karena belum diperlukan: lingkaran centang di
+tiap jadwal, panel isian pegawai/foto, tanda "Selesai" di daftar, dan ✅ di
+salinan WhatsApp semuanya tidak ada lagi.
+
+Yang hilang cuma tampilannya. Data yang terlanjur tercatat — field
+`done`/`staff`/`photos` di tiap jadwal, daftar pegawai, dan dokumen foto di
+koleksi `photos` — tetap utuh di Firestore dan tetap ikut export/import, jadi
+fiturnya bisa dipasang lagi kapan saja tanpa ada yang perlu diisi ulang. Satu
+hal yang tetap jalan diam-diam: foto ikut terhapus kalau jadwal induknya
+dihapus, supaya tidak ada foto yatim yang menumpuk tanpa bisa dijangkau.
 
 ## Gender customer
 

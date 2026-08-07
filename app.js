@@ -20,7 +20,10 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?}]
-const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, done?, staff?}]
+const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time}]
+// Pegawai cuma dipakai fitur "tandai selesai" yang sedang dinonaktifkan. Datanya
+// tetap ikut disinkronkan dan ikut terbawa export/import supaya utuh saat fiturnya
+// dinyalakan lagi — begitu juga field done/staff/photos di tiap appointment.
 const KEY_STAFF = 'staff';               // ['Nama Pegawai', ...]
 
 const configTerisi =
@@ -524,9 +527,7 @@ $('selDelete').addEventListener('click', () => {
   if (!selected.size) return;
   if (!bolehUbah()) return;
   if (!confirm('Hapus ' + selected.size + ' jadwal yang dipilih?')) return;
-  appointments.forEach((a) => {
-    if (selected.has(a.id)) (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
-  });
+  appointments.forEach((a) => { if (selected.has(a.id)) hapusFotoJadwal(a); });
   appointments = appointments.filter((a) => !selected.has(a.id));
   save(KEY_APPOINTMENTS, appointments);
   const n = selected.size;
@@ -562,9 +563,7 @@ $('editSheet').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('editSheet').hidden) closeEdit();
-  if (!$('doneSheet').hidden) closeDone();
   if (!$('cabangSheet').hidden) closeCabangSheet();
-  if (!$('fotoViewer').hidden) tutupFotoViewer();
 });
 
 $('editSave').addEventListener('click', () => {
@@ -614,282 +613,21 @@ $('editSave').addEventListener('click', () => {
 });
 
 // ============================================================
-// Tandai selesai (treatment sudah dilakukan + pegawai yang menangani)
+// Sisa fitur "tandai selesai"
+// ------------------------------------------------------------
+// Fitur centang selesai (pegawai + foto hasil treatment) sedang dimatikan
+// karena belum diperlukan. Datanya sengaja tidak diapa-apakan: field
+// done/staff/photos di appointment, daftar pegawai, dan dokumen foto di
+// koleksi photos semuanya tetap di Firestore, jadi fiturnya tinggal
+// dipasang lagi tanpa ada yang hilang.
+//
+// Yang tersisa di sini cuma pembersihnya — foto ikut terhapus kalau jadwal
+// induknya dihapus, supaya tidak ada dokumen foto yatim yang tak terjangkau
+// dari mana pun.
 // ============================================================
-let doneId = null;
-
-function renderStaffChips() {
-  const box = $('staffChips');
-  box.innerHTML = '';
-  const current = $('staffInput').value.trim().toLowerCase();
-  staff.forEach((s) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'staff-chip' + (s.toLowerCase() === current ? ' active' : '');
-    b.textContent = s;
-    b.onclick = () => { $('staffInput').value = s; renderStaffChips(); };
-    box.appendChild(b);
-  });
-}
-
-$('staffInput').addEventListener('input', renderStaffChips);
-
-// --- Foto hasil treatment ---
-// Tiap foto utuh (terkompres ±1080px) jadi dokumen sendiri di koleksi photos;
-// appointment hanya membawa daftar thumbnail mini (photos: [{id, thumb}])
-// supaya daftar jadwal tetap ringan. Foto utuh baru diunduh saat dilihat,
-// lalu dipegang di memori selama sesi ini saja.
 const fotoRef = (id) => doc(db, 'users', uid, 'cabang', cabangId, 'photos', id);
-let fotoTetap = []; // [{id, thumb}] — foto tersimpan yang tidak dihapus user
-let fotoBaru = [];  // [{full, thumb}] — foto baru yang belum disimpan
-
-// Foto utuh yang sudah ada di perangkat ini (pernah diunduh / baru di-upload).
-// Dipakai supaya thumbnail tampil tajam tanpa mengunduh apa pun.
-const fotoUtuh = new Map(); // photoId -> dataURL foto utuh
-
-// Tajam kalau fotonya sudah ada di memori sesi ini (baru di-upload atau pernah
-// dibuka di viewer); selebihnya biarkan buram. Mengunduh foto utuh cuma demi
-// thumbnail 24px jelas mubazir.
-function pasangFotoMini(img, p) {
-  img.src = fotoUtuh.has(p.id) ? fotoUtuh.get(p.id) : p.thumb;
-}
-
-function bacaGambar(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bukan gambar')); };
-    img.src = url;
-  });
-}
-
-async function kompresFoto(file) {
-  const img = await bacaGambar(file);
-  const kecilkan = (maxSisi, mutu) => {
-    const skala = Math.min(1, maxSisi / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(img.naturalWidth * skala));
-    c.height = Math.max(1, Math.round(img.naturalHeight * skala));
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', mutu);
-  };
-  return { full: kecilkan(1080, 0.75), thumb: kecilkan(24, 0.4) };
-}
-
-function renderFotoRow() {
-  const box = $('fotoRow');
-  box.innerHTML = '';
-  const pasang = (src, hapus) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'foto-item';
-    const img = document.createElement('img');
-    img.className = 'foto-preview';
-    img.src = src;
-    img.alt = 'Foto treatment';
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'foto-x';
-    x.title = 'Hapus foto ini';
-    x.setAttribute('aria-label', 'Hapus foto ini');
-    x.innerHTML = ikon('silang');
-    x.onclick = hapus;
-    wrap.append(img, x);
-    box.appendChild(wrap);
-  };
-  fotoTetap.forEach((p, i) =>
-    pasang(fotoUtuh.get(p.id) || p.thumb, () => { fotoTetap.splice(i, 1); renderFotoRow(); }));
-  fotoBaru.forEach((p, i) => pasang(p.full, () => { fotoBaru.splice(i, 1); renderFotoRow(); }));
-  const tambah = document.createElement('button');
-  tambah.type = 'button';
-  tambah.className = 'foto-btn';
-  tambah.innerHTML = ikon('kamera') + 'Tambah Foto';
-  tambah.onclick = () => $('fotoFile').click();
-  box.appendChild(tambah);
-}
-
-$('fotoFile').addEventListener('change', async () => {
-  const files = [...$('fotoFile').files];
-  $('fotoFile').value = '';
-  if (!files.length) return;
-  let gagal = 0;
-  for (const file of files) {
-    try { fotoBaru.push(await kompresFoto(file)); }
-    catch { gagal++; }
-  }
-  renderFotoRow();
-  if (gagal) toast(gagal + ' file bukan gambar — dilewati.', true);
-});
-
-function openDone(apptId) {
-  const a = appointments.find((x) => x.id === apptId);
-  if (!a) return;
-  doneId = apptId;
-  $('doneName').textContent = nameOf(a.customerId) + ' — ' + hariBulan(a.date) + ' ' + a.time;
-  $('staffInput').value = a.staff || '';
-  $('doneUndo').hidden = !a.done;
-  fotoTetap = (a.photos || []).slice();
-  fotoBaru = [];
-  renderStaffChips();
-  renderFotoRow();
-  $('doneSheet').hidden = false;
-  // Fokus ke input hanya saat belum ada daftar pegawai (pertama kali harus ketik manual);
-  // selebihnya cukup tap chip tanpa keyboard muncul.
-  if (!a.done && !staff.length) $('staffInput').focus();
-}
-
-function closeDone() {
-  doneId = null;
-  $('doneSheet').hidden = true;
-}
-
-$('doneCancel').addEventListener('click', closeDone);
-$('doneSheet').addEventListener('click', (e) => {
-  if (e.target === $('doneSheet')) closeDone();
-});
-
-$('doneSave').addEventListener('click', () => {
-  const a = appointments.find((x) => x.id === doneId);
-  if (!a) { closeDone(); return; }
-  if (!bolehUbah()) return; // foto ikut ditahan: jangan sampai terunggah tanpa induknya
-  const name = $('staffInput').value.trim().replace(/\s+/g, ' ');
-  a.done = true;
-  if (name) { a.staff = name; addStaff(name); }
-  else delete a.staff;
-  // Foto yang dibuang user: hapus dokumennya di cloud
-  (a.photos || []).forEach((p) => {
-    if (!fotoTetap.some((t) => t.id === p.id)) deleteDoc(fotoRef(p.id)).catch(() => {});
-  });
-  fotoBaru.forEach((p) => {
-    const idFoto = buatId();
-    setDoc(fotoRef(idFoto), { data: p.full })
-      .catch((e) => toast('Gagal menyimpan foto: ' + e.message, true));
-    fotoUtuh.set(idFoto, p.full); // perangkat peng-upload langsung tajam
-    fotoTetap.push({ id: idFoto, thumb: p.thumb });
-  });
-  if (fotoTetap.length) a.photos = fotoTetap;
-  else delete a.photos;
-  save(KEY_APPOINTMENTS, appointments);
-  closeDone();
-  renderList();
-  toast(name ? 'Ditandai selesai — oleh ' + name + '.' : 'Ditandai selesai.');
-});
-
-// Centang cepat: dua ketukan beruntun langsung menandai selesai tanpa isi
-// pegawai. Satu ketukan tetap membuka sheet (isi pegawai, foto, dll) — karena
-// itu ketukan pertama ditahan sebentar dulu, menunggu kemungkinan ketukan kedua.
-function toggleCentangCepat(apptId) {
-  const a = appointments.find((x) => x.id === apptId);
-  if (!a) return;
-  if (!bolehUbah()) return;
-  const jadiSelesai = !a.done;
-  // Sengaja tidak menyentuh a.staff dan a.photos: ketukan ganda hanya melepas
-  // centangnya, tidak membuang data. Kalau dicentang lagi, pegawai dan fotonya
-  // kembali utuh. Yang benar-benar menghapus foto cuma tombol "Batalkan tanda
-  // selesai" di dalam sheet — jalur eksplisit yang harus dibuka dulu.
-  if (jadiSelesai) a.done = true; else delete a.done;
-  save(KEY_APPOINTMENTS, appointments);
-  renderList();
-  if (navigator.vibrate) navigator.vibrate(15);
-  toast(jadiSelesai
-    ? 'Ditandai selesai. Tap centangnya lagi kalau mau isi pegawai.'
-    : 'Centang dilepas. Pegawai dan fotonya masih tersimpan.');
-}
-
-function pasangAksiCentang(btn, r) {
-  let tunggu = null;
-  btn.onclick = () => {
-    if (tunggu) { clearTimeout(tunggu); tunggu = null; toggleCentangCepat(r.id); return; }
-    tunggu = setTimeout(() => { tunggu = null; openDone(r.id); }, 260);
-  };
-}
-
-$('doneUndo').addEventListener('click', () => {
-  const a = appointments.find((x) => x.id === doneId);
-  if (!a) { closeDone(); return; }
-  if (!bolehUbah()) return;
-  delete a.done;
-  delete a.staff;
+const hapusFotoJadwal = (a) =>
   (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
-  delete a.photos;
-  save(KEY_APPOINTMENTS, appointments);
-  closeDone();
-  renderList();
-  toast('Tanda selesai dibatalkan.');
-});
-
-// ============================================================
-// Viewer foto — thumbnail buram dulu, foto utuh diunduh saat dibuka
-// lalu dipegang di memori sampai tab ditutup
-// ============================================================
-let muatFotoKe = 0;  // penanda: hasil unduhan lama tidak boleh menimpa viewer
-let viewerFotos = []; // daftar {id, thumb} milik appointment yang sedang dilihat
-let viewerIdx = 0;
-let viewerDate = '';
-
-function bukaFotoViewer(r, idx) {
-  viewerFotos = r.photos || [];
-  viewerDate = r.date;
-  $('fotoViewer').hidden = false;
-  tampilkanFoto(idx);
-}
-
-async function tampilkanFoto(idx) {
-  viewerIdx = idx;
-  const token = ++muatFotoKe;
-  const p = viewerFotos[idx];
-  const img = $('fotoViewerImg');
-  $('fotoPrev').hidden = idx <= 0;
-  $('fotoNext').hidden = idx >= viewerFotos.length - 1;
-  $('fotoCounter').textContent = (idx + 1) + ' / ' + viewerFotos.length;
-  $('fotoCounter').hidden = viewerFotos.length < 2;
-  if (!fotoUtuh.has(p.id)) { // belum ada di perangkat: buram dulu, unduh
-    img.src = p.thumb;
-    img.className = 'memuat';
-    $('fotoViewerSpin').hidden = false;
-    $('fotoDownload').hidden = true;
-    const ref = fotoRef(p.id);
-    try {
-      const snap = await getDoc(ref);
-      if (token !== muatFotoKe) return;          // keburu ditutup / pindah foto
-      if (!snap.exists()) throw new Error('foto tidak ditemukan di cloud');
-      fotoUtuh.set(p.id, snap.data().data);
-    } catch (e) {
-      if (token !== muatFotoKe) return;
-      tutupFotoViewer();
-      toast('Gagal memuat foto: ' + e.message, true);
-      return;
-    }
-  }
-  img.src = fotoUtuh.get(p.id);
-  img.className = '';
-  $('fotoViewerSpin').hidden = true;
-  const unduh = $('fotoDownload');
-  unduh.href = img.src;
-  unduh.download = 'treatment-' + viewerDate + '-' + (idx + 1) + '.jpg';
-  unduh.hidden = false;
-}
-
-function tutupFotoViewer() {
-  muatFotoKe++;
-  $('fotoViewer').hidden = true;
-  $('fotoViewerImg').src = '';
-  renderList(); // thumbnail foto yang baru diunduh ikut jadi tajam
-}
-
-$('fotoViewerClose').addEventListener('click', tutupFotoViewer);
-$('fotoViewer').addEventListener('click', (e) => {
-  if (e.target === $('fotoViewer')) tutupFotoViewer();
-});
-$('fotoPrev').addEventListener('click', () => tampilkanFoto(viewerIdx - 1));
-$('fotoNext').addEventListener('click', () => tampilkanFoto(viewerIdx + 1));
-document.addEventListener('keydown', (e) => {
-  if ($('fotoViewer').hidden) return;
-  if (e.key === 'ArrowLeft' && viewerIdx > 0) tampilkanFoto(viewerIdx - 1);
-  if (e.key === 'ArrowRight' && viewerIdx < viewerFotos.length - 1) tampilkanFoto(viewerIdx + 1);
-});
 
 // ============================================================
 // Daftar jadwal (render)
@@ -945,41 +683,16 @@ function renderList() {
         updateSelectBar();
       };
     } else {
-      if (r.done) el.classList.add('done');
       const bg = document.createElement('div');
       bg.className = 'appt-bg';
       bg.textContent = 'Hapus';
       el.appendChild(bg);
       main.innerHTML =
-        '<button class="chk" title="Tap: isi pegawai · Tap dua kali: ' +
-        (r.done ? 'lepas centang' : 'langsung selesai') + '" ' +
-        'aria-label="Tandai treatment selesai">' + ikon('cek') + '</button>' +
         '<div class="when"><div class="t"></div></div>' +
         '<div class="who"><div class="n"></div><div class="v"></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
         '<button class="del" title="Hapus jadwal">Hapus</button>';
       el.appendChild(main);
-      if (r.done) {
-        const d = document.createElement('div');
-        d.className = 'd';
-        d.innerHTML = ikon('cek');
-        d.append('Selesai' + (r.staff ? ' · ' + r.staff : ''));
-        el.querySelector('.who').appendChild(d);
-        if (r.photos && r.photos.length) {
-          const rowFoto = document.createElement('div');
-          rowFoto.className = 'foto-mini-row';
-          r.photos.forEach((p, i) => {
-            const f = document.createElement('img');
-            f.className = 'foto-mini';
-            f.alt = 'Foto treatment — tap untuk melihat';
-            pasangFotoMini(f, p);
-            f.onclick = () => bukaFotoViewer(r, i);
-            rowFoto.appendChild(f);
-          });
-          el.querySelector('.who').appendChild(rowFoto);
-        }
-      }
-      pasangAksiCentang(el.querySelector('.chk'), r);
       el.querySelector('.edit').onclick = () => openEdit(r.id);
       el.querySelector('.del').onclick = () => confirmDelete(r);
       attachRowGestures(main, r);
@@ -997,7 +710,7 @@ function renderList() {
 function confirmDelete(r) {
   if (!bolehUbah()) return;
   if (!confirm('Hapus jadwal ' + nameOf(r.customerId) + ' pada ' + hariBulan(r.date) + ' ' + r.time + '?')) return;
-  (r.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
+  hapusFotoJadwal(r);
   appointments = appointments.filter((a) => a.id !== r.id);
   save(KEY_APPOINTMENTS, appointments);
   toast('Jadwal dihapus.');
@@ -1021,7 +734,7 @@ function attachRowGestures(main, r) {
   main.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY; dx = 0; mode = null;
-    if (!e.target.closest('button, .foto-mini')) {
+    if (!e.target.closest('button')) {
       pressTimer = setTimeout(() => {
         pressTimer = null;
         mode = 'cancel';
@@ -1075,9 +788,7 @@ function buildWhatsAppText() {
       n = 0;
     }
     n++;
-    let line = n + '. ' + r.time + ' — ' + nameOf(r.customerId);
-    if (r.done) line += ' ✅' + (r.staff ? ' (' + r.staff + ')' : '');
-    lines.push(line);
+    lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId));
   });
   return lines.join('\n');
 }
