@@ -444,11 +444,12 @@ button.primary:active { transform: scale(.985); }
   display: grid; place-items: center; cursor: pointer;
 }
 .heat-sel.luar { background: none; cursor: default; pointer-events: none; }
-/* Hari kosong: tanggalnya saja, di tengah. Hari berisi: tanggal mengecil ke pojok
-   supaya jumlah treatment yang jadi angka utama — kebaca tanpa perlu hover */
-.heat-sel.ada .heat-tgl {
+/* Tanggal mengecil ke pojok supaya jumlah treatment yang jadi angka utama —
+   kebaca tanpa perlu hover. Hierarkinya dibikin lewat ukuran, bukan opacity:
+   tanggal 9px yang diredupkan tidak lagi lolos kontras di kotak paling terang. */
+.heat-tgl {
   position: absolute; top: 2px; left: 4px;
-  font-size: .56rem; font-weight: 600; opacity: .75;
+  font-size: .56rem; font-weight: 600;
 }
 .heat-jml { font-size: .95rem; font-weight: 700; line-height: 1; }
 /* Angka tanggal di dalam kotak: tinta gelap di dua langkah terang,

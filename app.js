@@ -1606,19 +1606,18 @@ function renderHeat(kini) {
     const n = perHari.get(iso) || 0;
     const sel = document.createElement('button');
     sel.type = 'button';
-    sel.className = 'heat-sel' + (n ? ' ada' : '') + (iso === today() ? ' kini' : '');
+    sel.className = 'heat-sel' + (iso === today() ? ' kini' : '');
     sel.dataset.l = String(tingkatWarna(n, maks));
-    // Jumlahnya dicetak langsung di kotak — di HP tidak ada hover untuk memunculkan tooltip
+    // Jumlahnya dicetak langsung di kotak — di HP tidak ada hover untuk memunculkan
+    // tooltip. Hari kosong ikut ditulis 0, bukan dikosongkan: kotak tanpa angka
+    // membaca seperti angkanya belum sempat termuat, bukan seperti hari yang sepi.
     const tgl = document.createElement('span');
     tgl.className = 'heat-tgl';
     tgl.textContent = String(t);
-    sel.appendChild(tgl);
-    if (n) {
-      const jml = document.createElement('span');
-      jml.className = 'heat-jml';
-      jml.textContent = String(n);
-      sel.appendChild(jml);
-    }
+    const jml = document.createElement('span');
+    jml.className = 'heat-jml';
+    jml.textContent = String(n);
+    sel.append(tgl, jml);
     const teks = n ? n + ' treatment' : 'Tidak ada jadwal';
     sel.setAttribute('aria-label', teks + ' — ' + hariSingkat(iso) + '. Buka di daftar jadwal.');
     pasangTip(sel, '<b>' + teks + '</b><br>' + hariSingkat(iso));
@@ -1961,15 +1960,11 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     ctx.fill();
     // Dua langkah tergelap pakai tinta putih supaya angkanya tetap terbaca
     const tinta = tingkat >= 3 ? '#ffffff' : C.text2;
-    if (n) {
-      // Sama seperti di layar: tanggal kecil di pojok, jumlah treatment di tengah
-      vizTeks(ctx, String(t), x + 7, ky + 14, { ukuran: 10, tebal: 600, warna: tinta });
-      vizTeks(ctx, String(n), x + selW / 2, ky + selH / 2 + 7,
-        { ukuran: 16, tebal: 700, warna: tinta, rata: 'center' });
-    } else {
-      vizTeks(ctx, String(t), x + selW / 2, ky + selH / 2 + 5,
-        { ukuran: 13, tebal: 600, warna: tinta, rata: 'center' });
-    }
+    // Sama seperti di layar: tanggal kecil di pojok, jumlah treatment di tengah,
+    // hari kosong tetap ditulis 0
+    vizTeks(ctx, String(t), x + 7, ky + 14, { ukuran: 10, tebal: 600, warna: tinta });
+    vizTeks(ctx, String(n), x + selW / 2, ky + selH / 2 + 7,
+      { ukuran: 16, tebal: 700, warna: tinta, rata: 'center' });
   }
   const ly = y + tinggiK - 18;
   vizTeks(ctx, 'Sepi', L + 22, ly + 4, { ukuran: 11.5, warna: C.muted });
