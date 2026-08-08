@@ -89,6 +89,10 @@ WA, export/import), ditambah:
   ikut berubah tanpa refresh.
 - **Login akun salon** — data hanya bisa dibuka setelah login; tombol "Keluar
   dari akun" ada di bawah Export/Import.
+- **Daftar jadwal yang tidak perlu dihitung manual**: total yang sedang tampil
+  tercetak di atas daftar ("12 jadwal · 5 hari"), tiap judul tanggal membawa
+  jumlah hari itu, dan tiap baris bernomor antrian yang mulai lagi dari 1 di
+  setiap tanggal.
 - **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
   supaya perangkat yang datanya tertinggal tidak bisa menimpa data terbaru.
@@ -99,8 +103,9 @@ WA, export/import), ditambah:
   - dua angka utama (total treatment dan customer dilayani) lengkap dengan
     selisih terhadap bulan sebelumnya;
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
-    makin pekat makin ramai; tap satu kotak untuk langsung melihat jadwal hari
-    itu di tab Jadwal;
+    dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
+    HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
+    kotak untuk langsung melihat jadwal hari itu di tab Jadwal;
   - **jam tersibuk** dalam bentuk batang;
   - **komposisi gender** (lihat bagian di bawah);
   - tombol **"Salin sebagai Gambar"** — seluruh ringkasan bulan itu jadi satu

@@ -802,6 +802,7 @@ function renderList() {
     [...selected].forEach((id) => { if (!visibleIds.has(id)) selected.delete(id); });
     updateSelectBar();
   }
+  setRingkasList(rows);
   if (!rows.length) {
     const msg = filterMode === 'today' ? 'Tidak ada jadwal hari ini.'
       : filterMode === 'pastweek' ? 'Tidak ada jadwal seminggu ke belakang.'
@@ -813,15 +814,25 @@ function renderList() {
     list.innerHTML = '<div class="empty">' + msg + '</div>';
     return;
   }
+  // Jumlah per tanggal dihitung sekali di depan supaya bisa dicetak di judul hari
+  const perHari = new Map();
+  rows.forEach((r) => perHari.set(r.date, (perHari.get(r.date) || 0) + 1));
   let lastDate = null;
+  let urut = 0;
   rows.forEach((r) => {
     if (r.date !== lastDate) {
       const h = document.createElement('div');
       h.className = 'day-head';
       h.textContent = hariBulan(r.date);
+      const jml = document.createElement('span');
+      jml.className = 'day-jml';
+      jml.textContent = perHari.get(r.date) + ' jadwal';
+      h.appendChild(jml);
       list.appendChild(h);
       lastDate = r.date;
+      urut = 0;
     }
+    urut++;
     // Lama/baru tetap dilihat dari seluruh riwayat; angkanya yang per bulan.
     const totalVisits = visitCount(r.customerId);
     const visitsBulan = visitCount(r.customerId, kunciDari(r.date));
@@ -847,7 +858,9 @@ function renderList() {
       bg.className = 'appt-bg';
       bg.textContent = 'Hapus';
       el.appendChild(bg);
+      // Nomor antrian hari itu — ikut di baris supaya tidak perlu dihitung manual
       main.innerHTML =
+        '<div class="urut"></div>' +
         '<div class="when"><div class="t"></div></div>' +
         '<div class="who"><div class="n"><span class="nama"></span></div><div class="v"></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
@@ -856,6 +869,11 @@ function renderList() {
       el.querySelector('.edit').onclick = () => openEdit(r.id);
       el.querySelector('.del').onclick = () => confirmDelete(r);
       attachRowGestures(main, r);
+    }
+    const noUrut = el.querySelector('.urut');
+    if (noUrut) {
+      noUrut.textContent = String(urut);
+      noUrut.setAttribute('aria-label', 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
     }
     el.querySelector('.t').textContent = r.time;
     el.querySelector('.nama').textContent = nameOf(r.customerId);
@@ -874,6 +892,16 @@ function renderList() {
     list.appendChild(el);
   });
   jadwalkanAnalitik();
+}
+
+// Total jadwal yang sedang tampil — supaya jumlahnya tidak perlu dihitung sendiri
+function setRingkasList(rows) {
+  const box = $('listTotal');
+  if (!rows.length) { box.textContent = ''; return; }
+  const hari = new Set(rows.map((r) => r.date)).size;
+  box.textContent = hari > 1
+    ? rows.length + ' jadwal · ' + hari + ' hari'
+    : rows.length + ' jadwal';
 }
 
 function confirmDelete(r) {
@@ -1578,9 +1606,19 @@ function renderHeat(kini) {
     const n = perHari.get(iso) || 0;
     const sel = document.createElement('button');
     sel.type = 'button';
-    sel.className = 'heat-sel' + (iso === today() ? ' kini' : '');
+    sel.className = 'heat-sel' + (n ? ' ada' : '') + (iso === today() ? ' kini' : '');
     sel.dataset.l = String(tingkatWarna(n, maks));
-    sel.textContent = String(t);
+    // Jumlahnya dicetak langsung di kotak — di HP tidak ada hover untuk memunculkan tooltip
+    const tgl = document.createElement('span');
+    tgl.className = 'heat-tgl';
+    tgl.textContent = String(t);
+    sel.appendChild(tgl);
+    if (n) {
+      const jml = document.createElement('span');
+      jml.className = 'heat-jml';
+      jml.textContent = String(n);
+      sel.appendChild(jml);
+    }
     const teks = n ? n + ' treatment' : 'Tidak ada jadwal';
     sel.setAttribute('aria-label', teks + ' — ' + hariSingkat(iso) + '. Buka di daftar jadwal.');
     pasangTip(sel, '<b>' + teks + '</b><br>' + hariSingkat(iso));
@@ -1905,7 +1943,7 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
   const tinggiK = 98 + minggu * (selH + selSela) - selSela + 40;
   vizPanel(ctx, C, L, y, W, tinggiK);
   vizTeks(ctx, 'Kepadatan Harian', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  vizTeks(ctx, 'Makin pekat warnanya, makin banyak treatment hari itu.',
+  vizTeks(ctx, 'Angka besarnya jumlah treatment, dan makin pekat warnanya makin ramai.',
     L + 22, y + 62, { ukuran: 12.5, warna: C.muted });
   ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((h, i) => {
     vizTeks(ctx, h, L + 22 + i * (selW + selSela) + selW / 2, y + 86,
@@ -1916,13 +1954,22 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     const x = L + 22 + (kotak % 7) * (selW + selSela);
     const ky = y + 98 + Math.floor(kotak / 7) * (selH + selSela);
     const iso = kunciBulan(bln.y, bln.m) + '-' + String(t).padStart(2, '0');
-    const tingkat = tingkatWarna(perHari.get(iso) || 0, maksHari);
+    const n = perHari.get(iso) || 0;
+    const tingkat = tingkatWarna(n, maksHari);
     ctx.fillStyle = C.h[tingkat];
     vizKotak(ctx, x, ky, selW, selH, 10);
     ctx.fill();
     // Dua langkah tergelap pakai tinta putih supaya angkanya tetap terbaca
-    vizTeks(ctx, String(t), x + selW / 2, ky + selH / 2 + 5,
-      { ukuran: 13, tebal: 600, warna: tingkat >= 3 ? '#ffffff' : C.text2, rata: 'center' });
+    const tinta = tingkat >= 3 ? '#ffffff' : C.text2;
+    if (n) {
+      // Sama seperti di layar: tanggal kecil di pojok, jumlah treatment di tengah
+      vizTeks(ctx, String(t), x + 7, ky + 14, { ukuran: 10, tebal: 600, warna: tinta });
+      vizTeks(ctx, String(n), x + selW / 2, ky + selH / 2 + 7,
+        { ukuran: 16, tebal: 700, warna: tinta, rata: 'center' });
+    } else {
+      vizTeks(ctx, String(t), x + selW / 2, ky + selH / 2 + 5,
+        { ukuran: 13, tebal: 600, warna: tinta, rata: 'center' });
+    }
   }
   const ly = y + tinggiK - 18;
   vizTeks(ctx, 'Sepi', L + 22, ly + 4, { ukuran: 11.5, warna: C.muted });

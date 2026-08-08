@@ -199,11 +199,22 @@ button.primary:active { transform: scale(.985); }
 .history li:last-child { border-bottom: 0; }
 
 /* ---- Daftar jadwal ---- */
+.list-total {
+  font-size: .78rem; font-weight: 600; color: var(--text-2);
+  font-variant-numeric: tabular-nums; margin: 0 0 10px;
+}
+.list-total:empty { display: none; }
 .day-head {
+  display: flex; align-items: baseline; gap: 8px;
   font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
   letter-spacing: .07em; margin: 18px 0 6px;
 }
 .day-head:first-child { margin-top: 0; }
+/* Jumlah hari itu menempel di ujung kanan judul, jadi sekali lihat sudah ketahuan */
+.day-jml {
+  margin-left: auto; letter-spacing: 0; text-transform: none;
+  font-weight: 600; font-variant-numeric: tabular-nums;
+}
 .appt { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
 .appt:last-child { border-bottom: 0; }
 .appt-main {
@@ -214,6 +225,13 @@ button.primary:active { transform: scale(.985); }
 .appt-bg {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
   padding-right: 18px; background: var(--red); color: #fff; font-size: .8rem; font-weight: 700;
+}
+/* Nomor antrian hari itu. Lebarnya dikunci supaya jam di sebelahnya tetap
+   sejajar dari baris ke baris, termasuk waktu masuk angka dua digit. */
+.appt .urut {
+  flex: none; width: 17px; text-align: right;
+  font-size: .78rem; font-weight: 600; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .appt .when {
   flex: none; min-width: 58px; text-align: center; padding: 8px 7px;
@@ -422,9 +440,17 @@ button.primary:active { transform: scale(.985); }
 .heat-sel {
   aspect-ratio: 1; min-height: 34px; padding: 0; border: 0; border-radius: 4px;
   font-family: inherit; font-size: .78rem; font-weight: 600;
-  font-variant-numeric: tabular-nums; display: grid; place-items: center; cursor: pointer;
+  font-variant-numeric: tabular-nums; position: relative;
+  display: grid; place-items: center; cursor: pointer;
 }
 .heat-sel.luar { background: none; cursor: default; pointer-events: none; }
+/* Hari kosong: tanggalnya saja, di tengah. Hari berisi: tanggal mengecil ke pojok
+   supaya jumlah treatment yang jadi angka utama — kebaca tanpa perlu hover */
+.heat-sel.ada .heat-tgl {
+  position: absolute; top: 2px; left: 4px;
+  font-size: .56rem; font-weight: 600; opacity: .75;
+}
+.heat-jml { font-size: .95rem; font-weight: 700; line-height: 1; }
 /* Angka tanggal di dalam kotak: tinta gelap di dua langkah terang,
    putih di dua langkah pekat — keduanya lolos 4.5:1 */
 .heat-sel[data-l="0"] { background: var(--h0); color: var(--muted); }
