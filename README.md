@@ -172,10 +172,15 @@ seperti sebelumnya, langsung tersimpan.
 namanya — bukan keterangan kecil di bawahnya, supaya langsung kelihatan waktu
 daftarnya dibaca sekilas. Customer lama tetap memakai baris keterangan berisi
 jumlah kunjungan bulan itu. Di salinan WhatsApp tandanya jadi 🆕 di ujung baris,
-dan baris penutupnya merangkum jumlahnya — "*6 jadwal · 5 customer · 2 customer
-baru 🆕*". Angka itu sekalian jadi kunci simbolnya. Jumlah orang cuma disebut
-kalau memang beda dari jumlah jadwal, dan bagian "customer baru" cuma ikut kalau
-ada yang ditandai — tidak ada 🆕 di daftar, tidak ada pula yang perlu dijelaskan.
+ditutup dua baris hitungan:
+
+```
+jumlah jadwal : 6
+jumlah cust baru : 2
+```
+
+Nol tetap ditulis — barisnya sendiri yang menyebut apa yang dihitung, jadi yang
+membaca tahu memang tidak ada, bukan sekadar lupa dicantumkan.
 
 ## Gender customer
 

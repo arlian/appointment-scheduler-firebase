@@ -978,7 +978,6 @@ function buildWhatsAppText() {
   let lines = ['*JADWAL TREATMENT' + judulCabang + '* 💆'];
   let lastDate = null;
   let n = 0;
-  const semua = new Set();
   const baruSet = new Set();
   rows.forEach((r) => {
     if (r.date !== lastDate) {
@@ -988,21 +987,15 @@ function buildWhatsAppText() {
     }
     n++;
     const baru = !sudahLamaDatang(r.customerId);
-    semua.add(r.customerId);
     if (baru) baruSet.add(r.customerId);
     lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId) + (baru ? ' 🆕' : ''));
   });
 
-  // Baris penutup menggantikan keterangan "🆕 customer baru" yang dulu: angkanya
-  // sekalian jadi kunci simbolnya, jadi tidak perlu dua baris untuk satu hal.
-  const ringkas = [rows.length + ' jadwal'];
-  // Jumlah orang cuma disebut kalau memang beda dari jumlah jadwal — kalau sama,
-  // menyebut dua angka kembar malah bikin yang membaca mengira ada yang salah.
-  if (semua.size !== rows.length) ringkas.push(semua.size + ' customer');
-  // Sama seperti dulu: yang nol tidak usah disebut. Tidak ada 🆕 di daftar,
-  // tidak ada pula yang perlu dijelaskan.
-  if (baruSet.size) ringkas.push(baruSet.size + ' customer baru 🆕');
-  lines.push('', '*' + ringkas.join(' · ') + '*');
+  // Dua baris penutup, menggantikan keterangan "🆕 customer baru" yang dulu.
+  // Nol tetap ditulis: barisnya sendiri yang menyebut apa yang dihitung, jadi
+  // yang membaca tahu memang tidak ada, bukan sekadar lupa dicantumkan.
+  lines.push('', 'jumlah jadwal : ' + rows.length,
+    'jumlah cust baru : ' + baruSet.size);
   return lines.join('\n');
 }
 
