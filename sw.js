@@ -1,10 +1,16 @@
 // Service worker: utamakan jaringan, cadangkan cache agar tetap bisa dibuka offline.
-const CACHE = 'jadwal-treatment-v12';
+const CACHE = 'jadwal-treatment-v13';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './firebase-config.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    // cache: 'reload' memaksa tiap aset diambil dari jaringan, bukan dari HTTP
+    // cache browser. Tanpa ini menaikkan versi CACHE saja tidak cukup: isinya
+    // bisa diisi ulang dengan file lama yang masih tersimpan di browser, dan
+    // HP tetap membuka tampilan lama walau kodenya sudah dirilis.
+    caches.open(CACHE)
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
   );
 });
 
