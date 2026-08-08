@@ -420,6 +420,9 @@ button.primary:active { transform: scale(.985); }
 
 /* Deretan angka utama — stat tile, bukan grafik satu batang */
 .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+/* Kartu ganjil terakhir melebar penuh — tiga kolom di layar HP bikin label dan
+   baris pembandingnya patah jadi tiga baris */
+.kpi-row .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .kpi {
   background: var(--card); border: 1px solid var(--border); border-radius: 14px;
   padding: 12px 13px; box-shadow: var(--shadow);

@@ -978,7 +978,8 @@ function buildWhatsAppText() {
   let lines = ['*JADWAL TREATMENT' + judulCabang + '* 💆'];
   let lastDate = null;
   let n = 0;
-  let adaBaru = false;
+  const semua = new Set();
+  const baruSet = new Set();
   rows.forEach((r) => {
     if (r.date !== lastDate) {
       lines.push('', '📅 *' + hariBulan(r.date) + '*');
@@ -987,12 +988,21 @@ function buildWhatsAppText() {
     }
     n++;
     const baru = !sudahLamaDatang(r.customerId);
-    if (baru) adaBaru = true;
+    semua.add(r.customerId);
+    if (baru) baruSet.add(r.customerId);
     lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId) + (baru ? ' 🆕' : ''));
   });
-  // Keterangannya cuma dicantumkan kalau memang ada tandanya — yang membaca di
-  // WhatsApp tidak perlu disodori kunci untuk simbol yang tidak muncul.
-  if (adaBaru) lines.push('', '🆕 customer baru');
+
+  // Baris penutup menggantikan keterangan "🆕 customer baru" yang dulu: angkanya
+  // sekalian jadi kunci simbolnya, jadi tidak perlu dua baris untuk satu hal.
+  const ringkas = [rows.length + ' jadwal'];
+  // Jumlah orang cuma disebut kalau memang beda dari jumlah jadwal — kalau sama,
+  // menyebut dua angka kembar malah bikin yang membaca mengira ada yang salah.
+  if (semua.size !== rows.length) ringkas.push(semua.size + ' customer');
+  // Sama seperti dulu: yang nol tidak usah disebut. Tidak ada 🆕 di daftar,
+  // tidak ada pula yang perlu dijelaskan.
+  if (baruSet.size) ringkas.push(baruSet.size + ' customer baru 🆕');
+  lines.push('', '*' + ringkas.join(' · ') + '*');
   return lines.join('\n');
 }
 
@@ -1373,12 +1383,34 @@ function ringkasBulan(kunci) {
     treatmentG[g]++;
     custG[g].add(a.customerId);
   });
+  const pelanggan = new Set(rows.map((a) => a.customerId));
   return {
     rows,
     total: rows.length,
-    jumlahCustomer: new Set(rows.map((a) => a.customerId)).size,
+    jumlahCustomer: pelanggan.size,
+    customerBaru: [...pelanggan].filter(baruDiBulan(kunci)).length,
     treatmentG,
     custG,
+  };
+}
+
+// "Baru bulan ini" sengaja dihitung dari kunjungan pertama yang tercatat, bukan
+// dari tanda "Baru" di daftar jadwal. Tanda itu memakai jumlah kunjungan sampai
+// hari ini, jadi orang yang baru di bulan Juni berhenti terhitung baru begitu ia
+// datang lagi di bulan Juli — angka bulan lalu akan menyusut sendiri tiap kali
+// dibuka, dan pembandingnya jadi tidak ada artinya. Tanda sudahLama tetap
+// menang: itu customer lama yang kebetulan baru masuk sistem.
+function baruDiBulan(kunci) {
+  const pertama = new Map();
+  appointments.forEach((a) => {
+    const p = pertama.get(a.customerId);
+    if (!p || a.date < p) pertama.set(a.customerId, a.date);
+  });
+  return (customerId) => {
+    const c = customers.find((x) => x.id === customerId);
+    if (c && c.sudahLama) return false;
+    const awal = pertama.get(customerId);
+    return !!awal && kunciDari(awal) === kunci;
   };
 }
 
@@ -1389,6 +1421,7 @@ function renderKpi(kini, lalu) {
   [
     ['Total treatment', kini.total, lalu.total],
     ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
+    ['Customer baru', kini.customerBaru, lalu.customerBaru],
   ].forEach(([label, nilai, sebelum]) => {
     const kartu = document.createElement('div');
     kartu.className = 'kpi';
@@ -1879,12 +1912,14 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     L, 126, { ukuran: 14, warna: C.text2 });
   let y = 154;
 
-  // --- Dua angka utama ---
-  const kpiH = 112, sela = 16, kpiW = (W - sela) / 2;
-  [
+  // --- Tiga angka utama ---
+  const kpi = [
     ['Total treatment', kini.total, lalu.total],
     ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
-  ].forEach(([label, nilai, sebelum], i) => {
+    ['Customer baru', kini.customerBaru, lalu.customerBaru],
+  ];
+  const kpiH = 112, sela = 16, kpiW = (W - sela * (kpi.length - 1)) / kpi.length;
+  kpi.forEach(([label, nilai, sebelum], i) => {
     const x = L + i * (kpiW + sela);
     vizPanel(ctx, C, x, y, kpiW, kpiH);
     vizTeks(ctx, label, x + 20, y + 33, { ukuran: 13, tebal: 600, warna: C.muted });

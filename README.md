@@ -100,8 +100,11 @@ WA, export/import), ditambah:
   akan menghapus apa pun yang ditambahkan perangkat lain.
 - **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
   digeser ke bulan mana pun lewat panah di atas:
-  - dua angka utama (total treatment dan customer dilayani) lengkap dengan
-    selisih terhadap bulan sebelumnya;
+  - tiga angka utama (total treatment, customer dilayani, dan customer baru)
+    lengkap dengan selisih terhadap bulan sebelumnya. "Customer baru" dihitung
+    dari kunjungan pertama yang tercatat, bukan dari tanda **Baru** di daftar
+    jadwal — tanda itu memakai jumlah kunjungan sampai hari ini, jadi angka
+    bulan lalu akan menyusut sendiri tiap kali dibuka;
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
     dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
     HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
@@ -169,8 +172,10 @@ seperti sebelumnya, langsung tersimpan.
 namanya — bukan keterangan kecil di bawahnya, supaya langsung kelihatan waktu
 daftarnya dibaca sekilas. Customer lama tetap memakai baris keterangan berisi
 jumlah kunjungan bulan itu. Di salinan WhatsApp tandanya jadi 🆕 di ujung baris,
-dengan satu baris keterangan "🆕 customer baru" di bawah — dan keterangan itu
-cuma ikut kalau memang ada yang ditandai.
+dan baris penutupnya merangkum jumlahnya — "*6 jadwal · 5 customer · 2 customer
+baru 🆕*". Angka itu sekalian jadi kunci simbolnya. Jumlah orang cuma disebut
+kalau memang beda dari jumlah jadwal, dan bagian "customer baru" cuma ikut kalau
+ada yang ditandai — tidak ada 🆕 di daftar, tidak ada pula yang perlu dijelaskan.
 
 ## Gender customer
 
