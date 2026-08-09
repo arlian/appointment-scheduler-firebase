@@ -189,13 +189,17 @@ function rapikanTreatment(list) {
 // Tanda yang menempel di belakang nama, di daftar maupun di salinan WA.
 // Rambut adalah dasarnya, jadi tidak ikut ditulis — yang perlu terbaca cuma
 // tambahannya ("+Exo"). Kalau justru rambutnya yang tidak ada, itu yang harus
-// disebut utuh ("Only Muka"), karena di situ bedanya.
+// disebut utuh ("Muka Only"), karena di situ bedanya.
+//
+// Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:
+// "+Exo +Muka" terbaca seperti dua tanda yang kebetulan berdempetan, sedangkan
+// "+Exo & Muka" jelas satu tanda berisi dua hal.
 function tandaTreatment(list) {
   const t = rapikanTreatment(list);
   if (!t.length) return '';
-  if (!t.includes('rambut')) return 'Only ' + t.map(labelT).join(' + ');
+  if (!t.includes('rambut')) return t.map(labelT).join(' & ') + ' Only';
   const tambahan = t.filter((k) => k !== 'rambut');
-  return tambahan.map((k) => '+' + labelT(k)).join(' ');
+  return tambahan.length ? '+' + tambahan.map(labelT).join(' & ') : '';
 }
 
 // Nama kombinasi versi panjang — dipakai di ringkasan, tempat "Rambut" justru
@@ -1139,7 +1143,7 @@ function buildWhatsAppText() {
     const baru = !sudahLamaDatang(r.customerId);
     if (baru) baruSet.add(r.customerId);
     // Rambut tidak ditulis — itu dasarnya. Yang muncul cuma tambahannya
-    // ("Tama (+Exo)") atau justru ketiadaan rambutnya ("Tama (Only Muka)").
+    // ("Tama (+Exo & Muka)") atau justru ketiadaan rambutnya ("Tama (Muka Only)").
     const tandaT = tandaTreatment(r.treatments);
     lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId)
       + (tandaT ? ' (' + tandaT + ')' : '') + (baru ? ' 🆕' : ''));

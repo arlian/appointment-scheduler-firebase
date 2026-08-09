@@ -149,9 +149,13 @@ tambahannya, atau justru ketiadaan rambutnya:
 | Rambut                | *(tidak ada)*                  |
 | Rambut + Exo          | `Tama (+Exo)`                  |
 | Rambut + Muka         | `Tama (+Muka)`                 |
-| Rambut + Exo + Muka   | `Tama (+Exo +Muka)`            |
-| Muka saja             | `Tama (Only Muka)`             |
+| Rambut + Exo + Muka   | `Tama (+Exo & Muka)`           |
+| Muka saja             | `Tama (Muka Only)`             |
 | *(kosong)*            | *(tidak ada)*                  |
+
+Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:
+`+Exo +Muka` terbaca seperti dua tanda yang kebetulan berdempetan, sedangkan
+`+Exo & Muka` jelas satu tanda berisi dua hal.
 
 Di bawah daftar jadwal — dan di ekor salinan WhatsApp, setelah "jumlah cust
 baru" — ada rekap **jumlah tiap kombinasi** dari jadwal yang sedang tampil

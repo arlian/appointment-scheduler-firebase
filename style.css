@@ -616,8 +616,18 @@ button.primary:active { transform: scale(.985); }
   background: var(--card); color: var(--text-2);
   font-family: inherit; font-size: .8125rem; font-weight: 600;
 }
-.treat-btn:hover:not(:disabled) { background: var(--field); }
 .treat-btn.aktif { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Hover dikurung @media (hover: hover) supaya tidak berlaku di layar sentuh.
+   Tanpa itu tombol yang baru ditap tersangkut di keadaan hover sampai ada yang
+   ditap lagi, dan latar --field-nya menang atas .aktif — jadi tombol terpilih
+   terbaca putih dulu, bukan langsung merah. Kondisi hover juga ditulis lebih
+   spesifik dari .aktif supaya urutannya tidak lagi menentukan. */
+@media (hover: hover) {
+  .treat-btn:hover:not(:disabled):not(.aktif) { background: var(--field); }
+  .treat-btn.aktif:hover:not(:disabled) {
+    background: var(--accent-deep); border-color: var(--accent-deep);
+  }
+}
 /* Exo menumpang Rambut — selama Rambut belum dipilih tombolnya memang mati,
    dan itu harus kelihatan sebelum ditekan, bukan cuma terasa waktu ditekan. */
 .treat-btn:disabled { opacity: .4; cursor: not-allowed; }
