@@ -20,7 +20,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?}]
-const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time}]
+const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, treatments?}]
 // Pegawai cuma dipakai fitur "tandai selesai" yang sedang dinonaktifkan. Datanya
 // tetap ikut disinkronkan dan ikut terbawa export/import supaya utuh saat fiturnya
 // dinyalakan lagi — begitu juga field done/staff/photos di tiap appointment.
@@ -157,6 +157,66 @@ const hariGeser = (n) => { // n hari dari hari ini, format YYYY-MM-DD
 const tglSingkat = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('id-ID',
   { day: 'numeric', month: 'short', year: 'numeric' });
 const nameOf = (id) => (customers.find((c) => c.id === id) || { name: '?' }).name;
+
+// ============================================================
+// Jenis treatment
+// ------------------------------------------------------------
+// Disimpan di appointment.treatments sebagai array kode. Boleh kosong: jadwal
+// yang jenisnya belum ditanyakan tetap sah, dan seluruh jadwal lama memang
+// tidak punya field ini sama sekali.
+//
+// Exo tidak berdiri sendiri — ia tambahan di atas Rambut. Muka sebaliknya:
+// boleh datang sendiri tanpa Rambut. Aturan itu ditegakkan di rapikanTreatment,
+// bukan cuma di tombolnya, supaya data dari import atau dari versi lama layar
+// tetap masuk dalam bentuk yang sama.
+// ============================================================
+const TREATMENT = [
+  { kode: 'rambut', label: 'Rambut' },
+  { kode: 'exo', label: 'Exo' },
+  { kode: 'muka', label: 'Muka' },
+];
+const URUT_T = TREATMENT.map((t) => t.kode);
+const labelT = (kode) => (TREATMENT.find((t) => t.kode === kode) || { label: kode }).label;
+
+// Urutannya selalu dikembalikan mengikuti URUT_T supaya kombinasi yang sama
+// tidak pernah terhitung sebagai dua kombinasi berbeda di ringkasan.
+function rapikanTreatment(list) {
+  const set = new Set(Array.isArray(list) ? list : []);
+  if (!set.has('rambut')) set.delete('exo');
+  return URUT_T.filter((k) => set.has(k));
+}
+
+// Tanda yang menempel di belakang nama, di daftar maupun di salinan WA.
+// Rambut adalah dasarnya, jadi tidak ikut ditulis — yang perlu terbaca cuma
+// tambahannya ("+Exo"). Kalau justru rambutnya yang tidak ada, itu yang harus
+// disebut utuh ("Only Muka"), karena di situ bedanya.
+function tandaTreatment(list) {
+  const t = rapikanTreatment(list);
+  if (!t.length) return '';
+  if (!t.includes('rambut')) return 'Only ' + t.map(labelT).join(' + ');
+  const tambahan = t.filter((k) => k !== 'rambut');
+  return tambahan.map((k) => '+' + labelT(k)).join(' ');
+}
+
+// Nama kombinasi versi panjang — dipakai di ringkasan, tempat "Rambut" justru
+// perlu disebut supaya barisnya bisa dibaca berdiri sendiri.
+const namaKombinasi = (t) => (t.length ? t.map(labelT).join(' + ') : 'Belum diisi');
+
+// [{t: [...kode], n: jumlah}] — kombinasi terbanyak di atas, dan jadwal yang
+// jenisnya belum diisi selalu di baris paling bawah.
+function ringkasTreatment(rows) {
+  const peta = new Map();
+  rows.forEach((r) => {
+    const t = rapikanTreatment(r.treatments);
+    const kunci = t.join('+');
+    const item = peta.get(kunci) || { t, n: 0 };
+    item.n++;
+    peta.set(kunci, item);
+  });
+  return [...peta.values()].sort((a, b) =>
+    Number(!a.t.length) - Number(!b.t.length) || b.n - a.n
+    || namaKombinasi(a.t).localeCompare(namaKombinasi(b.t), 'id'));
+}
 
 // ============================================================
 // Gender customer
@@ -346,6 +406,52 @@ genderSeg.addEventListener('click', (e) => {
   perbaruiGender();
 });
 
+// ============================================================
+// Pilihan jenis treatment — dipakai di form tambah dan di sheet ubah.
+// Satu pemasang untuk keduanya, jadi aturan "Exo menumpang Rambut" cuma
+// ditulis sekali dan tidak mungkin beda perilaku di dua tempat.
+// ============================================================
+function pasangTreatSeg(segId, hintId) {
+  const seg = $(segId), hint = $(hintId);
+  let pilih = new Set();
+
+  function gambar() {
+    [...seg.children].forEach((b) => {
+      const aktif = pilih.has(b.dataset.t);
+      const mati = b.dataset.t === 'exo' && !pilih.has('rambut');
+      b.classList.toggle('aktif', aktif);
+      b.disabled = mati;
+      b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
+    });
+    // Keterangannya menunjukkan hasil jadinya, bukan aturannya — operator
+    // langsung tahu bentuk tulisan yang nanti masuk ke salinan WA.
+    const tanda = tandaTreatment([...pilih]);
+    hint.textContent = !pilih.size
+      ? 'Boleh dikosongkan kalau jenisnya belum ditanyakan.'
+      : tanda
+        ? 'Ditulis: Nama (' + tanda + ')'
+        : 'Rambut saja — tidak ditulis apa-apa di belakang nama.';
+  }
+
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('.treat-btn');
+    if (!b || b.disabled) return;
+    const kode = b.dataset.t;
+    if (pilih.has(kode)) pilih.delete(kode); else pilih.add(kode);
+    if (!pilih.has('rambut')) pilih.delete('exo'); // Exo tidak bisa berdiri sendiri
+    gambar();
+  });
+
+  return {
+    get: () => rapikanTreatment([...pilih]),
+    set: (list) => { pilih = new Set(rapikanTreatment(list)); gambar(); },
+  };
+}
+const treatForm = pasangTreatSeg('formTreat', 'treatHint');
+const treatEdit = pasangTreatSeg('editTreat', 'editTreatHint');
+const TREAT_BAWAAN = ['rambut']; // yang paling sering, jadi sudah tercentang
+treatForm.set(TREAT_BAWAAN);
+
 // Ganti tanggal di form → hitungan kunjungan ikut pindah ke bulan tanggal itu
 $('date').addEventListener('change', () => {
   if (!selectedCustomer) return;
@@ -423,7 +529,12 @@ function simpanJadwal(customer, cleanName, date, time, status) {
   if (dup) { toast(customer.name + ' sudah punya jadwal di tanggal dan jam yang sama.', true); return; }
 
   const newId = buatId();
-  appointments.push({ id: newId, customerId: customer.id, date, time });
+  const appt = { id: newId, customerId: customer.id, date, time };
+  // Field-nya cuma ditulis kalau memang ada isinya, jadi jadwal tanpa jenis
+  // treatment tetap sebentuk dengan seluruh jadwal lama.
+  const jenis = treatForm.get();
+  if (jenis.length) appt.treatments = jenis;
+  appointments.push(appt);
   save(KEY_APPOINTMENTS, appointments);
 
   let msg = !isNew
@@ -438,6 +549,7 @@ function simpanJadwal(customer, cleanName, date, time, status) {
   nameInput.value = ''; $('time').value = '';
   selectedCustomer = null;
   genderDipilih = false;
+  treatForm.set(TREAT_BAWAAN);
   closeSug();
   updateBadge();
   perbaruiGender();
@@ -707,6 +819,9 @@ function openEdit(apptId) {
   $('editName').value = c ? c.name : '';
   $('editDate').value = a.date;
   $('editTime').value = a.time;
+  // Jadwal lama belum punya field ini — di sheet ia tampil kosong, bukan
+  // ikut bawaan Rambut, supaya yang belum pernah diisi tidak diam-diam terisi.
+  treatEdit.set(a.treatments);
   $('editSheet').hidden = false;
 }
 
@@ -766,6 +881,8 @@ $('editSave').addEventListener('click', () => {
 
   a.date = date;
   a.time = time;
+  const jenis = treatEdit.get();
+  if (jenis.length) a.treatments = jenis; else delete a.treatments;
   save(KEY_APPOINTMENTS, appointments);
   closeEdit();
   renderList();
@@ -803,6 +920,7 @@ function renderList() {
     updateSelectBar();
   }
   setRingkasList(rows);
+  setRingkasTreat(rows);
   if (!rows.length) {
     const msg = filterMode === 'today' ? 'Tidak ada jadwal hari ini.'
       : filterMode === 'pastweek' ? 'Tidak ada jadwal seminggu ke belakang.'
@@ -877,6 +995,15 @@ function renderList() {
     }
     el.querySelector('.t').textContent = r.time;
     el.querySelector('.nama').textContent = nameOf(r.customerId);
+    // Bentuk tandanya sama persis dengan yang nanti keluar di salinan WA
+    const tandaT = tandaTreatment(r.treatments);
+    if (tandaT) {
+      const chip = document.createElement('span');
+      chip.className = 'tanda-treat';
+      chip.textContent = tandaT;
+      chip.title = 'Jenis treatment: ' + namaKombinasi(rapikanTreatment(r.treatments));
+      el.querySelector('.n').appendChild(chip);
+    }
     if (sudahLamaDatang(r.customerId, totalVisits)) {
       el.querySelector('.v').textContent =
         'customer lama · ' + visitsBulan + 'x ' + labelBulanSingkat(kunciDari(r.date));
@@ -902,6 +1029,29 @@ function setRingkasList(rows) {
   box.textContent = hari > 1
     ? rows.length + ' jadwal · ' + hari + ' hari'
     : rows.length + ' jadwal';
+}
+
+// Rekap kombinasi treatment dari jadwal yang sedang tampil. Selama belum ada
+// satu pun jadwal yang jenisnya diisi, kotaknya disembunyikan — daftar lama
+// yang semuanya kosong tidak perlu diberi tabel berisi satu baris "Belum diisi".
+function setRingkasTreat(rows) {
+  const box = $('treatRingkas');
+  const kombinasi = ringkasTreatment(rows);
+  const adaIsi = kombinasi.some((k) => k.t.length);
+  box.hidden = !rows.length || !adaIsi;
+  if (box.hidden) { box.innerHTML = ''; return; }
+  box.innerHTML = '<h3>Jenis treatment</h3>';
+  kombinasi.forEach((k) => {
+    const baris = document.createElement('div');
+    baris.className = 'treat-baris' + (k.t.length ? '' : ' kosong');
+    const nama = document.createElement('span');
+    nama.textContent = namaKombinasi(k.t);
+    const n = document.createElement('span');
+    n.className = 'treat-n';
+    n.textContent = k.n;
+    baris.append(nama, n);
+    box.appendChild(baris);
+  });
 }
 
 function confirmDelete(r) {
@@ -988,7 +1138,11 @@ function buildWhatsAppText() {
     n++;
     const baru = !sudahLamaDatang(r.customerId);
     if (baru) baruSet.add(r.customerId);
-    lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId) + (baru ? ' 🆕' : ''));
+    // Rambut tidak ditulis — itu dasarnya. Yang muncul cuma tambahannya
+    // ("Tama (+Exo)") atau justru ketiadaan rambutnya ("Tama (Only Muka)").
+    const tandaT = tandaTreatment(r.treatments);
+    lines.push(n + '. ' + r.time + ' — ' + nameOf(r.customerId)
+      + (tandaT ? ' (' + tandaT + ')' : '') + (baru ? ' 🆕' : ''));
   });
 
   // Dua baris penutup, menggantikan keterangan "🆕 customer baru" yang dulu.
@@ -996,6 +1150,14 @@ function buildWhatsAppText() {
   // yang membaca tahu memang tidak ada, bukan sekadar lupa dicantumkan.
   lines.push('', 'jumlah jadwal : ' + rows.length,
     'jumlah cust baru : ' + baruSet.size);
+
+  // Rekap kombinasi treatment. Ikut cuma kalau memang ada yang diisi, supaya
+  // salinan dari daftar lama tidak berbuntut satu baris "Belum diisi" saja.
+  const kombinasi = ringkasTreatment(rows);
+  if (kombinasi.some((k) => k.t.length)) {
+    lines.push('', '*Jenis treatment*');
+    kombinasi.forEach((k) => lines.push(namaKombinasi(k.t) + ' : ' + k.n));
+  }
   return lines.join('\n');
 }
 
@@ -1080,6 +1242,10 @@ $('importFile').addEventListener('change', async () => {
     const cid = idMap.get(a.customerId);
     if (appointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
     const appt = { id: buatId(), customerId: cid, date: a.date, time: a.time };
+    // Kode yang tidak dikenal dan kombinasi yang mustahil (Exo tanpa Rambut)
+    // dibuang di sini, jadi file dari versi mana pun masuk dalam bentuk yang sama.
+    const jenis = rapikanTreatment(a.treatments);
+    if (jenis.length) appt.treatments = jenis;
     if (a.done === true) appt.done = true;
     if (typeof a.staff === 'string' && a.staff.trim()) {
       appt.staff = a.staff.trim().replace(/\s+/g, ' ');

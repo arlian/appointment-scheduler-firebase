@@ -93,6 +93,7 @@ WA, export/import), ditambah:
   tercetak di atas daftar ("12 jadwal · 5 hari"), tiap judul tanggal membawa
   jumlah hari itu, dan tiap baris bernomor antrian yang mulai lagi dari 1 di
   setiap tanggal.
+- **Jenis treatment** (lihat bagian di bawah).
 - **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
   supaya perangkat yang datanya tertinggal tidak bisa menimpa data terbaru.
@@ -126,6 +127,42 @@ WA, export/import), ditambah:
   salinan WA mengikuti cabang yang sedang dibuka (nama cabang ikut
   tercantum di salinan WA).
 - **Gender customer** (lihat bagian di bawah).
+
+## Jenis treatment
+
+Saat menambah jadwal ada tiga pilihan yang bisa dicentang lebih dari satu:
+**Rambut** (tercentang sendiri, karena itu yang paling sering), **Exo**, dan
+**Muka**. Boleh dikosongkan semua — jadwal yang jenisnya belum ditanyakan
+tetap bisa disimpan. Jenisnya juga bisa diperbaiki belakangan lewat sheet
+"Ubah Jadwal" (tekan lama pada barisnya).
+
+Exo tidak bisa dipilih sendirian: tombolnya mati sampai Rambut dicentang, dan
+begitu Rambut dilepas, Exo ikut lepas. Muka sebaliknya — boleh berdiri sendiri
+tanpa Rambut.
+
+Cara penulisannya di daftar dan di salinan WhatsApp sengaja dibuat sama
+persis. Rambut tidak ikut ditulis karena ia dasarnya; yang muncul cuma
+tambahannya, atau justru ketiadaan rambutnya:
+
+| Yang dicentang        | Yang tertulis di belakang nama |
+| --------------------- | ------------------------------ |
+| Rambut                | *(tidak ada)*                  |
+| Rambut + Exo          | `Tama (+Exo)`                  |
+| Rambut + Muka         | `Tama (+Muka)`                 |
+| Rambut + Exo + Muka   | `Tama (+Exo +Muka)`            |
+| Muka saja             | `Tama (Only Muka)`             |
+| *(kosong)*            | *(tidak ada)*                  |
+
+Di bawah daftar jadwal — dan di ekor salinan WhatsApp, setelah "jumlah cust
+baru" — ada rekap **jumlah tiap kombinasi** dari jadwal yang sedang tampil
+(mis. `Rambut + Exo : 3`), diurutkan dari kombinasi terbanyak. Jadwal yang
+jenisnya belum diisi masuk baris "Belum diisi" di paling bawah. Seluruh rekap
+ini hilang sendiri kalau tidak ada satu pun jadwal yang jenisnya terisi, jadi
+daftar lama tidak berbuntut tabel kosong.
+
+Datanya disimpan di field `treatments` pada tiap jadwal, hanya kalau memang
+ada isinya. Jadwal lama yang belum punya field ini tetap sah dan ikut
+export/import seperti biasa.
 
 ## Tandai selesai — sedang dimatikan
 

@@ -128,6 +128,17 @@
           </div>
           <div class="gender-hint" id="genderHint"></div>
         </div>
+        <!-- Boleh dikosongkan: jadwal yang belum tahu treatment-nya tetap bisa
+             disimpan. Rambut tercentang dari awal karena itu yang paling sering. -->
+        <div class="treat-field">
+          <label id="treatLabel">Jenis Treatment <span class="opsional">opsional</span></label>
+          <div class="treat-seg" role="group" aria-labelledby="treatLabel" id="formTreat">
+            <button type="button" class="treat-btn" data-t="rambut" aria-pressed="false">Rambut</button>
+            <button type="button" class="treat-btn" data-t="exo" aria-pressed="false">Exo</button>
+            <button type="button" class="treat-btn" data-t="muka" aria-pressed="false">Muka</button>
+          </div>
+          <div class="treat-hint" id="treatHint"></div>
+        </div>
         <div class="row2">
           <div>
             <label for="date">Tanggal</label>
@@ -175,6 +186,8 @@
       <p class="list-total" id="listTotal" aria-live="polite"></p>
       <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
       <div id="list"></div>
+      <!-- Rekap kombinasi treatment dari jadwal yang sedang tampil -->
+      <div class="treat-ringkas" id="treatRingkas" hidden></div>
     </section>
 
     <div class="select-bar" id="selectBar" hidden>
@@ -262,6 +275,15 @@
         <label for="editTime">Jam</label>
         <input id="editTime" type="time">
       </div>
+    </div>
+    <div class="treat-field">
+      <label id="editTreatLabel">Jenis Treatment <span class="opsional">opsional</span></label>
+      <div class="treat-seg" role="group" aria-labelledby="editTreatLabel" id="editTreat">
+        <button type="button" class="treat-btn" data-t="rambut" aria-pressed="false">Rambut</button>
+        <button type="button" class="treat-btn" data-t="exo" aria-pressed="false">Exo</button>
+        <button type="button" class="treat-btn" data-t="muka" aria-pressed="false">Muka</button>
+      </div>
+      <div class="treat-hint" id="editTreatHint"></div>
     </div>
     <div class="sheet-actions">
       <button type="button" class="ghost" id="editCancel">Batal</button>

@@ -253,10 +253,33 @@ button.primary:active { transform: scale(.985); }
   font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   background: var(--accent); color: #fff;
 }
+/* Jenis treatment sengaja lebih kalem daripada tanda "Baru": ini keterangan
+   yang dibaca saat mata sudah berhenti di barisnya, bukan penanda yang harus
+   menarik perhatian lebih dulu. Tulisannya sama persis dengan salinan WA. */
+.tanda-treat {
+  flex: none; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  font-size: .66rem; font-weight: 700;
+  background: var(--field); color: var(--text-2); border: 1px solid var(--border);
+}
 .appt button {
   flex: none; border: 0; cursor: pointer;
   font-size: .76rem; font-weight: 600; font-family: inherit; padding: 6px 11px; border-radius: 999px;
 }
+/* Rekap kombinasi treatment, menutup daftar yang sedang tampil */
+.treat-ringkas { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.treat-ringkas[hidden] { display: none; }
+.treat-ringkas h3 {
+  font-size: .7rem; color: var(--muted); margin: 0 0 2px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+}
+.treat-baris {
+  display: flex; align-items: baseline; gap: 10px; font-size: .8125rem;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.treat-baris:last-child { border-bottom: 0; }
+.treat-baris.kosong { color: var(--muted); }
+.treat-n { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+
 .appt button.edit { background: var(--accent-soft); color: var(--accent-deep); }
 .appt button.del { background: var(--red-soft); color: var(--red); }
 .appt button:active { transform: scale(.95); }
@@ -572,6 +595,34 @@ button.primary:active { transform: scale(.985); }
 .gender-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
 .gender-hint.perlu { color: var(--accent-deep); font-weight: 600; }
 .gender-hint:empty { display: none; }
+
+/* ---- Jenis treatment (boleh lebih dari satu, boleh kosong) ---- */
+/* Jarak atasnya dipasang di pembungkusnya, seperti .gender-field. Label-nya
+   dinolkan sendiri di sini — aturan "form label:first-child" tidak menjangkau
+   salinan yang di sheet ubah jadwal, yang memang bukan di dalam <form>. */
+.treat-field { margin-top: 14px; margin-bottom: 20px; }
+.treat-field > label:first-child { margin-top: 0; }
+/* Ditempel di labelnya, bukan ditulis di keterangan bawah: yang perlu tahu
+   ini boleh dilewat adalah orang yang sedang membaca judul fieldnya. */
+.opsional {
+  margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+  background: var(--field); color: var(--muted);
+  font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.treat-seg { display: flex; gap: 8px; }
+.treat-btn {
+  flex: 1; min-width: 0; padding: 11px 8px; cursor: pointer;
+  border: 1px solid var(--border-kuat); border-radius: 11px;
+  background: var(--card); color: var(--text-2);
+  font-family: inherit; font-size: .8125rem; font-weight: 600;
+}
+.treat-btn:hover:not(:disabled) { background: var(--field); }
+.treat-btn.aktif { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Exo menumpang Rambut — selama Rambut belum dipilih tombolnya memang mati,
+   dan itu harus kelihatan sebelum ditekan, bukan cuma terasa waktu ditekan. */
+.treat-btn:disabled { opacity: .4; cursor: not-allowed; }
+.treat-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+.treat-hint:empty { display: none; }
 
 /* Tabel: padanan setiap grafik, supaya angka tidak hanya lewat warna */
 .tabel-wrap { margin-top: 12px; }
