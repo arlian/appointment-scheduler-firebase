@@ -50,9 +50,35 @@ let cabangId = null; // cabang yang sedang dibuka di perangkat ini
 // masih fromCache, isi layar belum tentu sama dengan isi server.
 let tersambung = false;
 
+// Palangnya ditahan dulu sebentar sebelum muncul. Snapshot pertama dari
+// Firestore hampir selalu fromCache — jawaban server baru menyusul sepersekian
+// detik kemudian — jadi tanpa jeda ini palang merah berkedip tiap kali aplikasi
+// dibuka dan tiap kali sinyal tersendat sekejap, padahal tidak ada yang salah.
+//
+// Yang ditahan cuma tampilannya. Nilai `tersambung` tetap berubah saat itu juga,
+// jadi bolehUbah() dan save() tidak ikut melunak: selama jeda ini pun perubahan
+// data tetap ditolak kalau memang belum tersambung.
+const JEDA_PALANG = 3000;
+let timerPalang = null;
+
 function setSambung(on) {
   tersambung = on;
-  $('offlineBar').hidden = on || !uid;
+  const palang = $('offlineBar');
+  if (on || !uid) {
+    clearTimeout(timerPalang);
+    timerPalang = null;
+    palang.hidden = true;
+    return;
+  }
+  // Hitungan mundurnya dimulai di sinyal putus yang pertama dan tidak diulang
+  // oleh sinyal putus berikutnya. Kalau diulang, perangkat yang benar-benar
+  // offline justru tidak pernah dapat palangnya — tiap snapshot cache yang
+  // masuk akan menunda kemunculannya lagi dari nol.
+  if (!palang.hidden || timerPalang) return;
+  timerPalang = setTimeout(() => {
+    timerPalang = null;
+    palang.hidden = false;
+  }, JEDA_PALANG);
 }
 
 // Gerbang untuk semua perubahan data. Menulis tanpa sambungan berarti mengirim
@@ -143,7 +169,6 @@ const $ = (id) => document.getElementById(id);
 const ikon = (nama) =>
   '<svg class="ico" aria-hidden="true"><use href="#i-' + nama + '"/></svg>';
 const nameInput = $('name'), sug = $('sug'), badge = $('badge');
-const historyBox = $('history'), historyList = $('historyList');
 let selectedCustomer = null; // {id, name, visits} jika cocok dengan customer lama
 let activeIdx = -1;
 
@@ -352,11 +377,9 @@ function selectCustomer(c, fill) {
   if (fill) { nameInput.value = c.name; closeSug(); genderDipilih = false; }
   updateBadge();
   perbaruiGender();
-  showHistory(c.id);
 }
 
 function updateBadge() {
-  historyBox.classList.remove('show');
   if (selectedCustomer) {
     const kunci = kunciForm(); // dihitung ulang tiap render, biar ikut tanggal yang dipilih
     badge.className = 'badge known';
@@ -460,23 +483,7 @@ treatForm.set(TREAT_BAWAAN);
 $('date').addEventListener('change', () => {
   if (!selectedCustomer) return;
   updateBadge();
-  showHistory(selectedCustomer.id);
 });
-
-function showHistory(customerId) {
-  const rows = appointments
-    .filter((a) => a.customerId === customerId)
-    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))
-    .slice(0, 5);
-  if (!rows.length) return;
-  historyList.innerHTML = '';
-  rows.forEach((r) => {
-    const li = document.createElement('li');
-    li.textContent = hariBulan(r.date) + ' — ' + r.time;
-    historyList.appendChild(li);
-  });
-  historyBox.classList.add('show');
-}
 
 // ============================================================
 // Simpan jadwal

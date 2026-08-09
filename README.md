@@ -98,7 +98,12 @@ WA, export/import), ditambah:
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
   supaya perangkat yang datanya tertinggal tidak bisa menimpa data terbaru.
   Tiap dokumen ditulis utuh sekali kirim, jadi tulisan dari layar yang basi
-  akan menghapus apa pun yang ditambahkan perangkat lain.
+  akan menghapus apa pun yang ditambahkan perangkat lain. Palangnya sendiri
+  ditahan 3 detik sebelum muncul: snapshot pertama Firestore hampir selalu
+  datang dari cache dan jawaban server menyusul sepersekian detik kemudian,
+  jadi tanpa jeda itu palangnya berkedip tiap kali aplikasi dibuka. Yang
+  ditahan cuma tampilannya — penolakan perubahan tetap berlaku sejak detik
+  pertama sambungan dianggap putus.
 - **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
   digeser ke bulan mana pun lewat panah di atas:
   - tiga angka utama (total treatment, customer dilayani, dan customer baru)

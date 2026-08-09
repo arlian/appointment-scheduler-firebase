@@ -188,16 +188,6 @@ button.primary:active { transform: scale(.985); }
 .badge.known { display: block; background: var(--accent-soft); color: var(--accent-deep); }
 .badge.new { display: block; background: var(--field); color: var(--text-2); }
 
-.history { margin-top: 4px; display: none; }
-.history.show { display: block; }
-.history h3 {
-  font-size: .7rem; color: var(--muted); margin: 12px 0 4px;
-  font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
-}
-.history ul { margin: 0; padding: 0; list-style: none; font-size: .83rem; }
-.history li { padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--text-2); }
-.history li:last-child { border-bottom: 0; }
-
 /* ---- Daftar jadwal ---- */
 .list-total {
   font-size: .78rem; font-weight: 600; color: var(--text-2);
