@@ -136,9 +136,15 @@ Saat menambah jadwal ada tiga pilihan yang bisa dicentang lebih dari satu:
 tetap bisa disimpan. Jenisnya juga bisa diperbaiki belakangan lewat sheet
 "Ubah Jadwal" (tekan lama pada barisnya).
 
-Tombol yang terpilih ditandai dua kali: latarnya jadi merah, dan muncul centang
-kecil di pojok kanan atas. Warna saja tidak cukup — yang tidak bisa membedakan
-merah dari putih tetap harus bisa membaca mana yang aktif.
+Tombol yang terpilih ditandai dua kali: latarnya jadi merah, dan muncul cakram
+putih bercentang merah di pojok kanan atas. Warna saja tidak cukup — yang tidak
+bisa membedakan merah dari putih tetap harus bisa membaca mana yang aktif, dan
+bentuk centang mengerjakan itu tanpa bergantung pada warna.
+
+Cakramnya putih dengan centang merah, bukan sebaliknya. Penanda yang berdiri di
+atas latar merah harus dibedakan oleh terang-gelapnya, bukan oleh hue lain:
+cakram putih 4.62:1 terhadap tombol, sedangkan cakram berwarna yang sama
+gelapnya (hijau, misalnya) cuma 1.34:1 — hasilnya menabrak, bukan menonjol.
 
 Exo tidak bisa dipilih sendirian: tombolnya mati sampai Rambut dicentang, dan
 begitu Rambut dilepas, Exo ikut lepas. Muka sebaliknya — boleh berdiri sendiri

@@ -620,10 +620,18 @@ button.primary:active { transform: scale(.985); }
 /* Centang di pojok: penanda kedua di samping warna, jadi keadaan terpilih tidak
    bergantung pada bisa-tidaknya membedakan merah dari putih. Selalu ada di DOM
    dan cuma dimunculkan, bukan di-display:none — supaya labelnya tidak bergeser
-   waktu tombolnya ditekan. */
+   waktu tombolnya ditekan.
+
+   Cakramnya putih dengan centang merah, bukan sebaliknya. Penanda yang berdiri
+   di atas latar merah harus dibedakan oleh terang-gelapnya, bukan oleh hue
+   lain: cakram putih 4.62:1 terhadap tombol, sedangkan cakram berwarna yang
+   sama gelapnya cuma 1.3-1.6:1 dan hasilnya menabrak, bukan menonjol. Isi
+   centangnya tidak diberi padding — viewBox #i-cek sudah menyisakan ruang
+   di tepinya sendiri. */
 .treat-cek {
-  position: absolute; top: 4px; right: 4px; width: 12px; height: 12px;
-  fill: none; stroke: currentColor; stroke-width: 3;
+  position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
+  border-radius: 50%; background: #fff;
+  fill: none; stroke: var(--accent-deep); stroke-width: 3.4;
   stroke-linecap: round; stroke-linejoin: round;
   opacity: 0; transform: scale(.5); transition: opacity .12s ease, transform .12s ease;
 }
@@ -646,11 +654,12 @@ button.primary:active { transform: scale(.985); }
 .treat-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
 .treat-hint:empty { display: none; }
 /* Layar sangat sempit (iPhone SE lama, 320px): tiga tombol sejajar tinggal
-   ~78px masing-masing, dan ujung "Rambut" mulai menyenggol centang di pojok.
-   Labelnya dikecilkan sedikit, bukan centangnya — penanda yang dikecilkan
-   justru menghilangkan gunanya. */
+   ~78px masing-masing, dan cakram centang plus ujung "Rambut" tidak lagi muat
+   berdampingan. Labelnya dikecilkan lebih dulu; cakramnya baru ikut menyusut
+   setelah itu pun masih mepet. */
 @media (max-width: 359px) {
   .treat-btn { font-size: .75rem; padding-left: 6px; padding-right: 6px; }
+  .treat-cek { width: 12px; height: 12px; stroke-width: 3.8; }
 }
 
 /* Tabel: padanan setiap grafik, supaya angka tidak hanya lewat warna */
