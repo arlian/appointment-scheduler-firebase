@@ -161,6 +161,34 @@ Exo tidak bisa dipilih sendirian: tombolnya mati sampai Rambut dicentang, dan
 begitu Rambut dilepas, Exo ikut lepas. Muka sebaliknya — boleh berdiri sendiri
 tanpa Rambut.
 
+### Mengisi jadwal lama yang jenisnya kosong
+
+Jadwal dari masa sebelum fitur ini ada tidak punya jenis sama sekali. Untuk
+mengisinya sekaligus dengan Rambut ada [`isi-treatment.js`](isi-treatment.js) —
+skrip sekali pakai yang **bukan bagian dari aplikasi**: tidak dimuat
+`index.html`, tidak ikut di-cache service worker, dan tidak menambah apa pun ke
+layar. Perkakas perawatan tidak perlu menempati aplikasi selamanya.
+
+1. Buka aplikasinya di browser komputer, lalu login seperti biasa.
+2. **Tutup aplikasinya di perangkat lain.** Tiap dokumen ditulis utuh sekali
+   kirim, jadi layar lain yang ikut menyimpan bisa menimpa hasil skrip ini.
+3. Buka DevTools (F12) → tab **Console**.
+4. Tempel seluruh isi file, tekan Enter. Yang jalan cuma pemeriksaan — belum
+   ada satu pun data yang berubah, dan cadangan seluruh jadwal otomatis
+   terunduh sebagai JSON.
+5. Periksa tabel yang tercetak. Kalau sudah cocok:
+   `await isiTreatment({ tulis: true })`
+
+Skrip menumpang sesi login yang sudah ada di halaman, jadi tidak ada password
+yang perlu diketik dan tidak ada service account yang perlu diunduh. Ia juga
+menjangkau **semua cabang** sekali jalan, bukan cuma yang sedang dibuka.
+
+Yang dianggap kosong adalah yang tidak menyisakan apa pun setelah dirapikan,
+jadi data aneh seperti `['exo']` tanpa Rambut ikut terjaring. Yang seperti itu
+tidak ditimpa jadi Rambut saja — Rambut ditambahkan sebagai dasarnya dan Exo-nya
+tetap. `Muka` yang berdiri sendiri memang sah, jadi tidak ikut tersapu.
+Menjalankannya dua kali tidak mengubah apa pun lagi.
+
 Cara penulisannya di daftar dan di salinan WhatsApp sengaja dibuat sama
 persis. Rambut tidak ikut ditulis karena ia dasarnya; yang muncul cuma
 tambahannya, atau justru ketiadaan rambutnya:
