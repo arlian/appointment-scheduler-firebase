@@ -1691,6 +1691,68 @@ function renderGender(kini, lalu) {
   renderKoreksi(kini);
 }
 
+// --- Kombinasi treatment (batang mendatar, porsi dari total bulan itu) ---
+// Bentuknya sengaja dipinjam dari komposisi gender: dua kartu ini menjawab
+// pertanyaan yang sama bentuknya ("dari sekian treatment, berapa porsi tiap
+// kelompok"), jadi keduanya pantas dibaca dengan cara yang sama.
+function renderKomb(kini) {
+  const box = $('chartKomb');
+  box.innerHTML = '';
+  if (!kini.rows.length) {
+    box.innerHTML = '<div class="empty">Belum ada jadwal di bulan ini.</div>';
+    return;
+  }
+  const kombinasi = ringkasTreatment(kini.rows);
+  // Sebulan yang jenisnya belum diisi sama sekali tidak perlu diberi satu
+  // batang "Belum diisi 100%" — itu bukan komposisi, cuma ketiadaan data.
+  if (!kombinasi.some((k) => k.t.length)) {
+    box.innerHTML = '<div class="empty">Belum ada jadwal yang jenisnya diisi bulan ini.</div>';
+    return;
+  }
+  kombinasi.forEach((k) => {
+    const persen = Math.round(k.n / kini.total * 100);
+    const nama = namaKombinasi(k.t);
+
+    const baris = document.createElement('div');
+    baris.className = 'gen-row';
+    baris.tabIndex = 0;
+
+    const label = document.createElement('div');
+    label.className = 'gen-label';
+    const teksLabel = document.createElement('span');
+    teksLabel.textContent = nama;
+    label.appendChild(teksLabel);
+
+    const nilai = document.createElement('div');
+    nilai.className = 'gen-val';
+    nilai.textContent = String(k.n);
+    const pct = document.createElement('span');
+    pct.className = 'gen-persen';
+    pct.textContent = persen + '%';
+    nilai.appendChild(pct);
+
+    const atas = document.createElement('div');
+    atas.className = 'gen-atas';
+    atas.append(label, nilai);
+
+    const track = document.createElement('div');
+    track.className = 'gen-track';
+    const bar = document.createElement('div');
+    // Yang belum diisi dapat abu-abu, bukan warna merek: di palet ini abu-abu
+    // memang jatahnya data yang belum lengkap, bukan salah satu kategori.
+    bar.className = 'gen-bar komb' + (k.t.length ? '' : ' kosong');
+    // Dibagi total bulan itu, sama seperti komposisi gender — panjang batang
+    // berarti porsi, jadi ia bicara hal yang sama dengan persen di sebelahnya.
+    bar.style.width = Math.max(2, k.n / kini.total * 100) + '%';
+    track.appendChild(bar);
+
+    baris.append(atas, track);
+    baris.setAttribute('aria-label', nama + ': ' + k.n + ' treatment, ' + persen + '% dari bulan ini.');
+    pasangTip(baris, '<b>' + k.n + ' treatment</b> · ' + persen + '%<br>' + nama);
+    box.appendChild(baris);
+  });
+}
+
 // --- Koreksi gender: satu-satunya tempat gender bisa diatur manual ---
 // Daftarnya dibatasi customer yang punya jadwal di bulan yang sedang dilihat,
 // supaya yang muncul cuma yang memang memengaruhi angka di atas.
@@ -1958,6 +2020,13 @@ function renderTabel(kini, lalu) {
         bedaTeks(kini.treatmentG[g] - lalu.treatmentG[g])]),
     'Belum ada jadwal di bulan ini.');
 
+  tambah('Per kombinasi treatment', ['Kombinasi', 'Treatment', 'Porsi'],
+    kini.total
+      ? ringkasTreatment(kini.rows).map((k) =>
+        [namaKombinasi(k.t), k.n, Math.round(k.n / kini.total * 100) + '%'])
+      : [],
+    'Belum ada jadwal di bulan ini.');
+
   const perHari = new Map();
   kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
   tambah('Per hari', ['Tanggal', 'Treatment'],
@@ -1998,6 +2067,7 @@ function renderAnalitik() {
 
   renderKpi(kini, lalu);
   renderGender(kini, lalu);
+  renderKomb(kini);
   renderHeat(kini);
   renderJam(kini);
   if (!$('tabelWrap').hidden) renderTabel(kini, lalu);
@@ -2134,6 +2204,38 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     gy += 56;
   });
   y += tinggiG + 18;
+
+  // --- Kombinasi treatment ---
+  const kombinasi = kini.total ? ringkasTreatment(kini.rows) : [];
+  const barisT = kombinasi.some((k) => k.t.length) ? kombinasi : [];
+  const tinggiT = 62 + (barisT.length ? barisT.length * 56 : 40) + 14;
+  vizPanel(ctx, C, L, y, W, tinggiT);
+  vizTeks(ctx, 'Kombinasi Treatment', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+  let ty = y + 64;
+  if (!barisT.length) {
+    vizTeks(ctx, kini.total ? 'Belum ada jadwal yang jenisnya diisi bulan ini.'
+      : 'Belum ada jadwal di bulan ini.',
+      L + 22, ty + 18, { ukuran: 14, warna: C.muted });
+  } else barisT.forEach((k) => {
+    const persen = Math.round(k.n / kini.total * 100);
+    const nama = namaKombinasi(k.t);
+    vizTeks(ctx, nama, L + 22, ty + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+    // Jumlah dan persen dipisah kurung dan beda bobot, sama seperti komposisi
+    // gender — persennya turunan, jadi ia yang mengalah.
+    const teksPersen = '(' + persen + '%)';
+    vizTeks(ctx, teksPersen, L + W - 22, ty + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+    vizTeks(ctx, String(k.n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, ty + 14,
+      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+    const jalur = W - 44;
+    ctx.fillStyle = C.field;
+    vizKotak(ctx, L + 22, ty + 27, jalur, 11, 6);
+    ctx.fill();
+    ctx.fillStyle = k.t.length ? C.accent : C.gen['?'];
+    vizKotak(ctx, L + 22, ty + 27, Math.max(8, jalur * k.n / kini.total), 11, 6);
+    ctx.fill();
+    ty += 56;
+  });
+  y += tinggiT + 18;
 
   // --- Kepadatan harian (kalender sebulan) ---
   const perHari = new Map();

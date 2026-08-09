@@ -521,6 +521,11 @@ button.primary:active { transform: scale(.985); }
 .gen-bar[data-g="P"] { background: var(--gen-p); }
 .gen-bar[data-g="L"] { background: var(--gen-l); }
 .gen-bar[data-g="?"] { background: var(--gen-x); }
+/* Kartu "Kombinasi Treatment" memakai ulang seluruh tata letak .gen-* di atas
+   — barisnya memang dibaca dengan cara yang sama, cuma isinya yang beda. Yang
+   perlu ditambah cuma warna batangnya: satu seri, jadi satu warna merek. */
+.gen-bar.komb { background: var(--accent); }
+.gen-bar.komb.kosong { background: var(--gen-x); }
 .gen-val {
   flex: none; font-size: .875rem; font-weight: 700;
   font-variant-numeric: tabular-nums; color: var(--text);

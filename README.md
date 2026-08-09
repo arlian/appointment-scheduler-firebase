@@ -111,6 +111,12 @@ WA, export/import), ditambah:
     dari kunjungan pertama yang tercatat, bukan dari tanda **Baru** di daftar
     jadwal — tanda itu memakai jumlah kunjungan sampai hari ini, jadi angka
     bulan lalu akan menyusut sendiri tiap kali dibuka;
+  - **kombinasi treatment** — porsi tiap kombinasi dari seluruh treatment bulan
+    itu, lengkap dengan persennya, dibaca dengan bentuk yang sama seperti
+    komposisi gender. Jadwal yang jenisnya belum diisi ikut terhitung sebagai
+    barisnya sendiri (abu-abu, selalu paling bawah) supaya persen yang lain
+    tidak melar; kalau sebulan itu tidak ada satu pun yang diisi, kartunya
+    berisi keterangan, bukan satu batang "Belum diisi 100%";
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
     dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
     HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
