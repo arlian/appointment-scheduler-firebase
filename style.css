@@ -611,11 +611,23 @@ button.primary:active { transform: scale(.985); }
 }
 .treat-seg { display: flex; gap: 8px; }
 .treat-btn {
+  position: relative;
   flex: 1; min-width: 0; padding: 11px 8px; cursor: pointer;
   border: 1px solid var(--border-kuat); border-radius: 11px;
   background: var(--card); color: var(--text-2);
   font-family: inherit; font-size: .8125rem; font-weight: 600;
 }
+/* Centang di pojok: penanda kedua di samping warna, jadi keadaan terpilih tidak
+   bergantung pada bisa-tidaknya membedakan merah dari putih. Selalu ada di DOM
+   dan cuma dimunculkan, bukan di-display:none — supaya labelnya tidak bergeser
+   waktu tombolnya ditekan. */
+.treat-cek {
+  position: absolute; top: 4px; right: 4px; width: 12px; height: 12px;
+  fill: none; stroke: currentColor; stroke-width: 3;
+  stroke-linecap: round; stroke-linejoin: round;
+  opacity: 0; transform: scale(.5); transition: opacity .12s ease, transform .12s ease;
+}
+.treat-btn.aktif .treat-cek { opacity: 1; transform: scale(1); }
 .treat-btn.aktif { background: var(--accent); border-color: var(--accent); color: #fff; }
 /* Hover dikurung @media (hover: hover) supaya tidak berlaku di layar sentuh.
    Tanpa itu tombol yang baru ditap tersangkut di keadaan hover sampai ada yang
@@ -633,6 +645,13 @@ button.primary:active { transform: scale(.985); }
 .treat-btn:disabled { opacity: .4; cursor: not-allowed; }
 .treat-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
 .treat-hint:empty { display: none; }
+/* Layar sangat sempit (iPhone SE lama, 320px): tiga tombol sejajar tinggal
+   ~78px masing-masing, dan ujung "Rambut" mulai menyenggol centang di pojok.
+   Labelnya dikecilkan sedikit, bukan centangnya — penanda yang dikecilkan
+   justru menghilangkan gunanya. */
+@media (max-width: 359px) {
+  .treat-btn { font-size: .75rem; padding-left: 6px; padding-right: 6px; }
+}
 
 /* Tabel: padanan setiap grafik, supaya angka tidak hanya lewat warna */
 .tabel-wrap { margin-top: 12px; }
