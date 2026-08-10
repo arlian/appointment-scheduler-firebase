@@ -93,6 +93,9 @@ WA, export/import), ditambah:
   tercetak di atas daftar ("12 jadwal · 5 hari"), tiap judul tanggal membawa
   jumlah hari itu, dan tiap baris bernomor antrian yang mulai lagi dari 1 di
   setiap tanggal.
+- **Geser hari** dengan panah di kiri-kanan tombol tanggal, muncul saat yang
+  tampil memang satu hari saja ("Hari Ini" atau tanggal pilihan). Kembali ke
+  tanggal hari ini, filternya balik jadi "Hari Ini" sendiri.
 - **Jenis treatment** (lihat bagian di bawah).
 - **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
