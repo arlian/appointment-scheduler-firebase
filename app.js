@@ -181,6 +181,12 @@ const hariGeser = (n) => { // n hari dari hari ini, format YYYY-MM-DD
 };
 const tglSingkat = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('id-ID',
   { day: 'numeric', month: 'short', year: 'numeric' });
+const hariPendek = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('id-ID',
+  { weekday: 'short', day: 'numeric', month: 'short' });
+const isoGeser = (iso, n) => { // n hari dari sebuah tanggal, format YYYY-MM-DD
+  const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('sv-SE');
+};
 const nameOf = (id) => (customers.find((c) => c.id === id) || { name: '?' }).name;
 
 // ============================================================
@@ -746,11 +752,27 @@ function setFilter(mode) {
   $('filterStart').classList.toggle('active', range);
   $('filterEnd').classList.toggle('active', range);
   if (!range) { $('filterStart').value = ''; $('filterEnd').value = ''; }
-  // Panah hanya berguna kalau yang tampil memang satu hari saja
-  const sehari = mode === 'today' || mode === 'day';
-  $('hariPrev').hidden = !sehari;
-  $('hariNext').hidden = !sehari;
+  perbaruiGeserHari();
   renderList();
+}
+
+// Tanggal yang sedang tampil, kalau memang cuma satu hari. null berarti
+// filternya menjangkau banyak hari, jadi tidak ada yang bisa digeser.
+function hariTampil() {
+  if (filterMode === 'today') return today();
+  if (filterMode === 'day') return $('filterDate').value || null;
+  return null;
+}
+
+function perbaruiGeserHari() {
+  const hari = hariTampil();
+  $('hariBar').hidden = !hari;
+  if (!hari) return;
+  const kemarin = isoGeser(hari, -1), besok = isoGeser(hari, 1);
+  $('hariPrevLabel').textContent = hariPendek(kemarin);
+  $('hariNextLabel').textContent = hariPendek(besok);
+  $('hariPrev').title = 'Lihat jadwal ' + hariBulan(kemarin);
+  $('hariNext').title = 'Lihat jadwal ' + hariBulan(besok);
 }
 
 // Satu-satunya jalan untuk menampilkan satu tanggal tertentu. Tanggal hari ini
@@ -763,16 +785,10 @@ function pilihTanggal(iso) {
   $('pickDateLabel').textContent = tglSingkat(iso);
 }
 
-// Dari mode 'today' pun tetap bisa digeser: dasarnya hari ini.
-function geserHari(n) {
-  const dasar = (filterMode === 'day' && $('filterDate').value) || today();
-  const d = new Date(dasar + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  pilihTanggal(d.toLocaleDateString('sv-SE'));
-}
-
+const geserHari = (n) => pilihTanggal(isoGeser(hariTampil(), n));
 $('hariPrev').addEventListener('click', () => geserHari(-1));
 $('hariNext').addEventListener('click', () => geserHari(1));
+perbaruiGeserHari(); // filter awal "Hari Ini" — palangnya langsung terisi
 
 document.querySelectorAll('.chip[data-f]').forEach((c) =>
   c.addEventListener('click', () => setFilter(c.dataset.f)));

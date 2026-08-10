@@ -171,23 +171,11 @@
         <button type="button" class="chip active" data-f="today">Hari Ini</button>
         <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
         <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
-        <!-- Panah geser hari mengapit tombol tanggal, dan ikut turun baris
-             bersamanya di layar sempit karena satu blok flex. Tampil sejak awal
-             karena filter pertama memang "Hari Ini" — sama seperti chip di atas
-             yang sudah membawa class active dari sini. -->
-        <span class="hari-nav">
-          <button type="button" class="chip chip-hari" id="hariPrev" title="Hari sebelumnya" aria-label="Hari sebelumnya">
-            <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg>
+        <span class="pick-date">
+          <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
+            <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
           </button>
-          <span class="pick-date">
-            <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
-              <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
-            </button>
-            <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
-          </span>
-          <button type="button" class="chip chip-hari" id="hariNext" title="Hari berikutnya" aria-label="Hari berikutnya">
-            <svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
-          </button>
+          <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
         </span>
         <button type="button" class="chip" data-f="week">Minggu Ini</button>
         <button type="button" class="chip" data-f="all">Semua</button>
@@ -199,6 +187,17 @@
       </div>
       <p class="list-total" id="listTotal" aria-live="polite"></p>
       <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
+      <!-- Pindah hari, hanya saat yang tampil memang satu tanggal. Tanggal yang
+           dituju ditulis di tombolnya, jadi tidak mengulang judul tanggal yang
+           sudah tercetak tepat di bawahnya. -->
+      <div class="hari-bar" id="hariBar" hidden>
+        <button type="button" class="hari-btn" id="hariPrev">
+          <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg><span id="hariPrevLabel"></span>
+        </button>
+        <button type="button" class="hari-btn" id="hariNext">
+          <span id="hariNextLabel"></span><svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
+        </button>
+      </div>
       <div id="list"></div>
       <!-- Rekap kombinasi treatment dari jadwal yang sedang tampil -->
       <div class="treat-ringkas" id="treatRingkas" hidden></div>
