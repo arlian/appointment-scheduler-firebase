@@ -749,6 +749,16 @@ function setFilter(mode) {
   renderList();
 }
 
+// Satu-satunya jalan untuk menampilkan satu tanggal tertentu. Tanggal hari ini
+// sengaja dikembalikan ke mode 'today' supaya chip "Hari Ini" yang menyala —
+// bukan tombol tanggal dengan tanggal hari ini yang tertulis di situ.
+function pilihTanggal(iso) {
+  if (iso === today()) { setFilter('today'); return; }
+  $('filterDate').value = iso;
+  setFilter('day');
+  $('pickDateLabel').textContent = tglSingkat(iso);
+}
+
 document.querySelectorAll('.chip[data-f]').forEach((c) =>
   c.addEventListener('click', () => setFilter(c.dataset.f)));
 ['filterStart', 'filterEnd'].forEach((id) =>
@@ -765,9 +775,8 @@ document.querySelectorAll('.chip[data-f]').forEach((c) =>
   }));
 $('filterDate').addEventListener('change', () => {
   const v = $('filterDate').value;
-  if (!v) { setFilter('today'); return; }
-  setFilter('day');
-  $('pickDateLabel').textContent = tglSingkat(v);
+  if (!v) setFilter('today');
+  else pilihTanggal(v);
 });
 
 // ============================================================
@@ -1914,9 +1923,7 @@ function renderHeat(kini) {
 
 // Klik satu kotak → langsung lihat jadwal hari itu di tab Jadwal
 function bukaTanggal(iso) {
-  $('filterDate').value = iso;
-  setFilter('day');
-  $('pickDateLabel').textContent = tglSingkat(iso);
+  pilihTanggal(iso);
   pilihTab('jadwal');
   scrollTo({ top: 0, behavior: 'smooth' });
 }
