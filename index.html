@@ -171,11 +171,23 @@
         <button type="button" class="chip active" data-f="today">Hari Ini</button>
         <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
         <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
-        <span class="pick-date">
-          <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
-            <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
+        <!-- Panah geser hari mengapit tombol tanggal, dan ikut turun baris
+             bersamanya di layar sempit karena satu blok flex. Tampil sejak awal
+             karena filter pertama memang "Hari Ini" — sama seperti chip di atas
+             yang sudah membawa class active dari sini. -->
+        <span class="hari-nav">
+          <button type="button" class="chip chip-hari" id="hariPrev" title="Hari sebelumnya" aria-label="Hari sebelumnya">
+            <svg class="ico" aria-hidden="true"><use href="#i-kiri"/></svg>
           </button>
-          <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
+          <span class="pick-date">
+            <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
+              <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
+            </button>
+            <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
+          </span>
+          <button type="button" class="chip chip-hari" id="hariNext" title="Hari berikutnya" aria-label="Hari berikutnya">
+            <svg class="ico" aria-hidden="true"><use href="#i-kanan"/></svg>
+          </button>
         </span>
         <button type="button" class="chip" data-f="week">Minggu Ini</button>
         <button type="button" class="chip" data-f="all">Semua</button>

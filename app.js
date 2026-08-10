@@ -746,6 +746,10 @@ function setFilter(mode) {
   $('filterStart').classList.toggle('active', range);
   $('filterEnd').classList.toggle('active', range);
   if (!range) { $('filterStart').value = ''; $('filterEnd').value = ''; }
+  // Panah hanya berguna kalau yang tampil memang satu hari saja
+  const sehari = mode === 'today' || mode === 'day';
+  $('hariPrev').hidden = !sehari;
+  $('hariNext').hidden = !sehari;
   renderList();
 }
 
@@ -758,6 +762,17 @@ function pilihTanggal(iso) {
   setFilter('day');
   $('pickDateLabel').textContent = tglSingkat(iso);
 }
+
+// Dari mode 'today' pun tetap bisa digeser: dasarnya hari ini.
+function geserHari(n) {
+  const dasar = (filterMode === 'day' && $('filterDate').value) || today();
+  const d = new Date(dasar + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  pilihTanggal(d.toLocaleDateString('sv-SE'));
+}
+
+$('hariPrev').addEventListener('click', () => geserHari(-1));
+$('hariNext').addEventListener('click', () => geserHari(1));
 
 document.querySelectorAll('.chip[data-f]').forEach((c) =>
   c.addEventListener('click', () => setFilter(c.dataset.f)));

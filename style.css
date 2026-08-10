@@ -125,6 +125,10 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 /* Tombol "Pilih Tanggal": input date transparan menumpuk di atas tombol,
    jadi tap langsung membuka picker bawaan browser */
 .pick-date { position: relative; display: inline-flex; }
+/* Panah geser hari: chip tanpa teks, jadi paddingnya dirapatkan biar bulat */
+.hari-nav { display: inline-flex; align-items: center; gap: 7px; }
+.chip-hari { padding: 7px 9px; font-size: .875rem; }
+.chip-hari[hidden] { display: none; }
 .pick-date input[type="date"] {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: 0; padding: 0; cursor: pointer;
