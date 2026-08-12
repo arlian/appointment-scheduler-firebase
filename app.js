@@ -1105,10 +1105,14 @@ function renderList() {
       bg.textContent = 'Hapus';
       el.appendChild(bg);
       // Nomor antrian hari itu — ikut di baris supaya tidak perlu dihitung manual
+      // Namanya <button>, bukan <span>: selain jadi pintu ke riwayat, bentuk
+      // tombol membuat tekan-lama di atasnya tidak ikut membuka sheet ubah
+      // jadwal — attachRowGestures memang melewati apa pun yang berupa tombol.
       main.innerHTML =
         '<div class="urut"></div>' +
         '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"><span class="nama"></span></div><div class="v"></div></div>' +
+        '<div class="who"><div class="n"><button type="button" class="nama"></button></div>' +
+        '<div class="v"></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
         '<button class="del" title="Hapus jadwal">Hapus</button>';
       el.appendChild(main);
@@ -1122,7 +1126,13 @@ function renderList() {
       noUrut.setAttribute('aria-label', 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
     }
     el.querySelector('.t').textContent = r.time;
-    el.querySelector('.nama').textContent = nameOf(r.customerId);
+    const namaEl = el.querySelector('.nama');
+    namaEl.textContent = nameOf(r.customerId);
+    // Di mode pilih namanya cuma teks: tap di baris itu milik centang pilihan.
+    if (!selectMode) {
+      namaEl.title = 'Lihat semua kunjungan ' + nameOf(r.customerId);
+      namaEl.onclick = () => cariCustomer(r.customerId);
+    }
     // Bentuk tandanya sama persis dengan yang nanti keluar di salinan WA
     const tandaT = tandaTreatment(r.treatments);
     if (tandaT) {
@@ -1233,8 +1243,13 @@ function attachRowGestures(main, r) {
     main.style.transform = 'translateX(' + dx + 'px)';
   }, { passive: true });
 
-  main.addEventListener('touchend', () => {
+  main.addEventListener('touchend', (e) => {
     const wasSwipe = mode === 'swipe' && dx < -70;
+    // Geser dan tekan-lama sudah menghasilkan tindakannya sendiri. Tanpa ini,
+    // klik semu yang menyusul di ujung gestur ikut menekan nama customer di
+    // bawah jari dan daftarnya berpindah ke riwayat orang itu. Tap biasa tidak
+    // kena: mode-nya masih null selama tekan-lama belum sempat jalan.
+    if (mode !== null) e.preventDefault();
     reset();
     if (wasSwipe) confirmDelete(r);
   });

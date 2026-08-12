@@ -262,6 +262,14 @@ button.primary:active { transform: scale(.985); }
    flex: yang menyusut cuma namanya, tanda "Baru" tetap utuh di sebelahnya. */
 .appt .who .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: .9375rem; }
 .appt .who .n .nama { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Namanya tombol ke riwayat kunjungan, tapi tampilannya tetap teks biasa —
+   garis bawahnya baru muncul waktu disentuh, supaya daftar tidak jadi ramai */
+button.nama {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  text-align: left; cursor: pointer;
+}
+button.nama:hover { color: var(--accent-deep); text-decoration: underline; }
+button.nama:active { opacity: .6; }
 .appt .who .v { font-size: .75rem; color: var(--muted); margin-top: 1px; }
 .appt .who .v:empty { display: none; }
 .tanda-baru {
