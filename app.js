@@ -1070,13 +1070,19 @@ function renderList() {
       const h = document.createElement('div');
       h.className = 'day-head';
       h.textContent = hariBulan(r.date);
-      const jml = document.createElement('span');
-      jml.className = 'day-jml';
-      jml.textContent = perHari.get(r.date) + ' jadwal';
-      h.appendChild(jml);
+      // Di mode riwayat yang terhitung cuma baris satu orang, jadi tiap hari
+      // akan selalu berbunyi "1 jadwal" — angka yang tidak menerangkan apa pun.
+      if (filterMode !== 'cust') {
+        const jml = document.createElement('span');
+        jml.className = 'day-jml';
+        jml.textContent = perHari.get(r.date) + ' jadwal';
+        h.appendChild(jml);
+      }
       list.appendChild(h);
       lastDate = r.date;
-      urut = 0;
+      // Nomornya tidak diulang dari 1 di mode riwayat: di situ ia justru jadi
+      // nomor kunjungan — baris paling bawah menunjukkan sudah keberapa kali.
+      if (filterMode !== 'cust') urut = 0;
     }
     urut++;
     // Lama/baru tetap dilihat dari seluruh riwayat; angkanya yang per bulan.
@@ -1123,7 +1129,9 @@ function renderList() {
     const noUrut = el.querySelector('.urut');
     if (noUrut) {
       noUrut.textContent = String(urut);
-      noUrut.setAttribute('aria-label', 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
+      noUrut.setAttribute('aria-label', filterMode === 'cust'
+        ? 'Kunjungan ke-' + urut
+        : 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
     }
     el.querySelector('.t').textContent = r.time;
     const namaEl = el.querySelector('.nama');
@@ -1163,6 +1171,15 @@ function renderList() {
 function setRingkasList(rows) {
   const box = $('listTotal');
   if (!rows.length) { box.textContent = ''; return; }
+  // Mode riwayat menanyakan hal lain: bukan berapa jadwal hari itu, tapi sudah
+  // berapa kali orangnya datang dan sejak kapan. rows sudah urut tanggal.
+  if (filterMode === 'cust') {
+    const awal = rows[0].date, akhir = rows[rows.length - 1].date;
+    box.textContent = rows.length + 'x kunjungan · ' + (awal === akhir
+      ? tglSingkat(awal)
+      : 'pertama ' + tglSingkat(awal) + ' · terakhir ' + tglSingkat(akhir));
+    return;
+  }
   const hari = new Set(rows.map((r) => r.date)).size;
   box.textContent = hari > 1
     ? rows.length + ' jadwal · ' + hari + ' hari'
