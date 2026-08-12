@@ -270,10 +270,10 @@ Nama yang sudah terdaftar tidak lewat panel ini sama sekali; alurnya persis
 seperti sebelumnya, langsung tersimpan.
 
 **Menandainya.** Di daftar jadwal, customer baru dapat tanda **Baru** di sebelah
-namanya — bukan keterangan kecil di bawahnya, supaya langsung kelihatan waktu
-daftarnya dibaca sekilas. Customer lama tetap memakai baris keterangan berisi
-jumlah kunjungan bulan itu. Di salinan WhatsApp tandanya jadi 🆕 di ujung baris,
-ditutup dua baris hitungan:
+namanya, supaya langsung kelihatan waktu daftarnya dibaca sekilas. Customer lama
+tidak diberi keterangan apa-apa — tiap jadwal cukup satu baris, dan jumlah
+kunjungannya justru lebih lengkap terbaca di riwayat, sejauh tap namanya. Di
+salinan WhatsApp tandanya jadi 🆕 di ujung baris, ditutup dua baris hitungan:
 
 ```
 jumlah jadwal : 6
