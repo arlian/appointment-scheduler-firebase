@@ -97,6 +97,13 @@ WA, export/import), ditambah:
   tampil memang satu hari saja ("Hari Ini" atau tanggal pilihan). Tanggal yang
   dituju tertulis di tombolnya. Kembali ke tanggal hari ini, filternya balik
   jadi "Hari Ini" sendiri.
+- **Cari nama → riwayat kunjungan**: chip "Cari Nama" di baris filter membuka
+  kotak nama; pilih satu customer, daftar jadwal berganti jadi seluruh
+  kunjungannya (semua tanggal, tanpa batas bulan), dengan ringkasan "8x
+  kunjungan · pertama 3 Mar 2026 · terakhir 11 Agu 2026" di atasnya. Jalan
+  pintasnya: tap nama customer di baris jadwal mana pun. Tombol chip-nya
+  ditekan lagi untuk kembali ke "Hari Ini". Riwayat terbatas pada cabang yang
+  sedang dibuka — customer dan jadwal memang tersimpan per cabang.
 - **Jenis treatment** (lihat bagian di bawah).
 - **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
