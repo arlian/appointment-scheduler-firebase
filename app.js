@@ -707,7 +707,8 @@ $('newCustSheet').addEventListener('click', (e) => {
 // ============================================================
 // Filter daftar jadwal
 // ============================================================
-let filterMode = 'today'; // 'today' | 'pastweek' | 'nextweek' | 'day' | 'week' | 'all' | 'date'
+let filterMode = 'today'; // 'today' | 'pastweek' | 'nextweek' | 'day' | 'week' | 'all' | 'date' | 'cust'
+let custCari = null;      // mode 'cust': customer yang riwayatnya sedang dibuka
 
 function thisWeekRange() { // Senin s.d. Minggu pekan berjalan
   const d = new Date();
@@ -736,6 +737,10 @@ function filteredRows() {
   } else if (filterMode === 'date') {
     const start = $('filterStart').value, end = $('filterEnd').value;
     rows = rows.filter((a) => (!start || a.date >= start) && (!end || a.date <= end));
+  } else if (filterMode === 'cust') {
+    // Satu-satunya mode yang tidak dibatasi tanggal: yang dicari justru seluruh
+    // riwayatnya. Selama namanya belum dipilih, daftarnya sengaja kosong.
+    rows = custCari ? rows.filter((a) => a.customerId === custCari) : [];
   }
   return rows.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 }
@@ -752,6 +757,13 @@ function setFilter(mode) {
   $('filterStart').classList.toggle('active', range);
   $('filterEnd').classList.toggle('active', range);
   if (!range) { $('filterStart').value = ''; $('filterEnd').value = ''; }
+  const cari = mode === 'cust';
+  $('cariBtn').classList.toggle('active', cari);
+  $('cariField').hidden = !cari;
+  // Pindah ke filter tanggal mana pun = keluar dari mode riwayat; nama yang
+  // tertinggal di kotaknya cuma akan membingungkan waktu kotaknya muncul lagi.
+  if (!cari) { custCari = null; $('filterCust').value = ''; }
+  tutupSugCust();
   perbaruiGeserHari();
   renderList();
 }
@@ -809,6 +821,68 @@ $('filterDate').addEventListener('change', () => {
   if (!v) setFilter('today');
   else pilihTanggal(v);
 });
+
+// ============================================================
+// Cari nama: riwayat kunjungan satu customer
+// ------------------------------------------------------------
+// Tampilannya menumpang daftar jadwal apa adanya — tiap barisnya sudah menulis
+// "customer lama · Nx <bulan>", jadi riwayatnya terbaca tanpa layar baru.
+// ============================================================
+const sugCust = $('sugCust');
+const tutupSugCust = () => { sugCust.classList.remove('open'); sugCust.innerHTML = ''; };
+
+// Saran nama memakai pencarian yang sama dengan form, tapi angkanya total
+// seumur hidup: yang dicari di sini riwayat, bukan kunjungan bulan tertentu.
+function renderSugCust(q) {
+  sugCust.innerHTML = '';
+  const rows = searchCustomerList(q);
+  if (!rows.length) { tutupSugCust(); return; }
+  rows.forEach((r) => {
+    const d = document.createElement('div');
+    d.innerHTML = '<span></span><span class="meta"></span>';
+    d.firstChild.textContent = r.name;
+    const n = visitCount(r.id);
+    d.lastChild.textContent = n ? n + 'x kunjungan' : 'belum ada kunjungan';
+    d.onmousedown = (e) => { e.preventDefault(); cariCustomer(r.id); };
+    sugCust.appendChild(d);
+  });
+  sugCust.classList.add('open');
+}
+
+// isiNama=false dipakai waktu namanya memang sedang diketik sendiri — menimpa
+// isi kotaknya di tengah pengetikan cuma akan melempar kursor ke ujung.
+function cariCustomer(id, isiNama = true) {
+  custCari = id;
+  setFilter('cust');
+  if (isiNama) $('filterCust').value = nameOf(id);
+}
+
+$('cariBtn').addEventListener('click', () => {
+  // Tombolnya sekaligus jalan keluar: ditekan lagi, kembali ke jadwal hari ini
+  if (filterMode === 'cust') { setFilter('today'); return; }
+  setFilter('cust');
+  $('filterCust').focus();
+});
+
+$('filterCust').addEventListener('input', () => {
+  const q = $('filterCust').value.trim();
+  const persis = findCustomerByName(q);
+  if (persis) cariCustomer(persis.id, false);
+  else if (custCari) { custCari = null; renderList(); } // nama diubah → riwayat lama tidak berlaku lagi
+  renderSugCust(q);
+});
+$('filterCust').addEventListener('keydown', (e) => {
+  // Enter mengambil saran teratas — nama yang diketik lengkap sudah tertangkap
+  // sendiri oleh pencocokan persis di atas.
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (sugCust.firstChild) sugCust.firstChild.dispatchEvent(new MouseEvent('mousedown'));
+  } else if (e.key === 'Escape') {
+    if (sugCust.classList.contains('open')) tutupSugCust();
+    else setFilter('today');
+  }
+});
+$('filterCust').addEventListener('blur', () => setTimeout(tutupSugCust, 120));
 
 // ============================================================
 // Mode pilih: hapus banyak jadwal sekaligus
@@ -979,6 +1053,9 @@ function renderList() {
       : filterMode === 'day' ? 'Tidak ada jadwal pada tanggal tersebut.'
       : filterMode === 'week' ? 'Tidak ada jadwal minggu ini.'
       : filterMode === 'date' ? 'Tidak ada jadwal pada rentang tanggal tersebut.'
+      : filterMode === 'cust' ? (custCari
+        ? 'Belum ada kunjungan tercatat untuk ' + nameOf(custCari) + '.'
+        : 'Ketik nama customer untuk melihat seluruh riwayat kunjungannya.')
       : 'Belum ada jadwal. Tambahkan lewat form di samping.';
     list.innerHTML = '<div class="empty">' + msg + '</div>';
     return;
@@ -1442,6 +1519,9 @@ function pilihCabang(id) {
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
   if (selectMode) setSelectMode(false);
+  // Customer & jadwal disimpan per cabang, jadi nama yang sedang dibuka
+  // riwayatnya tidak ada artinya lagi di cabang sebelah.
+  if (filterMode === 'cust') setFilter('today');
   mulaiSyncData();
   renderCabangBar();
   renderList();
