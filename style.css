@@ -262,10 +262,8 @@ button.primary:active { transform: scale(.985); }
 .appt .who { flex: 1; min-width: 0; }
 /* Nama boleh terpotong kalau kepanjangan, tandanya jangan — makanya baris ini
    flex: yang menyusut cuma namanya, tanda "Baru" tetap utuh di sebelahnya. */
-.appt .who .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: .9375rem; }
+.appt .who .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1.0625rem; }
 .appt .who .n .nama { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.appt .who .v { font-size: .75rem; color: var(--muted); margin-top: 1px; }
-.appt .who .v:empty { display: none; }
 .tanda-baru {
   flex: none; padding: 1.5px 7px; border-radius: 999px;
   font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;

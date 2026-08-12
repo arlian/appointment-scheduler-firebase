@@ -1085,9 +1085,8 @@ function renderList() {
       if (filterMode !== 'cust') urut = 0;
     }
     urut++;
-    // Lama/baru tetap dilihat dari seluruh riwayat; angkanya yang per bulan.
+    // Lama/baru dilihat dari seluruh riwayat, bukan dari bulan yang tampil
     const totalVisits = visitCount(r.customerId);
-    const visitsBulan = visitCount(r.customerId, kunciDari(r.date));
     const el = document.createElement('div');
     el.className = 'appt';
     const main = document.createElement('div');
@@ -1098,7 +1097,7 @@ function renderList() {
       main.innerHTML =
         '<span class="check">' + ikon('cek') + '</span>' +
         '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"><span class="nama"></span></div><div class="v"></div></div>';
+        '<div class="who"><div class="n"><span class="nama"></span></div></div>';
       el.appendChild(main);
       el.onclick = () => {
         if (selected.has(r.id)) selected.delete(r.id); else selected.add(r.id);
@@ -1117,8 +1116,7 @@ function renderList() {
       main.innerHTML =
         '<div class="urut"></div>' +
         '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"><button type="button" class="nama"></button></div>' +
-        '<div class="v"></div></div>' +
+        '<div class="who"><div class="n"><button type="button" class="nama"></button></div></div>' +
         '<button class="edit" title="Ubah jadwal">Ubah</button>' +
         '<button class="del" title="Hapus jadwal">Hapus</button>';
       el.appendChild(main);
@@ -1150,12 +1148,11 @@ function renderList() {
       chip.title = 'Jenis treatment: ' + namaKombinasi(rapikanTreatment(r.treatments));
       el.querySelector('.n').appendChild(chip);
     }
-    if (sudahLamaDatang(r.customerId, totalVisits)) {
-      el.querySelector('.v').textContent =
-        'customer lama · ' + visitsBulan + 'x ' + labelBulanSingkat(kunciDari(r.date));
-    } else {
-      // Customer baru dapat tanda di sebelah namanya, bukan keterangan kecil di
-      // bawahnya: ini yang perlu langsung kelihatan waktu daftar dibaca sekilas.
+    // Cuma customer baru yang diberi tanda. Keterangan "customer lama · Nx
+    // <bulan>" yang dulu duduk di bawah nama sudah tidak ada: satu baris per
+    // jadwal jauh lebih cepat dipindai, dan jumlah kunjungannya justru lebih
+    // lengkap terbaca di riwayat — sejauh tap namanya.
+    if (!sudahLamaDatang(r.customerId, totalVisits)) {
       const tanda = document.createElement('span');
       tanda.className = 'tanda-baru';
       tanda.textContent = 'Baru';
