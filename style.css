@@ -127,17 +127,19 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 /* Kotak cari nama: tombol dan kotaknya satu blok flex supaya turun baris
    bareng-bareng di layar sempit, sama seperti .range-box */
 .cari-box { display: inline-flex; align-items: center; gap: 7px; }
-.cari-field { position: relative; display: inline-flex; }
+/* Begitu kotak namanya terbuka, blok ini mengambil barisnya sendiri: kotaknya
+   jadi selebar sisa baris, dan daftar sarannya ikut selebar itu — bukan
+   menggantung 230px dari kotak sempit di pojok dan menjorok keluar kartu. */
+.cari-box:has(.cari-field:not([hidden])) { flex: 1 1 100%; }
+.cari-field { position: relative; display: inline-flex; flex: 1; min-width: 0; }
 .cari-field[hidden] { display: none; }
 /* 16px, bukan seukuran chip di sebelahnya: font lebih kecil dari itu membuat
    Safari iOS ikut memperbesar layar begitu kotaknya disentuh */
 .cari-field input {
-  width: 175px; padding: 5px 12px; font-size: 16px;
+  width: 100%; padding: 5px 12px; font-size: 16px;
   border: 0; border-radius: 999px; background: var(--card); color: var(--text);
   outline: 2px solid var(--accent); outline-offset: -2px;
 }
-/* Daftar saran menggantung di bawah kotaknya, bukan selebar baris filter */
-.cari-field .suggestions { min-width: 230px; }
 .pick-date { position: relative; display: inline-flex; }
 .pick-date input[type="date"] {
   position: absolute; inset: 0; width: 100%; height: 100%;
