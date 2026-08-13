@@ -885,53 +885,6 @@ $('filterCust').addEventListener('keydown', (e) => {
 $('filterCust').addEventListener('blur', () => setTimeout(tutupSugCust, 120));
 
 // ============================================================
-// Mode pilih: hapus banyak jadwal sekaligus
-// ============================================================
-let selectMode = false;
-const selected = new Set();
-
-function updateSelectBar() {
-  $('selCount').textContent = selected.size + ' dipilih';
-  $('selDelete').disabled = selected.size === 0;
-  const visible = filteredRows();
-  $('selAll').textContent =
-    visible.length && visible.every((r) => selected.has(r.id)) ? 'Batal Semua' : 'Pilih Semua';
-}
-
-function setSelectMode(on) {
-  selectMode = on;
-  selected.clear();
-  $('selectBtn').classList.toggle('on', on);
-  $('selectBar').hidden = !on;
-  renderList();
-  if (on) updateSelectBar();
-}
-
-$('selectBtn').addEventListener('click', () => setSelectMode(!selectMode));
-$('selCancel').addEventListener('click', () => setSelectMode(false));
-
-$('selAll').addEventListener('click', () => {
-  const visible = filteredRows();
-  const allSelected = visible.length && visible.every((r) => selected.has(r.id));
-  selected.clear();
-  if (!allSelected) visible.forEach((r) => selected.add(r.id));
-  renderList();
-  updateSelectBar();
-});
-
-$('selDelete').addEventListener('click', () => {
-  if (!selected.size) return;
-  if (!bolehUbah()) return;
-  if (!confirm('Hapus ' + selected.size + ' jadwal yang dipilih?')) return;
-  appointments.forEach((a) => { if (selected.has(a.id)) hapusFotoJadwal(a); });
-  appointments = appointments.filter((a) => !selected.has(a.id));
-  save(KEY_APPOINTMENTS, appointments);
-  const n = selected.size;
-  setSelectMode(false);
-  toast(n + ' jadwal dihapus.');
-});
-
-// ============================================================
 // Ubah jadwal
 // ============================================================
 let editingId = null;
@@ -1038,12 +991,6 @@ function renderList() {
   const list = $('list');
   list.innerHTML = '';
   const rows = filteredRows();
-  if (selectMode) {
-    // Lepas pilihan pada jadwal yang tidak lagi tampil karena ganti filter
-    const visibleIds = new Set(rows.map((r) => r.id));
-    [...selected].forEach((id) => { if (!visibleIds.has(id)) selected.delete(id); });
-    updateSelectBar();
-  }
   setRingkasList(rows);
   setRingkasTreat(rows);
   if (!rows.length) {
@@ -1091,54 +1038,34 @@ function renderList() {
     el.className = 'appt';
     const main = document.createElement('div');
     main.className = 'appt-main';
-    if (selectMode) {
-      el.classList.add('selectable');
-      if (selected.has(r.id)) el.classList.add('selected');
-      main.innerHTML =
-        '<span class="check">' + ikon('cek') + '</span>' +
-        '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"><span class="nama"></span></div></div>';
-      el.appendChild(main);
-      el.onclick = () => {
-        if (selected.has(r.id)) selected.delete(r.id); else selected.add(r.id);
-        el.classList.toggle('selected', selected.has(r.id));
-        updateSelectBar();
-      };
-    } else {
-      const bg = document.createElement('div');
-      bg.className = 'appt-bg';
-      bg.textContent = 'Hapus';
-      el.appendChild(bg);
-      // Nomor antrian hari itu — ikut di baris supaya tidak perlu dihitung manual
-      // Namanya <button>, bukan <span>: selain jadi pintu ke riwayat, bentuk
-      // tombol membuat tekan-lama di atasnya tidak ikut membuka sheet ubah
-      // jadwal — attachRowGestures memang melewati apa pun yang berupa tombol.
-      main.innerHTML =
-        '<div class="urut"></div>' +
-        '<div class="when"><div class="t"></div></div>' +
-        '<div class="who"><div class="n"><button type="button" class="nama"></button></div></div>' +
-        '<button class="edit" title="Ubah jadwal">Ubah</button>' +
-        '<button class="del" title="Hapus jadwal">Hapus</button>';
-      el.appendChild(main);
-      el.querySelector('.edit').onclick = () => openEdit(r.id);
-      el.querySelector('.del').onclick = () => confirmDelete(r);
-      attachRowGestures(main, r);
-    }
+    const bg = document.createElement('div');
+    bg.className = 'appt-bg';
+    bg.textContent = 'Hapus';
+    el.appendChild(bg);
+    // Nomor antrian hari itu — ikut di baris supaya tidak perlu dihitung manual
+    // Namanya <button>, bukan <span>: selain jadi pintu ke riwayat, bentuk
+    // tombol membuat tekan-lama di atasnya tidak ikut membuka sheet ubah
+    // jadwal — attachRowGestures memang melewati apa pun yang berupa tombol.
+    main.innerHTML =
+      '<div class="urut"></div>' +
+      '<div class="when"><div class="t"></div></div>' +
+      '<div class="who"><div class="n"><button type="button" class="nama"></button></div></div>' +
+      '<button class="edit" title="Ubah jadwal">Ubah</button>' +
+      '<button class="del" title="Hapus jadwal">Hapus</button>';
+    el.appendChild(main);
+    el.querySelector('.edit').onclick = () => openEdit(r.id);
+    el.querySelector('.del').onclick = () => confirmDelete(r);
+    attachRowGestures(main, r);
     const noUrut = el.querySelector('.urut');
-    if (noUrut) {
-      noUrut.textContent = String(urut);
-      noUrut.setAttribute('aria-label', filterMode === 'cust'
-        ? 'Kunjungan ke-' + urut
-        : 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
-    }
+    noUrut.textContent = String(urut);
+    noUrut.setAttribute('aria-label', filterMode === 'cust'
+      ? 'Kunjungan ke-' + urut
+      : 'Urutan ke-' + urut + ' pada ' + hariBulan(r.date));
     el.querySelector('.t').textContent = r.time;
     const namaEl = el.querySelector('.nama');
     namaEl.textContent = nameOf(r.customerId);
-    // Di mode pilih namanya cuma teks: tap di baris itu milik centang pilihan.
-    if (!selectMode) {
-      namaEl.title = 'Lihat semua kunjungan ' + nameOf(r.customerId);
-      namaEl.onclick = () => cariCustomer(r.customerId);
-    }
+    namaEl.title = 'Lihat semua kunjungan ' + nameOf(r.customerId);
+    namaEl.onclick = () => cariCustomer(r.customerId);
     // Bentuk tandanya sama persis dengan yang nanti keluar di salinan WA
     const tandaT = tandaTreatment(r.treatments);
     if (tandaT) {
@@ -1547,7 +1474,6 @@ function pilihCabang(id) {
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
-  if (selectMode) setSelectMode(false);
   // Customer & jadwal disimpan per cabang, jadi nama yang sedang dibuka
   // riwayatnya tidak ada artinya lagi di cabang sebelah.
   if (filterMode === 'cust') setFilter('today');
@@ -1636,8 +1562,6 @@ function pilihTab(nama) {
   });
   $('panelJadwal').hidden = nama !== 'jadwal';
   $('panelAnalitik').hidden = nama !== 'analitik';
-  // Mode pilih hanya berlaku di daftar jadwal — bar-nya mengambang di bawah
-  if (nama !== 'jadwal' && selectMode) setSelectMode(false);
   tipSembunyi();
   if (nama === 'analitik') renderAnalitik();
 }
