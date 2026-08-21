@@ -2478,6 +2478,62 @@ $('salinViz').addEventListener('click', () => {
 });
 
 // ============================================================
+// Tema terang / gelap
+// ------------------------------------------------------------
+// Pilihannya per perangkat (localStorage, seperti pilihan cabang): HP kasir
+// dan layar di meja depan boleh beda, dan temanya memang urusan mata orang
+// yang sedang memegang, bukan data salon.
+//
+// Selama tombolnya belum pernah ditekan, tampilan ikut setelan HP. Sekali
+// ditekan, pilihan itu yang menang. Kalau yang dipilih ternyata sama dengan
+// setelan HP-nya, penandanya justru dihapus — jadi tidak ada mode ketiga
+// "ikut sistem" yang perlu dijelaskan di layar: menekan tombolnya sampai
+// kembali cocok dengan HP membuat aplikasinya ikut HP lagi dengan sendirinya.
+//
+// Nilai awalnya sudah dipasang skrip kecil di <head> supaya tidak ada kedip
+// putih saat dibuka; di sini tinggal menyamakan ikon dan menangani penekanan.
+// ============================================================
+const KUNCI_TEMA = 'jt_tema';
+const mediaGelap = matchMedia('(prefers-color-scheme: dark)');
+const temaBtn = $('temaBtn');
+const temaTersimpan = () => {
+  try { return localStorage.getItem(KUNCI_TEMA); } catch { return null; }
+};
+const temaAktif = () => (document.documentElement.dataset.tema === 'gelap' ? 'gelap' : 'terang');
+
+function pasangTema(tema) {
+  document.documentElement.dataset.tema = tema;
+  // Palang status HP ikut, supaya tepi layar tidak tertinggal terang sendirian
+  $('metaTema').content = tema === 'gelap' ? '#171114' : '#d6336c';
+  // Ikon dan judulnya menyebut tampilan yang akan didapat, bukan yang sedang
+  // dipakai — tombol yang menggambarkan keadaan sekarang selalu ambigu:
+  // ditekan untuk apa, mempertahankannya atau menggantinya?
+  const keGelap = tema !== 'gelap';
+  temaBtn.querySelector('use').setAttribute('href', keGelap ? '#i-gelap' : '#i-terang');
+  const label = keGelap ? 'Ganti ke tampilan gelap' : 'Ganti ke tampilan terang';
+  temaBtn.setAttribute('aria-label', label);
+  temaBtn.title = label;
+}
+
+temaBtn.addEventListener('click', () => {
+  const baru = temaAktif() === 'gelap' ? 'terang' : 'gelap';
+  const samaDenganHp = baru === (mediaGelap.matches ? 'gelap' : 'terang');
+  try {
+    if (samaDenganHp) localStorage.removeItem(KUNCI_TEMA);
+    else localStorage.setItem(KUNCI_TEMA, baru);
+  } catch { /* mode privat: temanya tetap berganti, cuma tidak diingat */ }
+  pasangTema(baru);
+});
+
+// Setelan HP berubah di tengah pemakaian — mis. jadwal gelap otomatis begitu
+// malam. Diikuti hanya selama pemakainya belum pernah memilih sendiri.
+mediaGelap.addEventListener('change', (e) => {
+  if (!temaTersimpan()) pasangTema(e.matches ? 'gelap' : 'terang');
+});
+
+pasangTema(temaAktif());
+
+// ============================================================
 // PWA & inisialisasi awal
 // ============================================================
 if ('serviceWorker' in navigator) {
