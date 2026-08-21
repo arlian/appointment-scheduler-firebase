@@ -105,6 +105,7 @@ WA, export/import), ditambah:
   ditekan lagi untuk kembali ke "Hari Ini". Riwayat terbatas pada cabang yang
   sedang dibuka — customer dan jadwal memang tersimpan per cabang.
 - **Jenis treatment** (lihat bagian di bawah).
+- **Tampilan gelap** (lihat bagian di bawah).
 - **Server satu-satunya sumber kebenaran**: tidak ada cache data yang menetap
   di perangkat. Saat sinyal hilang muncul palang merah dan perubahan ditolak,
   supaya perangkat yang datanya tertinggal tidak bisa menimpa data terbaru.
@@ -332,3 +333,43 @@ form saat membuat jadwal berikutnya. Pilihan manual ditandai khusus: ia tidak
 akan tertimpa tebakan kalau namanya diedit, dan tidak tertimpa saat import.
 Sebaliknya, gender yang masih hasil tebakan akan dibaca ulang kalau sapaan di
 namanya diperbaiki.
+
+## Tampilan gelap
+
+Tombol bulan/matahari di pojok kanan atas. Ikon dan keterangannya selalu
+menyebut tampilan yang *akan didapat* kalau ditekan, bukan yang sedang
+dipakai — tombol yang menggambarkan keadaan sekarang selalu ambigu: ditekan
+untuk mempertahankannya atau untuk menggantinya?
+
+**Sebelum pernah ditekan, tampilan ikut setelan HP.** Jadi HP yang punya
+jadwal gelap otomatis saat malam akan ikut berganti sendiri, tanpa ada yang
+perlu diatur. Sekali tombolnya ditekan, pilihan itu yang menang dan diingat
+per perangkat (seperti pilihan cabang) — HP kasir dan layar di meja depan
+boleh beda, karena tema itu urusan mata orang yang sedang memegang, bukan
+data salon.
+
+**Tidak ada mode ketiga "ikut sistem".** Kalau tema yang dipilih ternyata sama
+dengan setelan HP-nya, penandanya justru dihapus — menekan tombolnya sampai
+kembali cocok dengan HP membuat aplikasinya ikut HP lagi dengan sendirinya.
+Satu tombol, dua keadaan, tanpa keadaan tersembunyi yang harus dijelaskan di
+layar.
+
+**Yang ikut berganti.** Seluruh tampilan memakai token warna di `:root`, jadi
+tema gelap cuma menimpa nilai tokennya — termasuk gambar PNG "Salin sebagai
+Gambar", karena `warnaViz()` di app.js membaca token yang sama. Gambar yang
+dikirim ke WhatsApp mengikuti tampilan layar yang menekan tombolnya. Pemilih
+tanggal dan jam bawaan browser ikut lewat `color-scheme`, supaya kalendernya
+tidak muncul putih menyilaukan di tengah layar gelap.
+
+**Warnanya.** Latarnya hitam keplum, bukan abu-abu netral — tema terang pun
+putihnya dicondongkan ke merah muda, dan abu-abu netral membuat warna merek
+di atasnya terbaca seperti warna nyasar. Merah muda mereknya (`#d6336c`)
+sengaja tidak diubah untuk isian tombol: di situ tulisannya putih, dan warna
+itu yang menjaga kontrasnya tetap lolos 4.5:1. Yang dibalik cuma warna
+*tulisan* merek, yang di latar gelap justru harus dimudakan.
+
+Ramp kalender kepadatan dibalik arahnya: di tema terang ia berjalan dari
+terang ke pekat, di tema gelap dari pekat ke terang — yang ramai tetap yang
+paling menonjol dari latarnya. Dua langkah teratasnya persis dua langkah
+terbawah tema terang, jadi warnanya masih warna merek, dan angka di dalam
+kotaknya tetap lolos 4.5:1 tanpa aturan tinta yang perlu diubah.
