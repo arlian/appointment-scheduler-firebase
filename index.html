@@ -4,7 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jadwal Treatment</title>
-<meta name="theme-color" content="#d6336c">
+<meta name="theme-color" content="#d6336c" id="metaTema">
+<script>
+// Tema dipasang di sini, sebelum sebaris pun halaman digambar. Kalau menunggu
+// app.js (module, jadi ditunda sampai HTML selesai dibaca), layar sempat
+// berkedip putih dulu tiap kali aplikasi dibuka dalam tampilan gelap.
+(function () {
+  var pilihan = null;
+  try { pilihan = localStorage.getItem('jt_tema'); } catch (e) { /* mode privat */ }
+  // Belum pernah memilih sendiri = ikut setelan HP.
+  var gelap = pilihan
+    ? pilihan === 'gelap'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.tema = gelap ? 'gelap' : 'terang';
+  if (gelap) document.getElementById('metaTema').content = '#171114';
+})();
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -68,6 +83,15 @@
   <symbol id="i-keluar" viewBox="0 0 24 24">
     <path d="M15 8.25V5.5a2.25 2.25 0 0 0-2.25-2.25h-6.5A2.25 2.25 0 0 0 4 5.5v13a2.25 2.25 0 0 0 2.25 2.25h6.5A2.25 2.25 0 0 0 15 18.5v-2.75M10.5 12H20m0 0-3.25-3.25M20 12l-3.25 3.25"/>
   </symbol>
+  <!-- Matahari & bulan: tombol tema selalu menggambarkan tampilan yang akan
+       didapat kalau ditekan, bukan yang sedang dipakai. -->
+  <symbol id="i-terang" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="4.2"/>
+    <path d="M12 2.5v2.4M12 19.1v2.4M4.28 4.28 5.98 5.98M18.02 18.02l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.28 19.72l1.7-1.7M18.02 5.98l1.7-1.7"/>
+  </symbol>
+  <symbol id="i-gelap" viewBox="0 0 24 24">
+    <path d="M20.6 14.3A8.7 8.7 0 0 1 9.7 3.4 8.8 8.8 0 1 0 20.6 14.3z"/>
+  </symbol>
 </svg>
 
 <div class="wrap">
@@ -77,6 +101,14 @@
       <h1>Jadwal Treatment</h1>
       <p class="subtitle">Ketik nama customer — customer lama terdeteksi otomatis.</p>
     </div>
+    <!-- Ikon dan keterangannya diperbarui app.js begitu jalan, menyebut
+         tampilan yang akan didapat kalau ditekan. Yang tertulis di sini
+         keterangan yang benar di kedua keadaan, supaya tombolnya tidak
+         pernah tanpa nama buat pembaca layar. -->
+    <button type="button" class="icon-btn tema-btn" id="temaBtn"
+            aria-label="Ganti tampilan terang atau gelap">
+      <svg class="ico" aria-hidden="true"><use href="#i-gelap"/></svg>
+    </button>
   </header>
 
   <div class="offline-bar" id="offlineBar" role="status" hidden>
