@@ -6,12 +6,15 @@
   /* Tinta — dipakai untuk semua teks, termasuk label grafik */
   --text: #241820; --text-2: #6b5560; --muted: #7d626b;
 
-  /* Merek */
-  --accent: #d6336c; --accent-deep: #a61e4d; --accent-soft: #fdeef3;
-  --accent-ring: rgba(214, 51, 108, .22);
+  /* Merek — --accent dan --accent-deep adalah warna isian (tulisan di atasnya
+     putih), --accent-ink warna tulisan merek di atas permukaan terang.
+     Di tema gelap keduanya berjalan berlawanan arah: isian tetap pekat supaya
+     tulisan putihnya lolos kontras, sedangkan tintanya justru dimudakan. */
+  --accent: #d6336c; --accent-deep: #a61e4d; --accent-ink: #a61e4d;
+  --accent-soft: #fdeef3; --accent-ring: rgba(214, 51, 108, .22);
 
-  /* Status */
-  --red: #c9302c; --red-soft: #fbeeed;
+  /* Status — --red isian, --red-ink tulisan; berpisah dengan alasan yang sama */
+  --red: #c9302c; --red-ink: #c9302c; --red-soft: #fbeeed; --red-border: #f0cfcd;
   --naik: #006300; --turun: #c0322f;
 
   /* Ramp sequential satu hue untuk heatmap — diturunkan dari --accent di ruang
@@ -28,8 +31,86 @@
   /* Kerangka grafik */
   --baseline: #ddccd5; --grid: #f0e7ec;
 
+  /* Permukaan yang berdiri di atas segalanya: tooltip & toast. Tintanya tidak
+     ikut --text — di tema gelap --text justru terang, dan tooltip bertulisan
+     terang di atas latar terang hilang sama sekali. */
+  --tip-bg: #241820; --tip-ink: #ffffff;
+
+  /* Latar saat disentuh/hover, dan kelambu di belakang panel */
+  --hover: #efe6ea; --hover-accent: #fbe2eb;
+  --scrim: rgba(36, 24, 32, .42);
+
   --shadow: 0 1px 2px rgba(36, 24, 32, .05);
   --shadow-lift: 0 6px 22px rgba(36, 24, 32, .10);
+  --shadow-sheet: 0 -10px 40px rgba(36, 24, 32, .2);
+  --shadow-accent: 0 5px 14px rgba(214, 51, 108, .25);
+
+  /* Kontrol bawaan browser — pemilih tanggal & jam, scrollbar — ikut tema */
+  color-scheme: light;
+}
+
+/* ============================================================
+   Tema gelap
+   ------------------------------------------------------------
+   Yang berganti cuma nilai token di sini — seluruh CSS di bawah tidak tahu
+   ada dua tema, dan gambar PNG analitik ikut sendiri karena warnaViz() di
+   app.js membaca token yang sama lewat getComputedStyle.
+
+   Penandanya data-tema di <html>, dipasang skrip kecil di <head> sebelum
+   halaman digambar (kalau menunggu app.js, layar sempat berkedip putih).
+   Aplikasi ini memang tidak bisa jalan tanpa JavaScript, jadi tidak ada yang
+   dikorbankan dengan menaruh pilihan tema di sana.
+
+   Latarnya hitam keplum, bukan abu-abu netral: tema terang pun putihnya
+   dicondongkan ke merah muda, dan abu-abu netral membuat merek pink di
+   atasnya terbaca seperti warna nyasar.
+   ============================================================ */
+:root[data-tema="gelap"] {
+  --bg: #171114; --card: #211a1f; --field: #2b2229;
+  --border: #372d34; --border-kuat: #4e414a;
+
+  --text: #f6edf1; --text-2: #cbb6c0; --muted: #b09ba5;
+
+  /* Isian tetap #d6336c — persis warna merek, dan putih di atasnya masih
+     lolos 4.5:1. Yang dimudakan cuma tintanya (--accent-ink) dan latar
+     tipisnya (--accent-soft), karena keduanya sekarang duduk di atas gelap. */
+  --accent: #d6336c; --accent-deep: #b52453; --accent-ink: #ff9dbb;
+  --accent-soft: #34202a; --accent-ring: rgba(255, 157, 187, .28);
+
+  --red: #c9302c; --red-ink: #ff958d; --red-soft: #331a1b; --red-border: #5c2a29;
+  --naik: #6ede8a; --turun: #ff958d;
+
+  /* Ramp heatmap dibalik arahnya: di tema terang ia berjalan dari terang ke
+     pekat, di sini dari pekat ke terang — yang ramai tetap yang paling
+     menonjol dari latarnya. Dua langkah teratas persis dua langkah terbawah
+     tema terang (L 0.495 & 0.580 di OKLCH), jadi warnanya masih warna merek.
+     Lightness-nya tetap monoton dengan jarak >= 0.08, dan aturan tinta di
+     .heat-sel tidak perlu diubah: --text yang kini terang lolos di dua
+     langkah gelap, putih lolos di dua langkah pekat. */
+  --h0: #251e23; --h1: #561e2e; --h2: #802241; --h3: #a82955; --h4: #d1346a;
+
+  /* Biru gender dipekatkan sedikit dari #1c7ed6 supaya tulisan putih di dalam
+     tombolnya lolos 4.5:1 — di latar gelap ia tetap terbedakan dari pink. */
+  --gen-p: #d6336c; --gen-l: #196cb3; --gen-x: #7a6a72;
+
+  --baseline: #4e414a; --grid: #2f2730;
+
+  /* Tooltip & toast naik jadi permukaan yang lebih terang dari kartu; di tema
+     terang mereka justru gelap. Yang tetap sama: ia paling menonjol di
+     layarnya. */
+  --tip-bg: #3a2f36; --tip-ink: #f6edf1;
+
+  --hover: #362b33; --hover-accent: #432734;
+  --scrim: rgba(0, 0, 0, .62);
+
+  /* Bayangan di latar gelap tidak lagi bekerja sebagai bayangan — yang
+     memisahkan permukaan adalah warnanya. Dibiarkan tipis sekadar penegas. */
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-lift: 0 6px 22px rgba(0, 0, 0, .5);
+  --shadow-sheet: 0 -10px 40px rgba(0, 0, 0, .5);
+  --shadow-accent: 0 5px 14px rgba(0, 0, 0, .45);
+
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -63,6 +144,11 @@ body {
 .brand-mark.lg { width: 54px; height: 54px; font-size: 28px; border-radius: 17px; }
 h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 .subtitle { color: var(--text-2); margin: 2px 0 0; font-size: .8125rem; line-height: 1.4; }
+/* Tombol tema — bentuknya sama persis dengan panah geser bulan di Analitik.
+   Sekarang keterangan di sebelahnya sudah cukup panjang untuk mendorongnya
+   sendiri ke tepi; margin ini yang memastikan ia tetap di tepi kalau suatu
+   saat keterangannya dipendekkan. */
+.tema-btn { margin-left: auto; }
 
 /* ---- Tab Jadwal / Analitik ---- */
 .tabs {
@@ -76,7 +162,7 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   color: var(--text-2); cursor: pointer; transition: background .15s, color .15s;
 }
 .tab .ico { font-size: 1.05rem; }
-.tab.active { background: var(--card); color: var(--accent-deep); box-shadow: var(--shadow); }
+.tab.active { background: var(--card); color: var(--accent-ink); box-shadow: var(--shadow); }
 .panel[hidden] { display: none; }
 
 /* ---- Kartu ---- */
@@ -92,9 +178,9 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   display: inline-flex; align-items: center; gap: 5px;
   padding: 7px 12px; font-size: .78rem; font-weight: 600; font-family: inherit;
   border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
-  color: var(--accent-deep); background: var(--accent-soft);
+  color: var(--accent-ink); background: var(--accent-soft);
 }
-.wa-btn:hover { background: #fbe2eb; }
+.wa-btn:hover { background: var(--hover-accent); }
 .wa-btn:active { transform: scale(.97); }
 
 /* ---- Filter ---- */
@@ -105,7 +191,7 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   color: var(--text-2); background: var(--field); border: 0; border-radius: 999px;
   cursor: pointer; transition: background .15s, color .15s;
 }
-.chip:hover { background: #efe6ea; }
+.chip:hover { background: var(--hover); }
 .chip.active { color: #fff; background: var(--accent); }
 .chip.active:hover { background: var(--accent-deep); }
 .filter-bar input[type="date"] {
@@ -174,7 +260,7 @@ input[type="time"]::-webkit-date-and-time-value {
 button.primary {
   margin-top: 20px; width: 100%; padding: 13px; font-size: .95rem; font-weight: 700;
   font-family: inherit; color: #fff; background: var(--accent); border: 0;
-  border-radius: 12px; cursor: pointer; box-shadow: 0 5px 14px rgba(214, 51, 108, .25);
+  border-radius: 12px; cursor: pointer; box-shadow: var(--shadow-accent);
   transition: background .15s;
 }
 button.primary:hover { background: var(--accent-deep); }
@@ -199,7 +285,7 @@ button.primary:active { transform: scale(.985); }
 .badge {
   display: none; margin-top: 10px; padding: 9px 13px; border-radius: 11px; font-size: .82rem;
 }
-.badge.known { display: block; background: var(--accent-soft); color: var(--accent-deep); }
+.badge.known { display: block; background: var(--accent-soft); color: var(--accent-ink); }
 .badge.new { display: block; background: var(--field); color: var(--text-2); }
 
 /* ---- Daftar jadwal ---- */
@@ -218,7 +304,7 @@ button.primary:active { transform: scale(.985); }
   color: var(--text-2); background: var(--card); border: 1px solid var(--border);
   border-radius: 999px; cursor: pointer; box-shadow: var(--shadow);
 }
-.hari-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
+.hari-btn:hover { color: var(--accent-ink); border-color: var(--border-kuat); }
 .hari-btn:active { transform: scale(.97); }
 .day-head {
   display: flex; align-items: baseline; gap: 8px;
@@ -254,7 +340,7 @@ button.primary:active { transform: scale(.985); }
   background: var(--accent-soft); border-radius: 10px;
 }
 .appt .when .t {
-  font-weight: 700; font-size: .875rem; color: var(--accent-deep);
+  font-weight: 700; font-size: .875rem; color: var(--accent-ink);
   font-variant-numeric: tabular-nums; letter-spacing: -.01em;
 }
 .appt .who { flex: 1; min-width: 0; }
@@ -294,8 +380,8 @@ button.primary:active { transform: scale(.985); }
 .treat-baris.kosong { color: var(--muted); }
 .treat-n { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.appt button.edit { background: var(--accent-soft); color: var(--accent-deep); }
-.appt button.del { background: var(--red-soft); color: var(--red); }
+.appt button.edit { background: var(--accent-soft); color: var(--accent-ink); }
+.appt button.del { background: var(--red-soft); color: var(--red-ink); }
 .appt button:active { transform: scale(.95); }
 /* Nama customer sekaligus pintu ke riwayat kunjungannya. Ia tombol supaya
    tekan-lama tidak ikut membuka sheet ubah jadwal, tapi bentuk tombol dari
@@ -306,26 +392,26 @@ button.primary:active { transform: scale(.985); }
   flex: 0 1 auto; padding: 0; border-radius: 0; background: none;
   font: inherit; color: inherit; text-align: left;
 }
-.appt button.nama:hover { color: var(--accent-deep); text-decoration: underline; }
+.appt button.nama:hover { color: var(--accent-ink); text-decoration: underline; }
 .appt button.nama:active { transform: none; opacity: .6; }
 
 /* ---- Panel ubah jadwal ---- */
 .sheet-backdrop {
-  position: fixed; inset: 0; z-index: 20; background: rgba(36, 24, 32, .42);
+  position: fixed; inset: 0; z-index: 20; background: var(--scrim);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .sheet-backdrop[hidden] { display: none; }
 .sheet {
   width: 100%; max-width: 480px; background: var(--card);
   border-radius: 20px 20px 0 0; padding: 20px 18px 24px;
-  box-shadow: 0 -10px 40px rgba(36, 24, 32, .2);
+  box-shadow: var(--shadow-sheet);
 }
 @media (min-width: 560px) {
   .sheet-backdrop { align-items: center; padding: 16px; }
   .sheet { border-radius: 20px; }
 }
 .sheet h2 { font-size: .9375rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -.012em; }
-.sheet-name { font-size: .875rem; color: var(--accent-deep); font-weight: 600; margin-bottom: 4px; }
+.sheet-name { font-size: .875rem; color: var(--accent-ink); font-weight: 600; margin-bottom: 4px; }
 .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sheet-actions .primary { margin-top: 20px; box-shadow: none; }
 .sheet-actions .ghost {
@@ -362,7 +448,7 @@ button.primary:active { transform: scale(.985); }
 .mirip-pakai {
   flex: none; padding: 7px 12px; border: 0; border-radius: 999px; cursor: pointer;
   font-family: inherit; font-size: .76rem; font-weight: 600;
-  background: var(--accent-soft); color: var(--accent-deep);
+  background: var(--accent-soft); color: var(--accent-ink);
 }
 .mirip-pakai:active { transform: scale(.96); }
 
@@ -374,12 +460,12 @@ button.primary:active { transform: scale(.985); }
   color: var(--text-2); background: var(--card); border: 1px solid var(--border);
   border-radius: 13px; box-shadow: var(--shadow); transition: color .15s, border-color .15s;
 }
-.data-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
+.data-btn:hover { color: var(--accent-ink); border-color: var(--border-kuat); }
 .data-btn:active { transform: scale(.97); }
 .data-btn.wide { width: 100%; }
 /* Aksi utama tab Analitik — dibedakan tipis dari tombol "lihat tabel" di bawahnya */
 .salin-viz {
-  margin-bottom: 10px; color: var(--accent-deep);
+  margin-bottom: 10px; color: var(--accent-ink);
   background: var(--accent-soft); border-color: var(--accent-ring);
 }
 .salin-viz:hover { border-color: var(--accent); }
@@ -390,14 +476,14 @@ button.primary:active { transform: scale(.985); }
   background: none; border: 0; cursor: pointer; border-radius: 9px;
   color: var(--muted); font-size: .8125rem; font-family: inherit;
 }
-.logout-btn:hover { color: var(--red); background: var(--red-soft); }
+.logout-btn:hover { color: var(--red-ink); background: var(--red-soft); }
 
 /* ---- Palang "belum tersambung" ---- */
 .offline-bar {
   display: flex; align-items: flex-start; gap: 9px;
   margin: -4px 0 14px; padding: 10px 13px;
-  border: 1px solid #f0cfcd; border-radius: 12px;
-  background: var(--red-soft); color: var(--red);
+  border: 1px solid var(--red-border); border-radius: 12px;
+  background: var(--red-soft); color: var(--red-ink);
   font-size: .84rem; line-height: 1.45;
 }
 .offline-bar[hidden] { display: none; }
@@ -410,7 +496,7 @@ button.primary:active { transform: scale(.985); }
   background: none; border: 1.5px dashed var(--border-kuat); color: var(--muted);
   padding: 5.5px 11.5px; /* kompensasi border biar setinggi chip lain */
 }
-.chip-tambah:hover { border-color: var(--accent); color: var(--accent-deep); background: none; }
+.chip-tambah:hover { border-color: var(--accent); color: var(--accent-ink); background: none; }
 
 /* ============================================================
    Analitik
@@ -421,7 +507,7 @@ button.primary:active { transform: scale(.985); }
 .bulan-label { font-size: .9375rem; font-weight: 700; letter-spacing: -.012em; }
 .bulan-kini {
   margin-top: 1px; padding: 2px 6px; border: 0; background: none; cursor: pointer;
-  font-family: inherit; font-size: .72rem; font-weight: 600; color: var(--accent-deep);
+  font-family: inherit; font-size: .72rem; font-weight: 600; color: var(--accent-ink);
   border-radius: 6px;
 }
 .bulan-kini[hidden] { display: none; }
@@ -431,7 +517,7 @@ button.primary:active { transform: scale(.985); }
   border: 1px solid var(--border); background: var(--card); border-radius: 11px;
   color: var(--text-2); font-size: 1.05rem; cursor: pointer; box-shadow: var(--shadow);
 }
-.icon-btn:hover { color: var(--accent-deep); border-color: var(--border-kuat); }
+.icon-btn:hover { color: var(--accent-ink); border-color: var(--border-kuat); }
 .icon-btn:active { transform: scale(.95); }
 
 /* Deretan angka utama — stat tile, bukan grafik satu batang */
@@ -471,8 +557,10 @@ button.primary:active { transform: scale(.985); }
   font-size: .56rem; font-weight: 600;
 }
 .heat-jml { font-size: .95rem; font-weight: 700; line-height: 1; }
-/* Angka tanggal di dalam kotak: tinta gelap di dua langkah terang,
-   putih di dua langkah pekat — keduanya lolos 4.5:1 */
+/* Angka tanggal di dalam kotak: --text di dua langkah pertama, putih di dua
+   langkah terakhir — lolos 4.5:1 di kedua tema. Aturannya tidak perlu dibalik
+   untuk tema gelap karena --text ikut berbalik, dan ramp-nya memang disusun
+   supaya dua langkah terakhirnya selalu cukup pekat untuk tulisan putih. */
 .heat-sel[data-l="0"] { background: var(--h0); color: var(--muted); }
 .heat-sel[data-l="1"] { background: var(--h1); color: var(--text); }
 .heat-sel[data-l="2"] { background: var(--h2); color: var(--text); }
@@ -544,7 +632,7 @@ button.primary:active { transform: scale(.985); }
 
 .gen-koreksi { margin-top: 14px; }
 .gen-koreksi .data-btn { margin: 0; }
-.gen-koreksi .data-btn.perlu { color: var(--accent-deep); border-color: var(--accent-ring); }
+.gen-koreksi .data-btn.perlu { color: var(--accent-ink); border-color: var(--accent-ring); }
 .gen-ket { margin: 12px 0 4px; }
 .gen-fix { max-height: 320px; overflow-y: auto; }
 .gen-fix-row {
@@ -556,7 +644,7 @@ button.primary:active { transform: scale(.985); }
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
   font-size: .8125rem; line-height: 1.35; overflow-wrap: anywhere;
 }
-.gen-fix-nama .ico { font-size: 1rem; color: var(--accent-deep); }
+.gen-fix-nama .ico { font-size: 1rem; color: var(--accent-ink); }
 .gen-fix-row.belum .gen-fix-nama { font-weight: 600; }
 .gen-seg { display: flex; flex: 0 0 auto; border: 1px solid var(--border-kuat); border-radius: 9px; overflow: hidden; }
 .gen-seg-btn {
@@ -591,7 +679,7 @@ button.primary:active { transform: scale(.985); }
    "Tanggal" dan terbaca seolah miliknya. */
 .gender-field { margin-top: 14px; margin-bottom: 20px; }
 .gender-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
-.gender-hint.perlu { color: var(--accent-deep); font-weight: 600; }
+.gender-hint.perlu { color: var(--accent-ink); font-weight: 600; }
 .gender-hint:empty { display: none; }
 
 /* ---- Jenis treatment (boleh lebih dari satu, boleh kosong) ---- */
@@ -674,7 +762,7 @@ button.primary:active { transform: scale(.985); }
 .tabel-wrap .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .viz-tip {
-  position: fixed; z-index: 50; background: var(--text); color: #fff;
+  position: fixed; z-index: 50; background: var(--tip-bg); color: var(--tip-ink);
   padding: 6px 10px; border-radius: 9px; font-size: .76rem; font-weight: 500;
   pointer-events: none; white-space: nowrap; box-shadow: var(--shadow-lift);
 }
@@ -710,7 +798,7 @@ button.primary:active { transform: scale(.985); }
 .login-card form { text-align: left; }
 .login-setup {
   margin-top: 16px; padding: 12px 14px; border-radius: 11px; text-align: left;
-  background: var(--red-soft); color: var(--red); font-size: .8125rem; line-height: 1.5;
+  background: var(--red-soft); color: var(--red-ink); font-size: .8125rem; line-height: 1.5;
 }
 .login-setup code { font-family: ui-monospace, Consolas, monospace; font-size: .95em; }
 
@@ -718,7 +806,7 @@ button.primary:active { transform: scale(.985); }
 .toast {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(6px);
   z-index: 40; /* di atas layar login, biar error login kelihatan */
-  background: var(--text); color: #fff; padding: 11px 18px; border-radius: 999px;
+  background: var(--tip-bg); color: var(--tip-ink); padding: 11px 18px; border-radius: 999px;
   font-size: .86rem; opacity: 0; transition: opacity .25s, transform .25s;
   pointer-events: none; max-width: calc(100vw - 32px); box-shadow: var(--shadow-lift);
 }
