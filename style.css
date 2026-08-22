@@ -729,14 +729,11 @@ button.primary:active { transform: scale(.985); }
    terbaca putih dulu, bukan langsung merah. Kondisi hover juga ditulis lebih
    spesifik dari .aktif supaya urutannya tidak lagi menentukan. */
 @media (hover: hover) {
-  .treat-btn:hover:not(:disabled):not(.aktif) { background: var(--field); }
-  .treat-btn.aktif:hover:not(:disabled) {
+  .treat-btn:hover:not(.aktif) { background: var(--field); }
+  .treat-btn.aktif:hover {
     background: var(--accent-deep); border-color: var(--accent-deep);
   }
 }
-/* Exo menumpang Rambut — selama Rambut belum dipilih tombolnya memang mati,
-   dan itu harus kelihatan sebelum ditekan, bukan cuma terasa waktu ditekan. */
-.treat-btn:disabled { opacity: .4; cursor: not-allowed; }
 .treat-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
 .treat-hint:empty { display: none; }
 /* Layar sangat sempit (iPhone SE lama, 320px): tiga tombol sejajar tinggal

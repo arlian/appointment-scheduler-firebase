@@ -169,9 +169,9 @@ atas latar merah harus dibedakan oleh terang-gelapnya, bukan oleh hue lain:
 cakram putih 4.62:1 terhadap tombol, sedangkan cakram berwarna yang sama
 gelapnya (hijau, misalnya) cuma 1.34:1 — hasilnya menabrak, bukan menonjol.
 
-Exo tidak bisa dipilih sendirian: tombolnya mati sampai Rambut dicentang, dan
-begitu Rambut dilepas, Exo ikut lepas. Muka sebaliknya — boleh berdiri sendiri
-tanpa Rambut.
+Ketiganya berdiri sendiri-sendiri: boleh dicentang satu, dua, atau ketiganya,
+dan tidak ada yang mensyaratkan yang lain. Exo maupun Muka sah tanpa Rambut.
+Rambut cuma istimewa waktu ditulis (lihat tabel di bawah), bukan waktu dipilih.
 
 ### Mengisi jadwal lama yang jenisnya kosong
 
@@ -196,10 +196,9 @@ yang perlu diketik dan tidak ada service account yang perlu diunduh. Ia juga
 menjangkau **semua cabang** sekali jalan, bukan cuma yang sedang dibuka.
 
 Yang dianggap kosong adalah yang tidak menyisakan apa pun setelah dirapikan,
-jadi data aneh seperti `['exo']` tanpa Rambut ikut terjaring. Yang seperti itu
-tidak ditimpa jadi Rambut saja — Rambut ditambahkan sebagai dasarnya dan Exo-nya
-tetap. `Muka` yang berdiri sendiri memang sah, jadi tidak ikut tersapu.
-Menjalankannya dua kali tidak mengubah apa pun lagi.
+jadi jadwal yang isinya cuma kode tak dikenal ikut terjaring. Satu jenis saja —
+termasuk `Exo` atau `Muka` sendirian — sudah terhitung terisi dan tidak
+disentuh. Menjalankannya dua kali tidak mengubah apa pun lagi.
 
 Cara penulisannya di daftar dan di salinan WhatsApp sengaja dibuat sama
 persis. Rambut tidak ikut ditulis karena ia dasarnya; yang muncul cuma
@@ -211,7 +210,9 @@ tambahannya, atau justru ketiadaan rambutnya:
 | Rambut + Exo          | `Tama (+Exo)`                  |
 | Rambut + Muka         | `Tama (+Muka)`                 |
 | Rambut + Exo + Muka   | `Tama (+Exo & Muka)`           |
+| Exo saja              | `Tama (Exo Only)`              |
 | Muka saja             | `Tama (Muka Only)`             |
+| Exo + Muka            | `Tama (Exo & Muka Only)`       |
 | *(kosong)*            | *(tidak ada)*                  |
 
 Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:

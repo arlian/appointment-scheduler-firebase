@@ -43,23 +43,19 @@
   const uid = user.uid;
 
   // Disalin dari app.js, bukan diimpor: app.js dimuat sebagai module, jadi isinya
-  // tidak bisa dijangkau dari console. Aturannya harus sama persis — Exo tidak
-  // pernah berdiri tanpa Rambut, dan urutannya selalu mengikuti URUT_T.
+  // tidak bisa dijangkau dari console. Aturannya harus sama persis — ketiga
+  // jenis berdiri sendiri-sendiri, dan urutannya selalu mengikuti URUT_T.
   const URUT_T = ['rambut', 'exo', 'muka'];
   const rapikan = (list) => {
     const set = new Set(Array.isArray(list) ? list : []);
-    if (!set.has('rambut')) set.delete('exo');
     return URUT_T.filter((k) => set.has(k));
   };
 
-  // "Kosong" = tidak menyisakan apa pun setelah dirapikan. Ini ikut menjaring
-  // data aneh seperti ['exo'] tanpa Rambut, yang memang perlu diperbaiki juga.
+  // "Kosong" = tidak menyisakan apa pun setelah dirapikan, jadi jadwal yang
+  // isinya cuma kode tak dikenal ikut terjaring. Satu jenis saja — termasuk
+  // Exo sendirian — sudah terhitung terisi dan tidak disentuh.
   const kosong = (a) => !rapikan(a.treatments).length;
-
-  // Yang kosong TIDAK ditimpa jadi ['rambut'] mentah-mentah: Rambut ditambahkan
-  // sebagai dasar dan sisanya dipertahankan, jadi ['exo'] jadi ['rambut','exo']
-  // dan exo-nya tidak ikut hilang.
-  const isi = (a) => rapikan(['rambut', ...(Array.isArray(a.treatments) ? a.treatments : [])]);
+  const isi = () => ['rambut'];
 
   const jalurAppt = (idCabang) => doc(db, 'users', uid, 'cabang', idCabang, 'data', 'appointments');
   const baca = async (ref) => (await getDoc(ref)).data();
@@ -96,11 +92,11 @@
       sasaran.slice(0, 3).forEach((a) => contoh.push({
         Cabang: c.name, Tanggal: a.date, Jam: a.time,
         Sekarang: JSON.stringify(a.treatments === undefined ? null : a.treatments),
-        Jadi: JSON.stringify(isi(a)),
+        Jadi: JSON.stringify(isi()),
       }));
 
       if (tulis && sasaran.length) {
-        sasaran.forEach((a) => { a.treatments = isi(a); });
+        sasaran.forEach((a) => { a.treatments = isi(); });
         await setDoc(ref, { rows });
         console.log('✔ ' + c.name + ': ' + sasaran.length + ' jadwal disimpan.');
       }

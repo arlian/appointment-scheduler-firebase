@@ -196,10 +196,9 @@ const nameOf = (id) => (customers.find((c) => c.id === id) || { name: '?' }).nam
 // yang jenisnya belum ditanyakan tetap sah, dan seluruh jadwal lama memang
 // tidak punya field ini sama sekali.
 //
-// Exo tidak berdiri sendiri — ia tambahan di atas Rambut. Muka sebaliknya:
-// boleh datang sendiri tanpa Rambut. Aturan itu ditegakkan di rapikanTreatment,
-// bukan cuma di tombolnya, supaya data dari import atau dari versi lama layar
-// tetap masuk dalam bentuk yang sama.
+// Ketiganya berdiri sendiri-sendiri: boleh dicentang satu, dua, atau ketiganya,
+// dan tidak ada yang mensyaratkan yang lain. Rambut cuma istimewa waktu ditulis
+// (lihat tandaTreatment), bukan waktu dipilih.
 // ============================================================
 const TREATMENT = [
   { kode: 'rambut', label: 'Rambut' },
@@ -213,14 +212,13 @@ const labelT = (kode) => (TREATMENT.find((t) => t.kode === kode) || { label: kod
 // tidak pernah terhitung sebagai dua kombinasi berbeda di ringkasan.
 function rapikanTreatment(list) {
   const set = new Set(Array.isArray(list) ? list : []);
-  if (!set.has('rambut')) set.delete('exo');
   return URUT_T.filter((k) => set.has(k));
 }
 
 // Tanda yang menempel di belakang nama, di daftar maupun di salinan WA.
 // Rambut adalah dasarnya, jadi tidak ikut ditulis — yang perlu terbaca cuma
 // tambahannya ("+Exo"). Kalau justru rambutnya yang tidak ada, itu yang harus
-// disebut utuh ("Muka Only"), karena di situ bedanya.
+// disebut utuh ("Exo Only", "Muka Only"), karena di situ bedanya.
 //
 // Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:
 // "+Exo +Muka" terbaca seperti dua tanda yang kebetulan berdempetan, sedangkan
@@ -441,8 +439,8 @@ genderSeg.addEventListener('click', (e) => {
 
 // ============================================================
 // Pilihan jenis treatment — dipakai di form tambah dan di sheet ubah.
-// Satu pemasang untuk keduanya, jadi aturan "Exo menumpang Rambut" cuma
-// ditulis sekali dan tidak mungkin beda perilaku di dua tempat.
+// Satu pemasang untuk keduanya, jadi perilakunya cuma ditulis sekali dan
+// tidak mungkin beda di dua tempat.
 // ============================================================
 function pasangTreatSeg(segId, hintId) {
   const seg = $(segId), hint = $(hintId);
@@ -451,9 +449,7 @@ function pasangTreatSeg(segId, hintId) {
   function gambar() {
     [...seg.children].forEach((b) => {
       const aktif = pilih.has(b.dataset.t);
-      const mati = b.dataset.t === 'exo' && !pilih.has('rambut');
       b.classList.toggle('aktif', aktif);
-      b.disabled = mati;
       b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
     });
     // Keterangannya menunjukkan hasil jadinya, bukan aturannya — operator
@@ -468,10 +464,9 @@ function pasangTreatSeg(segId, hintId) {
 
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('.treat-btn');
-    if (!b || b.disabled) return;
+    if (!b) return;
     const kode = b.dataset.t;
     if (pilih.has(kode)) pilih.delete(kode); else pilih.add(kode);
-    if (!pilih.has('rambut')) pilih.delete('exo'); // Exo tidak bisa berdiri sendiri
     gambar();
   });
 
@@ -1326,8 +1321,8 @@ $('importFile').addEventListener('change', async () => {
     const cid = idMap.get(a.customerId);
     if (appointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
     const appt = { id: buatId(), customerId: cid, date: a.date, time: a.time };
-    // Kode yang tidak dikenal dan kombinasi yang mustahil (Exo tanpa Rambut)
-    // dibuang di sini, jadi file dari versi mana pun masuk dalam bentuk yang sama.
+    // Kode yang tidak dikenal dibuang di sini dan urutannya disamakan, jadi
+    // file dari versi mana pun masuk dalam bentuk yang sama.
     const jenis = rapikanTreatment(a.treatments);
     if (jenis.length) appt.treatments = jenis;
     if (a.done === true) appt.done = true;
