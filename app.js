@@ -50,6 +50,25 @@ let cabangId = null; // cabang yang sedang dibuka di perangkat ini
 // masih fromCache, isi layar belum tentu sama dengan isi server.
 let tersambung = false;
 
+// Tersambung belum berarti siap menulis. Status di atas dibaca dari snapshot
+// daftar cabang, yang datang lebih dulu daripada isi cabangnya — jadi ada jeda
+// saat aplikasi merasa sudah tersambung padahal customers/appointments/staff
+// masih array kosong bawaan. Menyimpan di jeda itu mengirim array yang cuma
+// berisi baris baru dan menimpa seluruh isi dokumen di server: itu yang
+// menghabiskan data Puri dan Kemayoran pada 22 Agustus 2026.
+//
+// Penandanya per dokumen, dan baru true setelah snapshot pertamanya benar-benar
+// sampai. "Sampai tapi isinya kosong" tetap dihitung siap — di situlah bedanya
+// kosong karena memang dikosongkan operator dengan kosong karena belum dimuat.
+const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF];
+let dataSiap = {};
+const resetDataSiap = () => { dataSiap = {}; };
+const semuaDataSiap = () => !!cabangId && KEYS_DATA.every((k) => dataSiap[k]);
+
+// Daftar cabang punya jendela yang sama: `cabangList` masih [] sampai snapshot
+// pertamanya datang dari server, dan dokumennya juga ditulis utuh sekali kirim.
+let cabangSiap = false;
+
 // Palangnya ditahan dulu sebentar sebelum muncul. Snapshot pertama dari
 // Firestore hampir selalu fromCache — jawaban server baru menyusul sepersekian
 // detik kemudian — jadi tanpa jeda ini palang merah berkedip tiap kali aplikasi
@@ -85,13 +104,38 @@ function setSambung(on) {
 // seluruh array versi layar ini, yang bisa saja sudah tertinggal — jadi
 // perubahannya ditolak di depan, sebelum apa pun ikut berubah di memori.
 function bolehUbah() {
-  if (tersambung) return true;
-  toast('Belum tersambung ke server — perubahan tidak bisa disimpan dulu.', true);
-  return false;
+  if (!tersambung) {
+    toast('Belum tersambung ke server — perubahan tidak bisa disimpan dulu.', true);
+    return false;
+  }
+  // Sebabnya beda dengan di atas — sambungannya ada, isinya yang belum lengkap
+  // di layar ini — jadi yang dibaca operator juga dibedakan.
+  if (!semuaDataSiap()) {
+    toast('Data cabang ini masih dimuat — tunggu sebentar sebelum menyimpan.', true);
+    return false;
+  }
+  return true;
+}
+
+// Gerbang untuk dokumen daftar cabang. Yang ditimpa di sana bukan data cabang
+// yang sedang dibuka, jadi kesiapan yang diperiksa juga bukan yang itu.
+function bolehUbahCabang() {
+  if (!tersambung) {
+    toast('Belum tersambung ke server — perubahan tidak bisa disimpan dulu.', true);
+    return false;
+  }
+  if (!cabangSiap) {
+    toast('Daftar cabang masih dimuat — tunggu sebentar sebelum menambah cabang.', true);
+    return false;
+  }
+  return true;
 }
 
 function save(key, data) {
-  if (!tersambung) return; // jaring terakhir; pemanggilnya sudah lewat bolehUbah()
+  // Jaring terakhir; pemanggilnya sudah lewat bolehUbah(). Kesiapan diperiksa
+  // per key supaya penyimpanan yang dipicu snapshot itu sendiri — lengkapiGender()
+  // — tetap jalan begitu dokumennya siap, tanpa menunggu dua dokumen lainnya.
+  if (!tersambung || !cabangId || !dataSiap[key]) return;
   setDoc(doc(db, 'users', uid, 'cabang', cabangId, 'data', key), { rows: data })
     .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
 }
@@ -1352,9 +1396,14 @@ function ambilLokalLama(key) { // data versi lama (localStorage), untuk migrasi
 
 let stopCabangList = null;
 let stopData = [];
+// Sekali cukup: dengan includeMetadataChanges, keadaan buntu ini akan menyala
+// lagi tiap kali metadata snapshot-nya berubah, dan toast-nya jadi beruntun.
+let peringatanCabangKosong = false;
 
 function mulaiSync() {
   setSambung(false); // dianggap belum tersambung sampai server yang bilang lain
+  cabangSiap = false;
+  resetDataSiap();
   stopCabangList = onSnapshot(
     doc(db, 'users', uid, 'data', 'branches'),
     // includeMetadataChanges: tanpa ini listener diam saja waktu sambungan
@@ -1364,15 +1413,33 @@ function mulaiSync() {
       // Satu sambungan dipakai bersama seluruh listener, jadi metadata dari
       // dokumen yang selalu aktif ini sudah mewakili status aplikasi.
       setSambung(!snap.metadata.fromCache);
-      if (!snap.exists() || !(snap.data().rows || []).length) {
+      // Cuma jawaban server yang murni — bukan gema tulisan sendiri — yang
+      // boleh membuka gerbang tulis daftar cabang.
+      const dariServer = !snap.metadata.fromCache && !snap.metadata.hasPendingWrites;
+      const rows = snap.exists() ? (snap.data().rows || []) : [];
+      if (!rows.length) {
         // Kosong menurut cache belum tentu benar-benar kosong. Kalau ini
         // diteruskan, perangkat yang dibuka tanpa sinyal akan membuat ulang
         // cabang default dan menimpa daftar cabang asli begitu tersambung.
-        if (snap.metadata.fromCache) return;
+        if (!dariServer) return;
+        // Dokumennya ada tapi rows-nya kosong berarti bukan akun baru, melainkan
+        // daftar cabang yang pernah terisi lalu jadi kosong. Membuat cabang
+        // default di atasnya berarti tiga id acak yang baru, dan seluruh data
+        // lama jadi yatim di bawah id cabang lama: masih ada di Firestore, tapi
+        // tidak terjangkau dari mana pun. Lebih baik berhenti dan bilang apa adanya.
+        if (snap.exists()) {
+          cabangSiap = false;
+          if (!peringatanCabangKosong) {
+            peringatanCabangKosong = true;
+            toast('Daftar cabang kosong di server — jangan simpan apa pun dulu, periksa datanya.', true);
+          }
+          return;
+        }
         buatCabangDefault();
         return;
       }
-      cabangList = snap.data().rows;
+      cabangList = rows;
+      if (dariServer) cabangSiap = true;
       // Cabang aktif: yang terakhir dipakai di perangkat ini, atau cabang pertama
       if (!cabangList.some((c) => c.id === cabangId)) cabangId = null;
       if (!cabangId) {
@@ -1383,6 +1450,9 @@ function mulaiSync() {
       renderCabangBar();
     },
     (e) => {
+      // Daftar cabang yang gagal dibaca berarti `cabangList` di memori tidak
+      // bisa dipertanggungjawabkan lagi; gerbang tulisnya ditutup balik.
+      cabangSiap = false;
       setSambung(false);
       toast('Gagal memuat daftar cabang: ' + e.message, true);
     }
@@ -1391,13 +1461,27 @@ function mulaiSync() {
 
 function mulaiSyncData() {
   stopData.forEach((lepas) => lepas());
+  // Melepas listener tidak membatalkan snapshot yang sudah dalam perjalanan.
+  // Tanpa penanda cabang ini, jawaban cabang lama bisa mendarat sesudah operator
+  // pindah cabang, menggantikan isi memori, lalu ikut tertulis balik ke cabang
+  // yang baru — isi cabang lama nyasar, isi cabang baru habis.
+  const cabangDipasang = cabangId;
+  resetDataSiap();
   const pasang = (key, terapkan) => onSnapshot(
-    doc(db, 'users', uid, 'cabang', cabangId, 'data', key),
+    doc(db, 'users', uid, 'cabang', cabangDipasang, 'data', key),
     (snap) => {
+      if (cabangId !== cabangDipasang) return;
+      // Ditandai siap sebelum diterapkan: lengkapiGender() menyimpan dari dalam
+      // terapkan(), dan penyimpanan itu harus lolos gerbang save().
+      dataSiap[key] = true;
       terapkan(snap.exists() ? (snap.data().rows || []) : []);
       renderList();
     },
     (e) => {
+      if (cabangId !== cabangDipasang) return;
+      // Gagal baca berarti isi di layar tidak bisa dipertanggungjawabkan lagi;
+      // gerbangnya ditutup balik supaya tidak ada yang tertulis menimpanya.
+      dataSiap[key] = false;
       setSambung(false);
       toast('Gagal memuat data: ' + e.message, true);
     }
@@ -1412,11 +1496,22 @@ function mulaiSyncData() {
 // Login pertama: siapkan cabang default dan angkat data lama ke cabang
 // pertama — dari lokasi cloud versi sebelum-cabang kalau ada, atau localStorage.
 const CABANG_DEFAULT = ['Puri', 'Kemayoran', 'Bandung'];
-let migrasiJalan = false;
+// Sekali percobaan per sesi, dan sengaja tidak pernah dikembalikan ke false.
+// Jalur ini membuat tiga id cabang acak yang baru; kalau ia sampai jalan dua
+// kali — misalnya karena tulisan pertamanya gagal separuh jalan — data yang
+// sudah terlanjur dipindahkan ke id ronde pertama langsung jadi yatim. Kalau
+// percobaannya gagal, jalan keluarnya memuat ulang halaman, bukan mencoba lagi.
+let migrasiDicoba = false;
 async function buatCabangDefault() {
-  if (migrasiJalan) return;
-  migrasiJalan = true;
+  if (migrasiDicoba) return;
+  migrasiDicoba = true;
   try {
+    // Satu pembacaan terakhir langsung ke server sebelum menulis apa pun.
+    // Snapshot yang memicu jalur ini bisa saja sudah ketinggalan; dokumen
+    // branches yang ternyata sudah terisi berarti ini bukan akun baru, dan
+    // menimpanya sama saja dengan memutus jalan ke seluruh data di bawahnya.
+    const cek = await getDoc(doc(db, 'users', uid, 'data', 'branches'));
+    if (cek.exists() && (cek.data().rows || []).length) return;
     const daftar = CABANG_DEFAULT.map((name) => ({ id: buatId(), name }));
     for (const key of [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF]) {
       let rows = [];
@@ -1431,9 +1526,11 @@ async function buatCabangDefault() {
     }
     await setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: daftar });
   } catch (e) {
+    // Termasuk kalau pembacaan branches di atas yang gagal: server yang tidak
+    // bisa ditanya bukan berarti "akun baru", jadi jalur ini berhenti di sini
+    // dan tidak pernah jatuh ke pembuatan cabang default.
     toast('Gagal menyiapkan cabang: ' + e.message, true);
   }
-  migrasiJalan = false;
 }
 
 // ============================================================
@@ -1469,6 +1566,9 @@ function pilihCabang(id) {
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
+  // Array di atas sekarang kosong bukan karena cabang barunya kosong, tapi
+  // karena isinya belum sempat datang. Gerbangnya ditutup di detik yang sama.
+  resetDataSiap();
   // Customer & jadwal disimpan per cabang, jadi nama yang sedang dibuka
   // riwayatnya tidak ada artinya lagi di cabang sebelah.
   if (filterMode === 'cust') setFilter('today');
@@ -1485,7 +1585,7 @@ $('cabangSheet').addEventListener('click', (e) => {
 $('cabangSave').addEventListener('click', () => {
   const name = $('cabangName').value.trim().replace(/\s+/g, ' ');
   if (!name) { toast('Nama cabang wajib diisi.', true); return; }
-  if (!bolehUbah()) return;
+  if (!bolehUbahCabang()) return;
   if (cabangList.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     toast('Cabang "' + name + '" sudah ada.', true);
     return;
@@ -1522,6 +1622,7 @@ if (!configTerisi) {
       setSambung(false); // palang ikut disembunyikan karena uid sudah kosong
       customers = []; appointments = []; staff = [];
       cabangList = []; cabangId = null;
+      resetDataSiap(); cabangSiap = false; peringatanCabangKosong = false;
       $('cabangBar').innerHTML = '';
       renderList();
       $('loginScreen').hidden = false;

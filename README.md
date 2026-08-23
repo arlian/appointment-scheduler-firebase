@@ -116,6 +116,22 @@ WA, export/import), ditambah:
   jadi tanpa jeda itu palangnya berkedip tiap kali aplikasi dibuka. Yang
   ditahan cuma tampilannya — penolakan perubahan tetap berlaku sejak detik
   pertama sambungan dianggap putus.
+- **Tersambung ≠ siap menulis**: status sambungan dibaca dari snapshot daftar
+  cabang, yang sampai lebih dulu daripada isi cabangnya. Di jeda itu aplikasi
+  merasa sudah tersambung padahal customers/appointments/staff masih array
+  kosong, dan menyimpan apa pun akan mengirim array yang cuma berisi baris baru
+  — seluruh isi dokumen di server tertimpa. Itu yang menghabiskan data Puri dan
+  Kemayoran pada 22 Agustus 2026. Sekarang tiap dokumen punya penanda "sudah
+  termuat" sendiri, dan penyimpanan ditolak sampai ketiganya sampai, dengan
+  pesan yang membedakan "belum tersambung" dari "data masih dimuat". Snapshot
+  yang menyala untuk cabang yang sudah bukan cabang aktif diabaikan, dan daftar
+  cabang tidak pernah ditulis sebelum jawaban server yang pertama diterima.
+  Menghapus jadwal terakhir di satu cabang tetap boleh — kosong karena
+  dikosongkan operator memang beda dengan kosong karena belum dimuat.
+- **Rencana lanjutan (belum dikerjakan)**: memecah `{rows: [...]}` menjadi satu
+  dokumen per customer dan per jadwal, supaya satu penyimpanan cuma menyentuh
+  satu dokumen dan seluruh kelas bug "tulisan utuh menimpa segalanya" hilang
+  secara struktur, bukan cuma dijaga gerbang.
 - **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
   digeser ke bulan mana pun lewat panah di atas:
   - tiga angka utama (total treatment, customer dilayani, dan customer baru)
