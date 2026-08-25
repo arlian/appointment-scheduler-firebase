@@ -462,6 +462,11 @@ button.primary:active { transform: scale(.985); }
 }
 .data-btn:hover { color: var(--accent-ink); border-color: var(--border-kuat); }
 .data-btn:active { transform: scale(.97); }
+/* Selama export/import berjalan: tetap terbaca, tapi jelas tidak bisa ditekan
+   dan tidak ikut mengecil saat disentuh. */
+.data-btn:disabled { opacity: .55; cursor: default; }
+.data-btn:disabled:hover { color: var(--text-2); border-color: var(--border); }
+.data-btn:disabled:active { transform: none; }
 .data-btn.wide { width: 100%; }
 /* Aksi utama tab Analitik — dibedakan tipis dari tombol "lihat tabel" di bawahnya */
 .salin-viz {
