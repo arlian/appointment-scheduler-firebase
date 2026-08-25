@@ -15,8 +15,8 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-  initializeFirestore, memoryLocalCache, doc, getDoc,
-  setDoc, deleteDoc, onSnapshot,
+  initializeFirestore, memoryLocalCache, doc, getDoc, getDocFromServer,
+  setDoc, deleteDoc, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?}]
@@ -1305,20 +1305,217 @@ $('waBtn').addEventListener('click', async () => {
 // ============================================================
 // Export & Import data
 // ============================================================
-$('exportBtn').addEventListener('click', () => {
-  if (!customers.length && !appointments.length) { toast('Belum ada data untuk di-export.', true); return; }
-  const payload = {
-    app: 'jadwal-treatment', version: 2, exportedAt: new Date().toISOString(),
-    customers, appointments, staff,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'jadwal-treatment-' + today() + '.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast('Data ter-export sebagai file JSON.');
+// Satu file = satu cadangan utuh: isinya semua cabang sekaligus, bukan cuma
+// yang kebetulan sedang dibuka. Sebelumnya cadangan cabang sebelah cuma bisa
+// diambil dengan berpindah cabang dulu, dan cabang yang lupa dipindahi tidak
+// pernah punya cadangan sama sekali.
+//
+// Isi tiap cabang dibaca dan ditulis langsung dari/ke server, bukan dari array
+// di memori: memori cuma memuat cabang yang sedang dibuka, jadi untuk cabang
+// sebelah tidak ada apa pun di layar ini yang bisa dijadikan pegangan.
+const EXPORT_VERSI = 3;
+
+const isiExportBtn = $('exportBtn').innerHTML;
+const isiImportBtn = $('importBtn').innerHTML;
+// Dua-duanya dikunci sekaligus. Pekerjaannya berjalan beberapa detik dan
+// menyentuh banyak dokumen; export dan import yang berjalan bertumpuk bisa
+// saling menimpa hasil bacaannya.
+function kunciTombolData(btn, label) {
+  $('exportBtn').disabled = true;
+  $('importBtn').disabled = true;
+  btn.textContent = label;
+}
+function bukaTombolData() {
+  $('exportBtn').disabled = false; $('exportBtn').innerHTML = isiExportBtn;
+  $('importBtn').disabled = false; $('importBtn').innerHTML = isiImportBtn;
+}
+
+// Sengaja dari server, bukan getDoc biasa: file cadangan harus mewakili isi
+// server apa adanya, dan cache memori bisa saja belum menyusul.
+async function bacaCabang(id) {
+  const isi = {};
+  for (const key of KEYS_DATA) {
+    const snap = await getDocFromServer(doc(db, 'users', uid, 'cabang', id, 'data', key));
+    isi[key] = snap.exists() ? (snap.data().rows || []) : [];
+  }
+  return isi;
+}
+
+// Baca-gabung-tulis satu cabang dalam satu transaksi. Tanpa ini ada jeda
+// antara membaca isi cabang dan menuliskannya kembali, dan apa pun yang
+// ditulis perangkat lain di jeda itu akan hilang tertimpa hasil gabungan yang
+// dihitung dari isi sebelum perubahannya. Jeda itu cuma sepersekian detik,
+// tapi persis begitulah 24 customer hilang pada 7 Agustus 2026.
+//
+// Transaksi juga membuat ketiga dokumennya utuh sekali jalan: tidak ada lagi
+// keadaan setengah jadi di mana customer sudah masuk tapi jadwalnya belum,
+// gara-gara sambungan putus di tengah tiga penulisan berurutan.
+async function gabungCabang(id, dariFile) {
+  const refs = KEYS_DATA.map((key) => doc(db, 'users', uid, 'cabang', id, 'data', key));
+  return runTransaction(db, async (tx) => {
+    // Semua pembacaan harus selesai sebelum penulisan pertama — aturan
+    // transaksi Firestore. Isinya selalu dari server, tidak pernah dari cache.
+    const isi = {};
+    for (let i = 0; i < KEYS_DATA.length; i++) {
+      const snap = await tx.get(refs[i]);
+      isi[KEYS_DATA[i]] = snap.exists() ? (snap.data().rows || []) : [];
+    }
+    // Dihitung ulang tiap kali transaksi diulang karena bentrok, di atas isi
+    // yang baru dibaca lagi — jadi pengulangannya tidak pernah menggandakan
+    // apa pun maupun memakai isi yang sudah basi.
+    const n = gabungData(isi, dariFile);
+    if (n.berubah) KEYS_DATA.forEach((key, i) => tx.set(refs[i], { rows: isi[key] }));
+    return n;
+  });
+}
+
+$('exportBtn').addEventListener('click', async () => {
+  if (!tersambung) {
+    toast('Belum tersambung ke server — data cabang tidak bisa dibaca.', true); return;
+  }
+  if (!cabangSiap || !cabangList.length) {
+    toast('Daftar cabang masih dimuat — tunggu sebentar lalu ulangi.', true); return;
+  }
+  kunciTombolData($('exportBtn'), 'Menyiapkan…');
+  try {
+    const branches = [];
+    for (const c of cabangList) {
+      const isi = await bacaCabang(c.id);
+      branches.push({
+        name: c.name,
+        customers: isi[KEY_CUSTOMERS],
+        appointments: isi[KEY_APPOINTMENTS],
+        staff: isi[KEY_STAFF],
+      });
+    }
+    if (!branches.some((b) => b.customers.length || b.appointments.length)) {
+      toast('Belum ada data untuk di-export.', true); return;
+    }
+    // Cabang yang sedang dibuka ikut ditulis datar di luar `branches`, dalam
+    // bentuk file versi lama. Perangkat yang aplikasinya belum diperbarui jadi
+    // tetap bisa membaca file ini — dapat satu cabang, bukan pesan "format
+    // tidak dikenali". Yang sudah diperbarui membaca `branches` dan
+    // mengabaikan salinan datar ini.
+    const aktif = branches[Math.max(0, cabangList.findIndex((c) => c.id === cabangId))];
+    const payload = {
+      app: 'jadwal-treatment', version: EXPORT_VERSI, exportedAt: new Date().toISOString(),
+      branches,
+      customers: aktif.customers, appointments: aktif.appointments, staff: aktif.staff,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jadwal-treatment-' + today() + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Data ' + branches.length + ' cabang ter-export sebagai file JSON.');
+  } catch (e) {
+    toast('Gagal membaca data cabang: ' + e.message, true);
+  } finally {
+    bukaTombolData();
+  }
 });
+
+// Menggabungkan isi satu cabang dari file ke isi cabang itu yang baru dibaca
+// dari server. Aturannya sama seperti dulu: customer dicocokkan berdasarkan
+// nama, jadwal yang customer+tanggal+jamnya sudah ada dilewati.
+function gabungData(isi, dariFile) {
+  const dftCustomers = isi[KEY_CUSTOMERS];
+  const dftAppointments = isi[KEY_APPOINTMENTS];
+  const dftStaff = isi[KEY_STAFF];
+  let cust = 0, appt = 0, berubah = false;
+  const idMap = new Map(); // id di file -> id di cabang tujuan
+
+  const tambahStaff = (nama) => {
+    const n = String(nama).trim().replace(/\s+/g, ' ');
+    if (!n) return '';
+    if (!dftStaff.some((s) => s.toLowerCase() === n.toLowerCase())) {
+      dftStaff.push(n);
+      dftStaff.sort((a, b) => a.localeCompare(b, 'id'));
+      berubah = true;
+    }
+    return n;
+  };
+
+  (dariFile.customers || []).forEach((c) => {
+    if (!c || typeof c.name !== 'string' || !c.name.trim()) return;
+    const name = c.name.trim().replace(/\s+/g, ' ');
+    const q = name.toLowerCase();
+    let existing = dftCustomers.find((x) => x.name.toLowerCase() === q);
+    if (!existing) {
+      existing = { id: buatId(), name };
+      dftCustomers.push(existing);
+      cust++; berubah = true;
+    }
+    // Penanda "sudah lama datang, baru masuk sistem" ikut terbawa. Sekali
+    // seseorang diakui customer lama, tidak ada file yang bisa mencabutnya —
+    // ketiadaan penanda di file cuma berarti file itu belum tahu.
+    if (c.sudahLama && !existing.sudahLama) { existing.sudahLama = true; berubah = true; }
+    // Gender ikut terbawa: koreksi manual dari file menang atas tebakan yang
+    // belum dikoreksi, tapi koreksi manual yang sudah ada di sini tidak pernah
+    // ditimpa. Tebakan lawan tebakan sama saja hasilnya, jadi tidak diapa-apakan.
+    if ((c.gender === 'P' || c.gender === 'L') && !existing.genderManual
+        && (!existing.gender || c.genderManual)) {
+      existing.gender = c.gender;
+      if (c.genderManual) existing.genderManual = true;
+      berubah = true;
+    }
+    idMap.set(c.id, existing.id);
+  });
+
+  (dariFile.appointments || []).forEach((a) => {
+    if (!a || !idMap.has(a.customerId)) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !/^\d{2}:\d{2}$/.test(a.time || '')) return;
+    const cid = idMap.get(a.customerId);
+    if (dftAppointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
+    const baru = { id: buatId(), customerId: cid, date: a.date, time: a.time };
+    // Kode yang tidak dikenal dibuang di sini dan urutannya disamakan, jadi
+    // file dari versi mana pun masuk dalam bentuk yang sama.
+    const jenis = rapikanTreatment(a.treatments);
+    if (jenis.length) baru.treatments = jenis;
+    if (a.done === true) baru.done = true;
+    if (typeof a.staff === 'string' && a.staff.trim()) baru.staff = tambahStaff(a.staff);
+    dftAppointments.push(baru);
+    appt++; berubah = true;
+  });
+
+  (Array.isArray(dariFile.staff) ? dariFile.staff : [])
+    .forEach((s) => { if (typeof s === 'string') tambahStaff(s); });
+
+  return { cust, appt, berubah };
+}
+
+// Mengunci daftar cabang di server, lalu memetakan tiap nama cabang di file ke
+// id cabang di sana. Nama yang belum terdaftar dibuat di transaksi yang sama.
+//
+// Sengaja dari daftar di server, bukan dari `cabangList` di memori: kalau
+// perangkat lain menambah cabang sesudah snapshot terakhir sampai ke sini,
+// menulis balik daftar versi memori akan menghapus cabang itu dari daftar dan
+// membuat seluruh isinya yatim — masih ada di Firestore, tapi tidak ada lagi
+// yang bisa membukanya.
+async function petakanCabang(namaList) {
+  const ref = doc(db, 'users', uid, 'data', 'branches');
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const rows = snap.exists() ? (snap.data().rows || []) : [];
+    // Daftar kosong di server padahal di layar ada isinya: tanda bahaya yang
+    // sama yang dijaga peringatanCabangKosong. Menulis daftar baru di atasnya
+    // akan menguburkan semua cabang lama, jadi import berhenti di sini.
+    if (!rows.length && cabangList.length) {
+      throw new Error('daftar cabang di server terbaca kosong — periksa datanya dulu');
+    }
+    const peta = new Map();
+    const baru = [];
+    namaList.forEach((name) => {
+      const q = name.toLowerCase();
+      let c = rows.find((x) => String(x.name || '').toLowerCase() === q);
+      if (!c) { c = { id: buatId(), name }; rows.push(c); baru.push(name); }
+      peta.set(q, c.id);
+    });
+    if (baru.length) tx.set(ref, { rows });
+    return { peta, baru };
+  });
+}
 
 $('importBtn').addEventListener('click', () => $('importFile').click());
 $('importFile').addEventListener('change', async () => {
@@ -1328,62 +1525,90 @@ $('importFile').addEventListener('change', async () => {
   let data;
   try { data = JSON.parse(await file.text()); }
   catch { toast('File tidak bisa dibaca — bukan JSON valid.', true); return; }
-  if (!Array.isArray(data.customers) || !Array.isArray(data.appointments)) {
+
+  // File versi lama tidak punya daftar cabang dan isinya cuma satu cabang
+  // tanpa nama. Itu diperlakukan sebagai file untuk cabang yang sedang dibuka
+  // — persis perilaku sebelumnya, jadi file cadangan lama tetap masuk.
+  let daftarCabangFile;
+  if (Array.isArray(data.branches)) {
+    daftarCabangFile = data.branches;
+  } else if (Array.isArray(data.customers) && Array.isArray(data.appointments)) {
+    const aktif = cabangList.find((c) => c.id === cabangId);
+    if (!aktif) { toast('Cabang belum siap — tunggu sebentar lalu ulangi.', true); return; }
+    daftarCabangFile = [{
+      name: aktif.name,
+      customers: data.customers, appointments: data.appointments, staff: data.staff,
+    }];
+  } else {
     toast('Format file tidak dikenali.', true); return;
   }
-  if (!bolehUbah()) return;
+  if (!bolehUbahCabang()) return;
 
-  // Gabungkan: customer dicocokkan berdasarkan nama, jadwal duplikat dilewati
-  let newCust = 0, newAppt = 0;
-  const idMap = new Map(); // id di file -> id di penyimpanan ini
-  data.customers.forEach((c) => {
-    if (!c || typeof c.name !== 'string' || !c.name.trim()) return;
-    const name = c.name.trim().replace(/\s+/g, ' ');
-    let existing = findCustomerByName(name);
-    if (!existing) {
-      existing = { id: buatId(), name };
-      customers.push(existing);
-      newCust++;
-    }
-    // Penanda "sudah lama datang, baru masuk sistem" ikut terbawa. Sekali
-    // seseorang diakui customer lama, tidak ada file yang bisa mencabutnya —
-    // ketiadaan penanda di file cuma berarti file itu belum tahu.
-    if (c.sudahLama) existing.sudahLama = true;
-    // Gender ikut terbawa: koreksi manual dari file menang atas tebakan yang
-    // belum dikoreksi, tapi koreksi manual yang sudah ada di sini tidak pernah
-    // ditimpa. Tebakan lawan tebakan sama saja hasilnya, jadi tidak diapa-apakan.
-    if ((c.gender === 'P' || c.gender === 'L') && !existing.genderManual
-        && (!existing.gender || c.genderManual)) {
-      existing.gender = c.gender;
-      if (c.genderManual) existing.genderManual = true;
-    }
-    idMap.set(c.id, existing.id);
+  // Nama cabang dirapikan dan digabung dulu: dua entri "Puri" dan "puri " di
+  // satu file harus mendarat di cabang yang sama, bukan bikin cabang kembar.
+  const tujuan = [];
+  daftarCabangFile.forEach((b) => {
+    const name = String((b && b.name) || '').trim().replace(/\s+/g, ' ');
+    if (!name || !Array.isArray(b.customers) || !Array.isArray(b.appointments)) return;
+    const q = name.toLowerCase();
+    const sudah = tujuan.find((t) => t.nama.toLowerCase() === q);
+    if (sudah) { sudah.isi.push(b); return; }
+    tujuan.push({ nama: name, isi: [b] });
   });
-  data.appointments.forEach((a) => {
-    if (!a || !idMap.has(a.customerId)) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !/^\d{2}:\d{2}$/.test(a.time || '')) return;
-    const cid = idMap.get(a.customerId);
-    if (appointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
-    const appt = { id: buatId(), customerId: cid, date: a.date, time: a.time };
-    // Kode yang tidak dikenal dibuang di sini dan urutannya disamakan, jadi
-    // file dari versi mana pun masuk dalam bentuk yang sama.
-    const jenis = rapikanTreatment(a.treatments);
-    if (jenis.length) appt.treatments = jenis;
-    if (a.done === true) appt.done = true;
-    if (typeof a.staff === 'string' && a.staff.trim()) {
-      appt.staff = a.staff.trim().replace(/\s+/g, ' ');
-      addStaff(appt.staff);
+  if (!tujuan.length) { toast('Tidak ada cabang berisi data di file itu.', true); return; }
+
+  // Import menulis ke cabang yang tidak sedang dilihat operator, dan tidak ada
+  // tombol urung. Cabang mana saja yang akan disentuh disebutkan lebih dulu.
+  const belumAda = tujuan
+    .filter((t) => !cabangList.some((c) => c.name.toLowerCase() === t.nama.toLowerCase()))
+    .map((t) => t.nama);
+  const rincian = 'Import data ke ' + tujuan.length + ' cabang: '
+    + tujuan.map((t) => t.nama).join(', ') + '.'
+    + (belumAda.length ? '\n\nCabang baru akan dibuat: ' + belumAda.join(', ') + '.' : '')
+    + '\n\nData yang sudah ada tidak dihapus — yang masuk cuma tambahannya.';
+  if (!confirm(rincian)) return;
+  // Diperiksa ulang sesudah dialognya dijawab. Dialog itu bisa terbuka berapa
+  // lama pun, dan pemeriksaan sebelum dialog sudah basi begitu sambungan
+  // sempat putus di sela itu. Transaksinya memang akan gagal sendiri, tapi
+  // pesannya jadi pesan galat Firestore, bukan alasan yang bisa dibaca operator.
+  if (!bolehUbahCabang()) return;
+
+  kunciTombolData($('importBtn'), 'Mengimpor…');
+  try {
+    // Daftar cabang dikunci dan ditulis lebih dulu. Kalau urutannya dibalik,
+    // data yang sudah masuk ke id yang belum pernah terdaftar akan jadi yatim
+    // begitu penulisan daftarnya gagal.
+    const { peta, baru } = await petakanCabang(tujuan.map((t) => t.nama));
+    let totalCust = 0, totalAppt = 0, gagal = [];
+    for (const t of tujuan) {
+      const id = peta.get(t.nama.toLowerCase());
+      try {
+        for (const b of t.isi) {
+          const n = await gabungCabang(id, b);
+          totalCust += n.cust; totalAppt += n.appt;
+        }
+      } catch (e) {
+        // Satu cabang yang gagal tidak boleh menghentikan yang lain: yang
+        // berhenti di tengah justru meninggalkan keadaan paling sulit dibaca,
+        // karena tidak ada yang tahu sampai cabang mana yang sudah masuk.
+        gagal.push(t.nama + ' (' + e.message + ')');
+      }
     }
-    appointments.push(appt);
-    newAppt++;
-  });
-  if (Array.isArray(data.staff)) {
-    data.staff.forEach((s) => { if (typeof s === 'string') addStaff(s); });
+    const catatanBaru = baru.length ? ' (' + baru.length + ' cabang baru dibuat)' : '';
+    if (gagal.length) {
+      toast('Import sebagian: ' + totalCust + ' customer, ' + totalAppt
+        + ' jadwal masuk. Gagal di ' + gagal.join('; ')
+        + ' — ulangi dengan file yang sama untuk melengkapinya.', true);
+    } else {
+      toast('Import selesai: ' + totalCust + ' customer baru, ' + totalAppt
+        + ' jadwal ditambahkan di ' + tujuan.length + ' cabang' + catatanBaru + '.');
+    }
+  } catch (e) {
+    // Gagal di petakanCabang: belum ada satu pun data yang ditulis.
+    toast('Import dibatalkan: ' + e.message, true);
+  } finally {
+    bukaTombolData();
   }
-  save(KEY_CUSTOMERS, customers);
-  save(KEY_APPOINTMENTS, appointments);
-  renderList();
-  toast('Import selesai: ' + newCust + ' customer baru, ' + newAppt + ' jadwal ditambahkan.');
 });
 
 // ============================================================
