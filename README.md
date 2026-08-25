@@ -162,9 +162,10 @@ WA, export/import), ditambah:
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,
   tambah lewat "+ Cabang". Pilihan cabang diingat per perangkat — refresh
-  atau buka ulang tetap di cabang terakhir yang dipilih. Export/import dan
-  salinan WA mengikuti cabang yang sedang dibuka (nama cabang ikut
-  tercantum di salinan WA).
+  atau buka ulang tetap di cabang terakhir yang dipilih. Salinan WA
+  mengikuti cabang yang sedang dibuka (nama cabang ikut tercantum di
+  salinannya), sedangkan export/import berlaku untuk semua cabang
+  sekaligus (lihat bagian di bawah).
 - **Gender customer** (lihat bagian di bawah).
 
 ## Jenis treatment
@@ -245,6 +246,73 @@ daftar lama tidak berbuntut tabel kosong.
 Datanya disimpan di field `treatments` pada tiap jadwal, hanya kalau memang
 ada isinya. Jadwal lama yang belum punya field ini tetap sah dan ikut
 export/import seperti biasa.
+
+## Export & import — semua cabang sekaligus
+
+Satu file JSON = satu cadangan utuh: isinya **semua cabang**, bukan cuma
+cabang yang sedang dibuka. Tidak perlu lagi berpindah cabang tiga kali untuk
+mencadangkan tiga cabang, dan tidak ada lagi cabang yang tidak punya cadangan
+gara-gara lupa dipindahi.
+
+**Export** membaca isi tiap cabang langsung dari server, bukan dari yang
+sedang tampil di layar — layar cuma memuat satu cabang. Karena itu tombolnya
+butuh sambungan; kalau palang merah sedang muncul, export ditolak dengan
+alasannya. Selama berjalan tombolnya berubah jadi "Menyiapkan…" dan
+tombol Import ikut terkunci.
+
+**Import** mencocokkan cabang di file dengan cabang di sini **berdasarkan
+nama** (huruf besar/kecil tidak dibedakan). Cabang yang namanya belum ada
+**dibuat otomatis**, jadi file dari akun atau perangkat yang cabangnya lebih
+banyak tetap masuk utuh tanpa ada datanya yang hilang diam-diam. Karena
+sekarang yang tersentuh bisa cabang yang tidak sedang dilihat, daftar cabang
+tujuan dan cabang baru yang akan dibuat dikonfirmasi dulu sebelum apa pun
+ditulis.
+
+Penggabungan per cabang aturannya sama seperti dulu: customer dicocokkan
+berdasarkan nama, jadwal yang customer + tanggal + jamnya sudah ada dianggap
+duplikat dan dilewati. **Import tidak pernah menghapus** — yang masuk hanya
+tambahannya.
+
+### Kenapa import pakai transaksi
+
+Baca-gabung-tulis dijalankan sebagai **satu transaksi Firestore per cabang**,
+begitu juga penulisan daftar cabang. Alasannya sama dengan yang membuat
+seluruh aplikasi ini paranoid soal penyimpanan: tiap dokumen ditulis utuh
+sekali kirim, jadi kalau ada jeda antara membaca isi cabang dan menuliskannya
+kembali, apa pun yang ditulis perangkat lain di jeda itu akan hilang tertimpa
+hasil gabungan yang dihitung dari isi sebelum perubahannya. Transaksi menutup
+jeda itu: kalau isinya berubah di tengah jalan, Firestore mengulang
+penggabungan di atas isi yang baru, bukan menimpanya.
+
+Efek keduanya, ketiga dokumen satu cabang (customer, jadwal, pegawai) masuk
+sekali jalan — tidak ada lagi keadaan setengah jadi berisi customer yang
+jadwalnya belum ikut karena sambungan putus di tengah tiga penulisan
+berurutan.
+
+Daftar cabang juga dibaca ulang dari server di dalam transaksinya, bukan dari
+daftar yang ada di layar. Kalau perangkat lain menambah cabang sesudah
+snapshot terakhir sampai ke sini, menulis balik daftar versi layar akan
+menghapus cabang itu dari daftar dan membuat seluruh isinya yatim: masih ada
+di Firestore, tapi tidak ada lagi yang bisa membukanya. Satu penjaga lagi:
+kalau daftar cabang di server terbaca **kosong** padahal di layar ada isinya,
+import dibatalkan tanpa menulis apa pun — itu tanda bahaya yang sama yang
+sudah dijaga di tempat lain.
+
+Kalau satu cabang gagal (sambungan putus, transaksinya kalah bentrok berkali-
+kali), cabang lain tetap dilanjutkan dan nama yang gagal disebutkan di pesan
+akhir. Aman diulang dengan file yang sama: yang sudah masuk terhitung duplikat
+dan dilewati, jadi import kedua hanya melengkapi sisanya.
+
+**File cadangan lama tetap bisa dipakai.** File tanpa daftar cabang dianggap
+milik cabang yang sedang dibuka, persis seperti perilaku versi sebelumnya.
+Sebaliknya, file baru juga masih bisa dibaca perangkat yang aplikasinya belum
+diperbarui: di luar daftar cabang, isi cabang yang sedang dibuka ikut ditulis
+dalam bentuk lama, jadi perangkat itu dapat satu cabang — bukan pesan
+"format tidak dikenali".
+
+Foto hasil treatment tidak ikut file JSON (tersimpan sebagai dokumen
+tersendiri di Firestore); yang terbawa adalah customer, jadwal, dan daftar
+pegawai.
 
 ## Tandai selesai — sedang dimatikan
 
