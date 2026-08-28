@@ -236,12 +236,13 @@ Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:
 `+Exo +Muka` terbaca seperti dua tanda yang kebetulan berdempetan, sedangkan
 `+Exo & Muka` jelas satu tanda berisi dua hal.
 
-Di bawah daftar jadwal — dan di ekor salinan WhatsApp, setelah "jumlah cust
-baru" — ada rekap **jumlah tiap kombinasi** dari jadwal yang sedang tampil
+Di bawah daftar jadwal ada rekap **jumlah tiap kombinasi** dari jadwal yang
+sedang tampil
 (mis. `Rambut + Exo : 3`), diurutkan dari kombinasi terbanyak. Jadwal yang
 jenisnya belum diisi masuk baris "Belum diisi" di paling bawah. Seluruh rekap
 ini hilang sendiri kalau tidak ada satu pun jadwal yang jenisnya terisi, jadi
-daftar lama tidak berbuntut tabel kosong.
+daftar lama tidak berbuntut tabel kosong. Rekapnya **cuma di layar** — salinan
+WhatsApp tidak membawanya.
 
 Datanya disimpan di field `treatments` pada tiap jadwal, hanya kalau memang
 ada isinya. Jadwal lama yang belum punya field ini tetap sah dan ikut
@@ -419,15 +420,7 @@ seperti sebelumnya, langsung tersimpan.
 namanya, supaya langsung kelihatan waktu daftarnya dibaca sekilas. Customer lama
 tidak diberi keterangan apa-apa — tiap jadwal cukup satu baris, dan jumlah
 kunjungannya justru lebih lengkap terbaca di riwayat, sejauh tap namanya. Di
-salinan WhatsApp tandanya jadi 🆕 di ujung baris, ditutup dua baris hitungan:
-
-```
-jumlah jadwal : 6
-jumlah cust baru : 2
-```
-
-Nol tetap ditulis — barisnya sendiri yang menyebut apa yang dihitung, jadi yang
-membaca tahu memang tidak ada, bukan sekadar lupa dicantumkan.
+salinan WhatsApp tandanya jadi 🆕 di ujung baris.
 
 ## Gender customer
 

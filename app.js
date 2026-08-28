@@ -1310,7 +1310,6 @@ function buildWhatsAppText() {
   let lines = ['*JADWAL TREATMENT' + judulCabang + '* 💆'];
   let lastDate = null;
   let n = 0;
-  const baruSet = new Set();
   rows.forEach((r) => {
     if (r.date !== lastDate) {
       lines.push('', '📅 *' + hariBulan(r.date) + '*');
@@ -1319,7 +1318,6 @@ function buildWhatsAppText() {
     }
     n++;
     const baru = !sudahLamaDatang(r.customerId);
-    if (baru) baruSet.add(r.customerId);
     // Rambut tidak ditulis — itu dasarnya. Yang muncul cuma tambahannya
     // ("Tama (+Exo & Muka)") atau justru ketiadaan rambutnya ("Tama (Muka Only)").
     const tandaT = tandaTreatment(r.treatments);
@@ -1327,19 +1325,10 @@ function buildWhatsAppText() {
       + (tandaT ? ' (' + tandaT + ')' : '') + (baru ? ' 🆕' : ''));
   });
 
-  // Dua baris penutup, menggantikan keterangan "🆕 customer baru" yang dulu.
-  // Nol tetap ditulis: barisnya sendiri yang menyebut apa yang dihitung, jadi
-  // yang membaca tahu memang tidak ada, bukan sekadar lupa dicantumkan.
-  lines.push('', 'jumlah jadwal : ' + rows.length,
-    'jumlah cust baru : ' + baruSet.size);
-
-  // Rekap kombinasi treatment. Ikut cuma kalau memang ada yang diisi, supaya
-  // salinan dari daftar lama tidak berbuntut satu baris "Belum diisi" saja.
-  const kombinasi = ringkasTreatment(rows);
-  if (kombinasi.some((k) => k.t.length)) {
-    lines.push('', '*Jenis treatment*');
-    kombinasi.forEach((k) => lines.push(namaKombinasi(k.t) + ' : ' + k.n));
-  }
+  // Tidak ada penutup apa pun: tidak ada baris jumlah, tidak ada rekap jenis
+  // treatment. Yang dikirim ke WA cuma daftar jadwalnya — jumlahnya sudah
+  // terbaca dari nomor urut terakhir, dan rekapnya tetap ada di layar aplikasi
+  // buat yang memang perlu.
   return lines.join('\n');
 }
 
