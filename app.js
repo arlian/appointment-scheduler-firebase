@@ -1383,9 +1383,8 @@ function buildWhatsAppText() {
   return lines.join('\n');
 }
 
-$('waBtn').addEventListener('click', async () => {
-  const text = buildWhatsAppText();
-  if (!text) { toast('Belum ada jadwal untuk disalin.', true); return; }
+// Dipakai dua tombol salin: daftar jadwal dan daftar slot kosong.
+async function salinTeks(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
@@ -1398,6 +1397,12 @@ $('waBtn').addEventListener('click', async () => {
     document.execCommand('copy');
     ta.remove();
   }
+}
+
+$('waBtn').addEventListener('click', async () => {
+  const text = buildWhatsAppText();
+  if (!text) { toast('Belum ada jadwal untuk disalin.', true); return; }
+  await salinTeks(text);
   toast('Jadwal tersalin — tinggal paste di WhatsApp.');
 });
 
@@ -1578,6 +1583,36 @@ function renderSlot() {
     : 'Tidak ada slot yang muat untuk ' + sebut + ekor;
 }
 
+// Salinan WA untuk slot kosong: cukup rentang jamnya saja. Tidak ada jumlah
+// pegawai luang maupun lama rentangnya — yang dikirim ke customer adalah
+// tawaran jam, dan sisanya cuma catatan kerja yang tidak ada urusannya di sana.
+//
+// Rentang yang tidak muat untuk jenis yang sedang dicari tidak ikut: menawarkan
+// celah 20 menit untuk treatment 60 menit sama saja dengan tidak menawarkan.
+function buildSlotWaText() {
+  const hariIni = today();
+  const tanggal = tanggalFilter().filter((t) => t >= hariIni);
+  if (!tanggal.length) return null;
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  const judulCabang = cabangList.length > 1 && cabang ? ' ' + cabang.name.toUpperCase() : '';
+  const lines = ['*SLOT KOSONG' + judulCabang + '* 🕒'];
+  let ada = 0;
+  tanggal.forEach((tgl) => {
+    const slot = slotKosong(
+      appointments.filter((a) => a.date === tgl),
+      pegawaiSlot,
+      tgl === hariIni ? menitSekarang() : 0,
+    ).filter((s) => s.b - s.a >= durasiCari());
+    // Hari yang penuh tidak ditulis sama sekali. Daftar ini isinya tawaran;
+    // baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
+    if (!slot.length) return;
+    ada += slot.length;
+    lines.push('', '📅 *' + hariBulan(tgl) + '*');
+    slot.forEach((s) => lines.push(keJam(s.a) + ' – ' + keJam(s.b)));
+  });
+  return ada ? lines.join('\n') : null;
+}
+
 // Jenisnya dipilih dengan tombol centang yang sama persis seperti di form isi
 // jadwal — bukan dropdown berisi tujuh kombinasi jadi. Yang dipikirkan operator
 // tetap "rambut sama muka", bukan mencari baris "Rambut + Muka" di daftar.
@@ -1607,6 +1642,15 @@ function bukaSlot() {
 function tutupSlot() { $('slotSheet').hidden = true; }
 
 $('slotBtn').addEventListener('click', bukaSlot);
+$('slotWaBtn').addEventListener('click', async () => {
+  const text = buildSlotWaText();
+  if (!text) {
+    toast('Tidak ada slot yang muat untuk ' + namaCari() + ' — tidak ada yang bisa disalin.', true);
+    return;
+  }
+  await salinTeks(text);
+  toast('Slot kosong tersalin — tinggal paste di WhatsApp.');
+});
 $('slotTutup').addEventListener('click', tutupSlot);
 $('slotSheet').addEventListener('click', (e) => { if (e.target === $('slotSheet')) tutupSlot(); });
 $('slotPegawai').addEventListener('input', () => {

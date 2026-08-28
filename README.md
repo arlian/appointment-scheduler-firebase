@@ -321,6 +321,41 @@ jadwalnya, dibatasi 31 hari sekali jalan.
 Jumlah pegawai yang menyita dihitung dari **seluruh jadwal hari itu**, termasuk
 yang sedang disaring keluar layar oleh mode riwayat satu customer.
 
+### Salin slot ke WhatsApp
+
+Tombol **Salin untuk WA** di dalam sheet-nya. Isinya sengaja **cuma rentang
+jamnya**:
+
+```
+*SLOT KOSONG PURI* 🕒
+
+📅 *Selasa, 1 September 2026*
+16:15 – 17:00
+
+📅 *Rabu, 2 September 2026*
+09:00 – 17:00
+```
+
+Tidak ada jumlah pegawai luang, tidak ada lama rentangnya. Yang dikirim ke
+customer adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya di
+sana.
+
+Dua hal yang disaring diam-diam, dan keduanya disengaja:
+
+- **Rentang yang tidak muat** untuk jenis yang sedang dicari tidak ikut.
+  Menawarkan celah 20 menit untuk treatment 60 menit sama saja dengan tidak
+  menawarkan.
+- **Hari yang penuh tidak ditulis sama sekali.** Daftar ini isinya tawaran;
+  baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
+
+Kalau tidak ada satu pun rentang yang muat, tidak ada yang disalin — yang keluar
+pesan galat, bukan pesan berisi judul saja.
+
+Nama cabang ikut di judul hanya kalau cabangnya lebih dari satu, aturan yang
+sama dengan salinan daftar jadwal. Kode clipboard-nya dipakai bersama kedua
+tombol salin (`salinTeks`), termasuk jalur cadangan untuk browser tanpa
+Clipboard API.
+
 ### Hari dan jam yang sudah lewat dilewati
 
 Slot yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari:
