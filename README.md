@@ -247,6 +247,66 @@ Datanya disimpan di field `treatments` pada tiap jadwal, hanya kalau memang
 ada isinya. Jadwal lama yang belum punya field ini tetap sah dan ikut
 export/import seperti biasa.
 
+## Jadwal disimpan per bulan
+
+Susunan di Firestore:
+
+```
+users/{uid}/data/branches                      -> { rows: [{id, name}, ...] }
+users/{uid}/cabang/{id}/data/customers         -> { rows: [...] }
+users/{uid}/cabang/{id}/data/staff             -> { rows: [...] }
+users/{uid}/cabang/{id}/appointments/{YYYY-MM} -> { rows: [...] }   <- satu dokumen per bulan
+users/{uid}/cabang/{id}/photos/{fotoId}
+```
+
+Customer dan pegawai tetap satu dokumen — jumlahnya tumbuh pelan dan seluruh
+isinya memang selalu dibutuhkan sekaligus. **Jadwal dipecah per bulan.**
+
+Alasannya batas keras Firestore: **satu dokumen berhenti di 1 MiB**. Dengan
+~270 jadwal per bulan di cabang tersibuk dan ~156 byte per baris, riwayat yang
+ditumpuk di satu dokumen menabrak batas itu dalam belasan bulan — dan sejak
+saat itu tidak ada jadwal baru yang bisa disimpan sama sekali. Dipecah per
+bulan, tiap dokumen berhenti tumbuh di akhir bulannya: yang terbesar sekarang
+~43 KB, dan tidak akan pernah mendekati batas itu.
+
+Efek keduanya sama pentingnya. Dulu mencentang satu jadwal berarti mengirim
+ulang **seluruh riwayat** cabang itu — 81 KB untuk mengubah satu baris.
+Sekarang yang dikirim cuma dokumen bulan yang tersentuh. Mengubah tanggal
+jadwal ke bulan lain menulis dua dokumen: bulan asal dan bulan tujuan, supaya
+barisnya tidak tertinggal di keduanya sekaligus.
+
+Yang **tidak** berubah: `appointments` di memori tetap satu array datar berisi
+seluruh riwayat, digabung dari semua dokumen bulanan waktu cabangnya dibuka.
+Filter, hitungan kunjungan, riwayat per customer, dan analitik semuanya
+membacanya persis seperti sebelum dipecah — jadi "customer baru" tetap dihitung
+dari seluruh riwayat, bukan dari bulan yang kebetulan sedang tampil.
+
+### Pemindahan dari susunan lama
+
+Cabang yang datanya masih di `data/appointments` dipindahkan otomatis **waktu
+cabang itu dibuka**, dalam satu transaksi: dokumen lama dibaca, dipecah jadi
+dokumen bulanan, lalu dokumen lamanya dihapus. Kalau dua perangkat membuka
+cabang yang sama bersamaan, yang kalah membaca dokumen lama yang sudah tidak
+ada lalu berhenti tanpa menulis apa pun.
+
+Pemindahannya **menggabung, bukan menimpa**: dokumen bulanan yang sudah terisi
+bisa saja lebih baru daripada dokumen lama — misalnya karena import sudah
+menulis ke sana lebih dulu. Baris yang id-nya sudah ada tidak ditulis ulang.
+
+Listener jadwal baru dipasang **sesudah** pemindahan selesai. Kalau urutannya
+dibalik, koleksi yang masih kosong akan dilaporkan sebagai "siap": layar
+menunjukkan cabang tanpa jadwal sama sekali, dan apa pun yang disimpan di detik
+itu menulis dokumen bulanan yang sebentar lagi ditimpa hasil pemindahan.
+
+Import ikut memindahkan cabang tujuannya lebih dulu, karena import menulis ke
+cabang yang tidak sedang dibuka — dan cabang itu bisa saja belum pernah
+disentuh sejak versi ini. Export sebaliknya tidak menulis apa-apa: ia membaca
+dokumen bulanan **dan** dokumen lama, lalu menggabungnya, jadi cabang yang
+belum pernah dibuka tetap ikut tercadangkan utuh.
+
+Security rules tidak perlu diubah: `match /users/{uid}/{document=**}` sudah
+mencakup koleksi baru ini.
+
 ## Export & import — semua cabang sekaligus
 
 Satu file JSON = satu cadangan utuh: isinya **semua cabang**, bukan cuma
@@ -284,10 +344,14 @@ hasil gabungan yang dihitung dari isi sebelum perubahannya. Transaksi menutup
 jeda itu: kalau isinya berubah di tengah jalan, Firestore mengulang
 penggabungan di atas isi yang baru, bukan menimpanya.
 
-Efek keduanya, ketiga dokumen satu cabang (customer, jadwal, pegawai) masuk
-sekali jalan — tidak ada lagi keadaan setengah jadi berisi customer yang
-jadwalnya belum ikut karena sambungan putus di tengah tiga penulisan
-berurutan.
+Efek keduanya, satu cabang masuk sekali jalan — customer, pegawai, dan semua
+dokumen bulan yang tersentuh file itu — tidak ada lagi keadaan setengah jadi
+berisi customer yang jadwalnya belum ikut karena sambungan putus di tengah
+beberapa penulisan berurutan.
+
+Yang dibaca dan dikunci transaksinya cuma dokumen bulan yang benar-benar
+disebut file itu, bukan seluruh riwayat cabang. Bulan yang semua jadwalnya
+ternyata sudah ada tidak ditulis ulang sama sekali.
 
 Daftar cabang juga dibaca ulang dari server di dalam transaksinya, bukan dari
 daftar yang ada di layar. Kalau perangkat lain menambah cabang sesudah

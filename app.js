@@ -1,7 +1,15 @@
 // ============================================================
 // Penyimpanan (Firestore) — server satu-satunya sumber kebenaran.
-// Susunan: users/{uid}/data/{customers|appointments|staff},
-// tiap dokumen berisi { rows: [...] } meniru bentuk array lama.
+// Susunan: users/{uid}/cabang/{id}/data/{customers|staff} — satu dokumen
+// berisi { rows: [...] } meniru bentuk array lama — dan jadwal di
+// users/{uid}/cabang/{id}/appointments/{YYYY-MM}, satu dokumen per bulan.
+//
+// Jadwal dipecah per bulan karena satu dokumen Firestore berhenti di 1 MiB:
+// dengan ~270 jadwal per bulan, riwayat yang ditumpuk di satu dokumen akan
+// menabrak batas itu dalam hitungan belasan bulan, dan sejak itu tidak ada
+// jadwal baru yang bisa disimpan sama sekali. Dipecah per bulan, tiap dokumen
+// berhenti tumbuh di akhir bulannya. Efek sampingnya sama pentingnya: mengubah
+// satu jadwal cuma mengirim ulang bulan itu, bukan seluruh riwayat.
 //
 // Tiap dokumen ditulis utuh sekali kirim, jadi yang menulis terakhir menang
 // dengan membawa seluruh isinya. Selama masih ada salinan lokal yang menetap,
@@ -15,11 +23,14 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import {
-  initializeFirestore, memoryLocalCache, doc, getDoc, getDocFromServer,
+  initializeFirestore, memoryLocalCache, doc, collection, getDoc,
+  getDocFromServer, getDocsFromServer,
   setDoc, deleteDoc, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?}]
+// Bukan lagi nama dokumen seperti dua yang lain, melainkan nama koleksi
+// bulanannya — sekaligus tetap dipakai sebagai kunci di `dataSiap`.
 const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, treatments?}]
 // Pegawai cuma dipakai fitur "tandai selesai" yang sedang dinonaktifkan. Datanya
 // tetap ikut disinkronkan dan ikut terbawa export/import supaya utuh saat fiturnya
@@ -60,6 +71,8 @@ let tersambung = false;
 // Penandanya per dokumen, dan baru true setelah snapshot pertamanya benar-benar
 // sampai. "Sampai tapi isinya kosong" tetap dihitung siap — di situlah bedanya
 // kosong karena memang dikosongkan operator dengan kosong karena belum dimuat.
+// Ketiganya tetap punya penanda kesiapan sendiri, walau jadwal sekarang datang
+// dari koleksi bulanan dan bukan lagi dari satu dokumen seperti dua yang lain.
 const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF];
 let dataSiap = {};
 const resetDataSiap = () => { dataSiap = {}; };
@@ -131,13 +144,55 @@ function bolehUbahCabang() {
   return true;
 }
 
+// Alamat dokumen, dikumpulkan di satu tempat supaya susunan koleksinya cuma
+// tertulis sekali dan tidak ada pemanggil yang salah mengeja jalurnya.
+const refData = (id, key) => doc(db, 'users', uid, 'cabang', id, 'data', key);
+const refJadwalKol = (id) => collection(db, 'users', uid, 'cabang', id, 'appointments');
+const refJadwal = (id, kunci) => doc(db, 'users', uid, 'cabang', id, 'appointments', kunci);
+
+// Cuma dipakai customers & staff sekarang; jadwal lewat simpanJadwal().
 function save(key, data) {
   // Jaring terakhir; pemanggilnya sudah lewat bolehUbah(). Kesiapan diperiksa
   // per key supaya penyimpanan yang dipicu snapshot itu sendiri — lengkapiGender()
   // — tetap jalan begitu dokumennya siap, tanpa menunggu dua dokumen lainnya.
   if (!tersambung || !cabangId || !dataSiap[key]) return;
-  setDoc(doc(db, 'users', uid, 'cabang', cabangId, 'data', key), { rows: data })
+  setDoc(refData(cabangId, key), { rows: data })
     .catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
+}
+
+// Jadwal datar -> Map 'YYYY-MM' -> baris bulan itu. Bulan yang tidak punya
+// baris sama sekali tidak muncul sebagai kunci.
+function kelompokBulan(rows) {
+  const per = new Map();
+  rows.forEach((a) => {
+    const k = kunciDari(a.date);
+    if (!per.has(k)) per.set(k, []);
+    per.get(k).push(a);
+  });
+  return per;
+}
+
+// Tanggal yang tidak berbentuk 'YYYY-MM-DD' tidak punya bulan yang bisa
+// dijadikan nama dokumen. Barisnya juga tidak pernah terbaca filter mana pun,
+// jadi disaring di pintu masuk daripada menghasilkan dokumen bernama aneh.
+const tanggalSah = (a) => !!a && typeof a.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.date);
+
+// Menyimpan jadwal untuk bulan-bulan yang tersentuh saja. `appointments` di
+// memori tetap satu array datar berisi seluruh riwayat — yang dipecah cuma
+// bentuk simpannya — jadi isi tiap dokumen bulanan selalu dihitung ulang dari
+// array itu, bukan ditambal per baris.
+function simpanBulan(kunciSet) {
+  if (!tersambung || !cabangId || !dataSiap[KEY_APPOINTMENTS]) return;
+  const per = kelompokBulan(appointments.filter(tanggalSah));
+  const cab = cabangId;
+  kunciSet.forEach((k) => {
+    const rows = per.get(k) || [];
+    // Bulan yang barisnya habis dihapus dokumennya, bukan ditinggalkan berisi
+    // { rows: [] }: dokumen kosong tetap ikut terbaca listener dan tetap
+    // dihitung satu pembacaan tiap kali cabangnya dibuka.
+    const janji = rows.length ? setDoc(refJadwal(cab, k), { rows }) : deleteDoc(refJadwal(cab, k));
+    janji.catch((e) => toast('Gagal menyimpan ke cloud: ' + e.message, true));
+  });
 }
 
 // Id acak, bukan berurutan: dua perangkat yang offline bersamaan
@@ -591,7 +646,7 @@ function simpanJadwal(customer, cleanName, date, time, status) {
   const jenis = treatForm.get();
   if (jenis.length) appt.treatments = jenis;
   appointments.push(appt);
-  save(KEY_APPOINTMENTS, appointments);
+  simpanBulan(new Set([kunciDari(date)]));
 
   let msg = !isNew
     ? 'Jadwal tersimpan untuk ' + customer.name + ' (customer lama).'
@@ -996,11 +1051,15 @@ $('editSave').addEventListener('click', () => {
     save(KEY_CUSTOMERS, customers);
   }
 
+  // Tanggal baru bisa jatuh di bulan lain: dokumen bulan asalnya harus ikut
+  // ditulis ulang, kalau tidak barisnya tertinggal di sana dan jadwalnya jadi
+  // terbaca dua kali — sekali di bulan lama, sekali di bulan baru.
+  const bulanTersentuh = new Set([kunciDari(a.date), kunciDari(date)]);
   a.date = date;
   a.time = time;
   const jenis = treatEdit.get();
   if (jenis.length) a.treatments = jenis; else delete a.treatments;
-  save(KEY_APPOINTMENTS, appointments);
+  simpanBulan(bulanTersentuh);
   closeEdit();
   renderList();
   toast(namaBerubah ? 'Nama dan jadwal berhasil diubah.' : 'Jadwal berhasil diubah.');
@@ -1177,7 +1236,7 @@ function confirmDelete(r) {
   if (!confirm('Hapus jadwal ' + nameOf(r.customerId) + ' pada ' + hariBulan(r.date) + ' ' + r.time + '?')) return;
   hapusFotoJadwal(r);
   appointments = appointments.filter((a) => a.id !== r.id);
-  save(KEY_APPOINTMENTS, appointments);
+  simpanBulan(new Set([kunciDari(r.date)]));
   toast('Jadwal dihapus.');
   renderList();
 }
@@ -1334,10 +1393,26 @@ function bukaTombolData() {
 // server apa adanya, dan cache memori bisa saja belum menyusul.
 async function bacaCabang(id) {
   const isi = {};
-  for (const key of KEYS_DATA) {
-    const snap = await getDocFromServer(doc(db, 'users', uid, 'cabang', id, 'data', key));
+  for (const key of [KEY_CUSTOMERS, KEY_STAFF]) {
+    const snap = await getDocFromServer(refData(id, key));
     isi[key] = snap.exists() ? (snap.data().rows || []) : [];
   }
+  // Jadwal dikumpulkan dari dokumen bulanannya jadi satu array datar. Bentuk
+  // file cadangan sengaja tidak ikut berubah: file yang dibuat versi ini tetap
+  // terbaca aplikasi versi lama, dan file lama tetap terbaca yang ini.
+  const jadwal = [];
+  const kol = await getDocsFromServer(refJadwalKol(id));
+  kol.forEach((d) => (d.data().rows || []).forEach((a) => jadwal.push(a)));
+  // Cabang yang belum pernah dibuka di versi ini masih menyimpan riwayatnya di
+  // dokumen lama — pemindahan cuma jalan untuk cabang yang sedang dibuka.
+  // Cadangan harus tetap memuatnya, kalau tidak isinya diam-diam tidak lengkap
+  // justru untuk cabang yang paling jarang disentuh.
+  const lama = await getDocFromServer(refData(id, KEY_APPOINTMENTS));
+  if (lama.exists()) {
+    const punyaId = new Set(jadwal.map((a) => a && a.id));
+    (lama.data().rows || []).forEach((a) => { if (a && !punyaId.has(a.id)) jadwal.push(a); });
+  }
+  isi[KEY_APPOINTMENTS] = jadwal;
   return isi;
 }
 
@@ -1351,20 +1426,40 @@ async function bacaCabang(id) {
 // keadaan setengah jadi di mana customer sudah masuk tapi jadwalnya belum,
 // gara-gara sambungan putus di tengah tiga penulisan berurutan.
 async function gabungCabang(id, dariFile) {
-  const refs = KEYS_DATA.map((key) => doc(db, 'users', uid, 'cabang', id, 'data', key));
+  // Bulan mana saja yang akan tersentuh sudah ketahuan dari isi file, jadi yang
+  // dibaca dan dikunci transaksi cuma dokumen bulan itu. Tanpa ini transaksinya
+  // harus membaca seluruh riwayat cabang — persis yang dihindari pemecahan ini.
+  const bulanFile = new Set();
+  (dariFile.appointments || []).forEach((a) => {
+    if (tanggalSah(a)) bulanFile.add(kunciDari(a.date));
+  });
+  const refCust = refData(id, KEY_CUSTOMERS);
+  const refStaff = refData(id, KEY_STAFF);
   return runTransaction(db, async (tx) => {
     // Semua pembacaan harus selesai sebelum penulisan pertama — aturan
     // transaksi Firestore. Isinya selalu dari server, tidak pernah dari cache.
     const isi = {};
-    for (let i = 0; i < KEYS_DATA.length; i++) {
-      const snap = await tx.get(refs[i]);
-      isi[KEYS_DATA[i]] = snap.exists() ? (snap.data().rows || []) : [];
+    const snapCust = await tx.get(refCust);
+    isi[KEY_CUSTOMERS] = snapCust.exists() ? (snapCust.data().rows || []) : [];
+    const snapStaff = await tx.get(refStaff);
+    isi[KEY_STAFF] = snapStaff.exists() ? (snapStaff.data().rows || []) : [];
+    const perBulan = new Map();
+    for (const k of bulanFile) {
+      const snap = await tx.get(refJadwal(id, k));
+      perBulan.set(k, snap.exists() ? (snap.data().rows || []) : []);
     }
+    isi[KEY_APPOINTMENTS] = perBulan;
     // Dihitung ulang tiap kali transaksi diulang karena bentrok, di atas isi
     // yang baru dibaca lagi — jadi pengulangannya tidak pernah menggandakan
     // apa pun maupun memakai isi yang sudah basi.
     const n = gabungData(isi, dariFile);
-    if (n.berubah) KEYS_DATA.forEach((key, i) => tx.set(refs[i], { rows: isi[key] }));
+    if (n.berubah) {
+      tx.set(refCust, { rows: isi[KEY_CUSTOMERS] });
+      tx.set(refStaff, { rows: isi[KEY_STAFF] });
+      // Cuma bulan yang benar-benar bertambah yang ditulis ulang. Bulan yang
+      // semua jadwalnya ternyata sudah ada tidak perlu disentuh sama sekali.
+      n.bulan.forEach((k) => tx.set(refJadwal(id, k), { rows: perBulan.get(k) }));
+    }
     return n;
   });
 }
@@ -1421,9 +1516,12 @@ $('exportBtn').addEventListener('click', async () => {
 // nama, jadwal yang customer+tanggal+jamnya sudah ada dilewati.
 function gabungData(isi, dariFile) {
   const dftCustomers = isi[KEY_CUSTOMERS];
-  const dftAppointments = isi[KEY_APPOINTMENTS];
+  // Map 'YYYY-MM' -> baris bulan itu, sudah berisi dokumen bulan yang tersentuh
+  // file ini saja. Bulan lain tidak ikut dibaca dan tidak ikut ditulis.
+  const dftJadwal = isi[KEY_APPOINTMENTS];
   const dftStaff = isi[KEY_STAFF];
   let cust = 0, appt = 0, berubah = false;
+  const bulan = new Set(); // bulan yang isinya benar-benar bertambah
   const idMap = new Map(); // id di file -> id di cabang tujuan
 
   const tambahStaff = (nama) => {
@@ -1467,7 +1565,12 @@ function gabungData(isi, dariFile) {
     if (!a || !idMap.has(a.customerId)) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date || '') || !/^\d{2}:\d{2}$/.test(a.time || '')) return;
     const cid = idMap.get(a.customerId);
-    if (dftAppointments.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
+    // Jadwal kembar cuma mungkin ada di bulan yang sama dengan tanggalnya, jadi
+    // yang diperiksa cukup dokumen bulan itu — bukan seluruh riwayat cabang.
+    const kunci = kunciDari(a.date);
+    if (!dftJadwal.has(kunci)) dftJadwal.set(kunci, []);
+    const isiBulan = dftJadwal.get(kunci);
+    if (isiBulan.some((x) => x.customerId === cid && x.date === a.date && x.time === a.time)) return;
     const baru = { id: buatId(), customerId: cid, date: a.date, time: a.time };
     // Kode yang tidak dikenal dibuang di sini dan urutannya disamakan, jadi
     // file dari versi mana pun masuk dalam bentuk yang sama.
@@ -1475,14 +1578,15 @@ function gabungData(isi, dariFile) {
     if (jenis.length) baru.treatments = jenis;
     if (a.done === true) baru.done = true;
     if (typeof a.staff === 'string' && a.staff.trim()) baru.staff = tambahStaff(a.staff);
-    dftAppointments.push(baru);
+    isiBulan.push(baru);
+    bulan.add(kunci);
     appt++; berubah = true;
   });
 
   (Array.isArray(dariFile.staff) ? dariFile.staff : [])
     .forEach((s) => { if (typeof s === 'string') tambahStaff(s); });
 
-  return { cust, appt, berubah };
+  return { cust, appt, berubah, bulan };
 }
 
 // Mengunci daftar cabang di server, lalu memetakan tiap nama cabang di file ke
@@ -1583,6 +1687,11 @@ $('importFile').addEventListener('change', async () => {
     for (const t of tujuan) {
       const id = peta.get(t.nama.toLowerCase());
       try {
+        // Cabang tujuan dipindahkan lebih dulu kalau memang belum. Kalau tidak,
+        // hasil import mendarat di dokumen bulanan sementara riwayat lamanya
+        // masih menumpuk di dokumen lama — dan begitu cabang itu dibuka nanti,
+        // pemindahannya menggabungkan yang lama ke atas yang baru diimpor.
+        await migrasiJadwalBulanan(id);
         for (const b of t.isi) {
           const n = await gabungCabang(id, b);
           totalCust += n.cust; totalAppt += n.appt;
@@ -1684,8 +1793,56 @@ function mulaiSync() {
   );
 }
 
+// Cabang yang sudah dipastikan tidak punya dokumen lama lagi, supaya pindah
+// cabang bolak-balik tidak mengulang transaksi pemeriksaannya tiap kali.
+const sudahDipindah = new Set();
+
+// Pemindahan sekali jalan: satu dokumen data/appointments berisi seluruh
+// riwayat -> satu dokumen per bulan di koleksi appointments.
+//
+// Seluruhnya dalam satu transaksi supaya dua perangkat yang membuka cabang
+// yang sama di saat yang sama tidak sama-sama memindahkan: yang kalah membaca
+// dokumen lama yang sudah tidak ada, lalu berhenti tanpa menulis apa-apa.
+async function migrasiJadwalBulanan(cab) {
+  if (sudahDipindah.has(cab)) return 0;
+  const lama = refData(cab, KEY_APPOINTMENTS);
+  const jml = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(lama);
+    // Sudah tidak ada berarti cabang ini memang sudah dipindahkan sebelumnya.
+    if (!snap.exists()) return 0;
+    const rows = (snap.data().rows || []).filter(tanggalSah);
+    const per = kelompokBulan(rows);
+    // Semua pembacaan harus selesai sebelum penulisan pertama — aturan
+    // transaksi Firestore — jadi dokumen bulanannya dibaca sekaligus di sini.
+    const sudahAda = new Map();
+    for (const k of per.keys()) {
+      const s = await tx.get(refJadwal(cab, k));
+      sudahAda.set(k, s.exists() ? (s.data().rows || []) : []);
+    }
+    per.forEach((isi, k) => {
+      // Digabung, bukan ditimpa. Dokumen bulanan yang sudah terisi bisa lebih
+      // baru daripada dokumen lama ini — import sudah menulis ke sana, atau
+      // perangkat yang aplikasinya belum diperbarui masih sempat menambah
+      // jadwal ke dokumen lama sesudah cabang ini dipindahkan di perangkat
+      // lain. Menimpanya berarti membuang yang lebih baru.
+      const ada = sudahAda.get(k);
+      const punyaId = new Set(ada.map((a) => a.id));
+      const tambahan = isi.filter((a) => !punyaId.has(a.id));
+      if (tambahan.length) tx.set(refJadwal(cab, k), { rows: ada.concat(tambahan) });
+    });
+    // Dihapus di transaksi yang sama: selama dokumen lama masih ada, perangkat
+    // versi lama akan terus menulis ke sana dan tulisannya tidak pernah terbaca
+    // lagi di sini — hilang tanpa ada yang tahu.
+    tx.delete(lama);
+    return rows.length;
+  });
+  sudahDipindah.add(cab);
+  return jml;
+}
+
 function mulaiSyncData() {
   stopData.forEach((lepas) => lepas());
+  stopData = [];
   // Melepas listener tidak membatalkan snapshot yang sudah dalam perjalanan.
   // Tanpa penanda cabang ini, jawaban cabang lama bisa mendarat sesudah operator
   // pindah cabang, menggantikan isi memori, lalu ikut tertulis balik ke cabang
@@ -1693,7 +1850,7 @@ function mulaiSyncData() {
   const cabangDipasang = cabangId;
   resetDataSiap();
   const pasang = (key, terapkan) => onSnapshot(
-    doc(db, 'users', uid, 'cabang', cabangDipasang, 'data', key),
+    refData(cabangDipasang, key),
     (snap) => {
       if (cabangId !== cabangDipasang) return;
       // Ditandai siap sebelum diterapkan: lengkapiGender() menyimpan dari dalam
@@ -1711,11 +1868,54 @@ function mulaiSyncData() {
       toast('Gagal memuat data: ' + e.message, true);
     }
   );
-  stopData = [
+  stopData.push(
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
-    pasang(KEY_APPOINTMENTS, (rows) => { appointments = rows; }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
-  ];
+  );
+  pasangJadwal(cabangDipasang);
+}
+
+// Jadwal dipasang belakangan karena koleksinya baru boleh didengarkan sesudah
+// pemindahan dari susunan lama selesai. Kalau urutannya dibalik, listener
+// melaporkan koleksi yang masih kosong sebagai "siap": layar menunjukkan
+// cabang tanpa jadwal sama sekali, dan apa pun yang disimpan di detik itu
+// menulis dokumen bulanan yang sebentar lagi ditimpa hasil pemindahan.
+async function pasangJadwal(cab) {
+  try {
+    await migrasiJadwalBulanan(cab);
+  } catch (e) {
+    if (cabangId !== cab) return;
+    // Tanpa pemindahan yang berhasil, gerbang tulis jadwal sengaja dibiarkan
+    // tertutup: dataSiap[appointments] tidak pernah jadi true.
+    setSambung(false);
+    toast('Gagal menyiapkan jadwal cabang ini: ' + e.message
+      + ' — muat ulang halaman untuk mencoba lagi.', true);
+    return;
+  }
+  if (cabangId !== cab) return;
+  const lepas = onSnapshot(
+    refJadwalKol(cab),
+    (snap) => {
+      if (cabangId !== cab) return;
+      // Digabung jadi satu array datar berisi seluruh riwayat. Bentuk di memori
+      // sengaja tidak ikut berubah: filteredRows, visitCount, dan analitik
+      // semuanya membaca array ini apa adanya seperti sebelum dipecah.
+      const semua = [];
+      snap.forEach((d) => (d.data().rows || []).forEach((a) => semua.push(a)));
+      dataSiap[KEY_APPOINTMENTS] = true;
+      appointments = semua;
+      renderList();
+    },
+    (e) => {
+      if (cabangId !== cab) return;
+      dataSiap[KEY_APPOINTMENTS] = false;
+      setSambung(false);
+      toast('Gagal memuat jadwal: ' + e.message, true);
+    }
+  );
+  // Cabangnya bisa saja sudah berganti selagi listener di atas dipasang.
+  if (cabangId !== cab) { lepas(); return; }
+  stopData.push(lepas);
 }
 
 // Login pertama: siapkan cabang default dan angkat data lama ke cabang
@@ -1746,7 +1946,14 @@ async function buatCabangDefault() {
       } catch { /* tidak terbaca: coba localStorage versi lama saja */ }
       if (!rows.length) rows = ambilLokalLama('jt_' + key);
       if (rows.length) {
-        await setDoc(doc(db, 'users', uid, 'cabang', daftar[0].id, 'data', key), { rows });
+        if (key === KEY_APPOINTMENTS) {
+          // Langsung ke bentuk bulanan. Menulisnya ke dokumen lama dulu cuma
+          // membuat pemindahan yang baru saja dihindari harus jalan lagi.
+          const per = kelompokBulan(rows.filter(tanggalSah));
+          for (const [k, isi] of per) await setDoc(refJadwal(daftar[0].id, k), { rows: isi });
+        } else {
+          await setDoc(refData(daftar[0].id, key), { rows });
+        }
       }
     }
     await setDoc(doc(db, 'users', uid, 'data', 'branches'), { rows: daftar });
@@ -1848,6 +2055,9 @@ if (!configTerisi) {
       customers = []; appointments = []; staff = [];
       cabangList = []; cabangId = null;
       resetDataSiap(); cabangSiap = false; peringatanCabangKosong = false;
+      // Penanda cabang yang sudah dipindah ikut dikosongkan: yang login
+      // berikutnya bisa akun lain, dan cabangnya bukan cabang yang ini.
+      sudahDipindah.clear();
       $('cabangBar').innerHTML = '';
       renderList();
       $('loginScreen').hidden = false;
