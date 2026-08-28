@@ -321,6 +321,23 @@ jadwalnya, dibatasi 31 hari sekali jalan.
 Jumlah pegawai yang menyita dihitung dari **seluruh jadwal hari itu**, termasuk
 yang sedang disaring keluar layar oleh mode riwayat satu customer.
 
+### Hari dan jam yang sudah lewat dilewati
+
+Slot yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari:
+
+- **Hari sebelum hari ini dibuang**, berapa pun rentang filternya. Filter
+  "Seminggu ke Belakang" jadi menyisakan hari ini saja; kalau seluruh harinya
+  sudah lewat — misalnya satu tanggal di bulan lalu — hasilnya berbunyi apa
+  adanya, bukan daftar kosong tanpa keterangan. Berapa hari yang dilewati
+  disebut di baris ringkasan.
+- **Hari ini dipotong dari jam sekarang**, dibulatkan ke atas ke kelipatan 15
+  menit. Slot yang berbunyi "14:07" terbaca seperti salah hitung; 14:15 itu jam
+  yang memang dipakai orang waktu membuat janji. Judul harinya diberi tanda
+  "sisa hari ini" supaya jelas angkanya bukan hitungan sehari penuh.
+- Kalau jam kerja hari ini memang sudah habis, yang tertulis "Jam kerja hari ini
+  sudah lewat" — bukan "Penuh". Dua sebab yang berbeda: penuh berarti masih bisa
+  digeser ke besok, jam kerja habis berarti hari itu memang sudah tutup.
+
 ## Jadwal disimpan per bulan
 
 Susunan di Firestore:

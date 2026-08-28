@@ -365,6 +365,13 @@ const PEGAWAI_BAWAAN = 2;
 const MAKS_HARI_SLOT = 31;
 
 const keMenit = (jam) => (+jam.slice(0, 2)) * 60 + (+jam.slice(3, 5));
+// Jam sekarang, dibulatkan ke atas ke kelipatan 15 menit. Slot yang dimulai
+// "14:07" terbaca seperti salah hitung; 14:15 itu jam yang memang orang pakai
+// waktu membuat janji.
+const menitSekarang = () => {
+  const d = new Date();
+  return Math.ceil((d.getHours() * 60 + d.getMinutes()) / 15) * 15;
+};
 const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 const labelDurasi = (m) => {
   const j = Math.floor(m / 60), sisa = m % 60;
@@ -1406,8 +1413,12 @@ $('waBtn').addEventListener('click', async () => {
 // Rentang menganggur di satu hari, sudah dipotong jam buka/tutup.
 // Hasilnya [{a, b, min, max}] — a/b dalam menit sejak tengah malam, min/max
 // jumlah pegawai yang luang di sepanjang rentang itu.
-function slotKosong(rowsHari, pegawai) {
-  const buka = keMenit(JAM_BUKA), tutup = keMenit(JAM_TUTUP);
+function slotKosong(rowsHari, pegawai, palingAwal = 0) {
+  // `palingAwal` memotong jendela dari depan — dipakai untuk hari ini, supaya
+  // jam yang sudah lewat tidak ditawarkan sebagai slot yang masih bisa diisi.
+  const buka = Math.max(keMenit(JAM_BUKA), palingAwal);
+  const tutup = keMenit(JAM_TUTUP);
+  if (buka >= tutup) return [];
   // Jadwal yang seluruhnya di luar jam kerja tidak ikut menyita pegawai di
   // dalam jendela — tapi yang mulai sebelum buka dan baru selesai sesudahnya
   // tetap ikut, karena pegawainya memang belum bebas waktu pintu dibuka.
@@ -1481,9 +1492,20 @@ const namaCari = () => namaKombinasi(rapikanTreatment(treatCari));
 function renderSlot() {
   const box = $('slotHasil');
   box.innerHTML = '';
-  const tanggal = tanggalFilter();
-  if (!tanggal.length) {
+  const semuaTanggal = tanggalFilter();
+  if (!semuaTanggal.length) {
     box.innerHTML = '<div class="empty">Pilih dulu filter tanggalnya — mode ini tidak menunjuk hari tertentu.</div>';
+    $('slotRingkas').textContent = '';
+    return;
+  }
+  // Hari yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari. Filter
+  // seperti "Seminggu ke Belakang" memang isinya hampir seluruhnya hari lewat —
+  // yang tersisa cuma hari ini, dan itu yang ditampilkan.
+  const hariIni = today();
+  const tanggal = semuaTanggal.filter((t) => t >= hariIni);
+  const dilewati = semuaTanggal.length - tanggal.length;
+  if (!tanggal.length) {
+    box.innerHTML = '<div class="empty">Semua hari di filter ini sudah lewat — tidak ada yang bisa dicarikan jadwal.</div>';
     $('slotRingkas').textContent = '';
     return;
   }
@@ -1493,7 +1515,8 @@ function renderSlot() {
     // adalah seluruh jadwal hari itu, termasuk yang sedang disaring keluar
     // layar oleh mode riwayat satu customer.
     const rowsHari = appointments.filter((a) => a.date === tgl);
-    const slot = slotKosong(rowsHari, pegawaiSlot);
+    // Hari ini dipotong dari jam sekarang; hari-hari berikutnya utuh sejak buka.
+    const slot = slotKosong(rowsHari, pegawaiSlot, tgl === hariIni ? menitSekarang() : 0);
 
     const h = document.createElement('div');
     h.className = 'slot-hari';
@@ -1502,14 +1525,19 @@ function renderSlot() {
     judul.textContent = hariBulan(tgl);
     const jml = document.createElement('span');
     jml.className = 'slot-jml';
-    jml.textContent = rowsHari.length + ' jadwal';
+    jml.textContent = (tgl === hariIni && menitSekarang() > keMenit(JAM_BUKA)
+      ? 'sisa hari ini · ' : '') + rowsHari.length + ' jadwal';
     judul.appendChild(jml);
     h.appendChild(judul);
 
     if (!slot.length) {
       const p = document.createElement('div');
       p.className = 'slot-penuh';
-      p.textContent = 'Penuh — tidak ada pegawai yang luang.';
+      // Dua sebab yang berbeda, dan operator perlu tahu bedanya: penuh berarti
+      // masih bisa digeser besok, jam kerja habis berarti hari ini sudah tutup.
+      p.textContent = (tgl === hariIni && menitSekarang() >= keMenit(JAM_TUTUP))
+        ? 'Jam kerja hari ini sudah lewat.'
+        : 'Penuh — tidak ada pegawai yang luang.';
       h.appendChild(p);
     } else {
       slot.forEach((s) => {
@@ -1543,7 +1571,8 @@ function renderSlot() {
   });
 
   const sebut = namaCari() + ' (' + labelDurasi(durasiCari()) + ')';
-  const ekor = ' di ' + tanggal.length + ' hari yang diperiksa.';
+  const ekor = ' di ' + tanggal.length + ' hari yang diperiksa'
+    + (dilewati ? ' — ' + dilewati + ' hari yang sudah lewat dilewati' : '') + '.';
   $('slotRingkas').textContent = adaYangMuat
     ? adaYangMuat + ' slot muat untuk ' + sebut + ekor
     : 'Tidak ada slot yang muat untuk ' + sebut + ekor;
