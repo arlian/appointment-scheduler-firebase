@@ -841,16 +841,45 @@ button.primary:active { transform: scale(.985); }
 .slot-atur label, .slot-jenis label {
   display: block; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 4px;
 }
-/* Kotak jumlah pegawai sengaja sempit — isinya paling banyak dua angka, dan
-   kotak selebar sheet membuatnya terbaca seperti kolom nama. */
-.slot-atur input {
-  width: 88px; padding: 10px 12px; font: inherit; font-size: .9rem;
-  color: var(--text); background: var(--field);
-  border: 1px solid var(--border); border-radius: 10px;
+/* Kotak angka dengan tombol − dan +. Dibuat besar dengan sengaja: di iPhone
+   panah bawaan <input type=number> tidak ada sama sekali, jadi tombol inilah
+   satu-satunya cara mengubah angka tanpa memanggil papan ketik. Ukurannya
+   mengikuti sasaran sentuh 44px yang nyaman untuk ibu jari. */
+.stepper {
+  display: inline-flex; align-items: stretch;
+  background: var(--field); border: 1px solid var(--border); border-radius: 10px;
 }
-.slot-atur input:focus {
-  outline: none; border-color: var(--accent); background: var(--card);
+.stepper input {
+  width: 44px; padding: 0; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-size: .95rem; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stepper input:focus { outline: none; }
+.stepper:focus-within {
+  border-color: var(--accent); background: var(--card);
   box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.stepper-btn {
+  width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent;
+  color: var(--accent-ink); font: inherit; font-size: 1.2rem; font-weight: 700;
+  line-height: 1; cursor: pointer; border-radius: 9px;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:active { background: var(--accent-soft); }
+@media (hover: hover) {
+  .stepper-btn:hover { background: var(--accent-soft); }
+}
+/* Versi kecil, dipakai di judul tiap tanggal: yang mengecil cuma yang terlihat.
+   Sasaran sentuhnya dilebarkan kembali ke atas dan ke bawah lewat ::after —
+   area tak terlihat yang tidak ikut memakan ruang, jadi barisnya tetap ringkas
+   tapi tombolnya masih bisa ditekan ibu jari tanpa meleset. */
+.stepper.kecil { border-radius: 8px; }
+.stepper.kecil input { width: 30px; font-size: .82rem; }
+.stepper.kecil .stepper-btn {
+  position: relative; width: 28px; min-height: 28px; font-size: 1rem; border-radius: 7px;
+}
+.stepper.kecil .stepper-btn::after {
+  content: ''; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px;
 }
 .slot-jenis { margin-top: 14px; }
 .slot-atur-ket { display: block; font-size: .72rem; color: var(--muted); margin-top: 5px; line-height: 1.45; }
@@ -860,33 +889,36 @@ button.primary:active { transform: scale(.985); }
   padding: 9px 11px; margin: 14px 0 4px;
 }
 .slot-head {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  display: flex; align-items: center; gap: 8px;
   font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
   letter-spacing: .07em; margin: 16px 0 6px;
 }
-.slot-jml {
+/* Tanggalnya boleh menyusut kalau layarnya sempit, supaya kotak pegawai tetap
+   duduk sebaris dengannya dan tidak terlempar ke baris sendiri. */
+.slot-head > span:first-child { min-width: 0; }
+.slot-sisa {
   margin-left: auto; letter-spacing: 0; text-transform: none;
-  font-weight: 600; font-variant-numeric: tabular-nums;
+  font-weight: 600; font-style: italic; white-space: nowrap;
 }
 /* Jumlah pegawai hari itu, bisa disetel sendiri per tanggal. Duduk di judul
    harinya supaya jelas angkanya milik hari itu, bukan setelan sekali untuk semua. */
 .slot-peg-hari {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
   letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--text-2);
+  white-space: nowrap; font-size: .68rem;
 }
-.slot-peg-hari input {
-  width: 46px; padding: 4px 6px; font: inherit; font-size: .8rem; font-weight: 700;
-  text-align: center; font-variant-numeric: tabular-nums;
-  color: var(--text); background: var(--field);
-  border: 1px solid var(--border); border-radius: 8px;
-}
-.slot-peg-hari input:focus {
-  outline: none; border-color: var(--accent); background: var(--card);
-  box-shadow: 0 0 0 3px var(--accent-ring);
+/* "sisa hari ini" sudah memakan lebar; kalau keduanya muncul, kotaknya yang
+   dirapatkan ke penanda itu, bukan didorong ke baris berikutnya. */
+.slot-sisa + .slot-peg-hari { margin-left: 0; }
+/* Layar paling sempit: kata "pegawai" dilepas, angkanya yang harus tetap ada.
+   Artinya tetap terbaca dari kotak bawaan di atas yang berlabel lengkap. */
+@media (max-width: 420px) {
+  .slot-peg-hari { font-size: 0; gap: 0; }
 }
 /* Hari yang angkanya sengaja dibedakan dari bawaan diberi tanda, supaya tidak
    ada hari yang diam-diam dihitung dengan angka lain tanpa terlihat. */
-.slot-peg-hari.ubah input { border-color: var(--accent); color: var(--accent-ink); }
+.slot-peg-hari.ubah .stepper { border-color: var(--accent); }
+.slot-peg-hari.ubah .stepper input { color: var(--accent-ink); }
 .slot-peg-hari.ubah { color: var(--accent-ink); }
 .slot-item {
   display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;

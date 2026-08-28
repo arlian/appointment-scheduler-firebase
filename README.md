@@ -285,8 +285,14 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
 
 ### Yang bisa diatur
 
-- **Pegawai** — bawaannya 2, bisa diubah 1–20. Ini angka **bawaan untuk semua
-  hari**; tiap tanggal punya kotaknya sendiri di judul harinya, karena jumlah
+- **Pegawai** — bawaannya 2, bisa diubah 1–20 lewat tombol **−** dan **+**.
+  Tombolnya bukan hiasan: di iPhone `<input type="number">` tidak punya panah
+  sama sekali, jadi satu-satunya cara mengubah angka tanpa tombol itu adalah
+  memanggil papan ketik angka — terlalu repot cuma untuk mengubah 2 jadi 3.
+  Kotaknya tetap bisa diketik langsung buat yang mau lompat ke 8. Ukuran
+  tombolnya 44px, sasaran sentuh yang nyaman untuk ibu jari.
+
+  Ini angka **bawaan untuk semua hari**; tiap tanggal punya kotaknya sendiri di judul harinya, karena jumlah
   pegawai memang bisa beda tiap hari.
 
   Yang disimpan cuma hari yang benar-benar disetel sendiri. Selebihnya ikut
@@ -299,7 +305,24 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
 
   Mengubah angka satu hari cuma membangun ulang blok hari itu, bukan seluruh
   daftar — kalau seluruhnya dibangun ulang, kotak yang sedang diketik ikut
-  terhapus dan kursornya lompat keluar di tengah pengetikan.
+  terhapus dan kursornya lompat keluar di tengah pengetikan. Kalau yang ditekan
+  tombol − / +, fokusnya dikembalikan ke tombol yang sama, supaya ketukan
+  berikutnya tidak mendarat di ruang kosong.
+
+  Kotak per tanggal duduk **sebaris dengan tanggalnya**, rata kanan. Jumlah
+  jadwal hari itu tidak ditulis di sini: yang dicari di layar ini justru yang
+  kosong, dan angka yang terisi sudah terbaca di daftar jadwal sendiri. Yang
+  tetap disebut cuma penanda "sisa hari ini" kalau harinya memang sudah
+  terpotong jam berjalan — tanpa itu, daftar yang mulai jam 14:00 terlihat
+  seperti salah hitung. Di layar paling sempit kata "pegawai" ikut dilepas;
+  artinya tetap terbaca dari kotak bawaan di atas yang berlabel lengkap.
+
+  Kedua kotak — yang bawaan maupun yang per tanggal — dibangun fungsi yang sama
+  (`buatStepper`), jadi perilakunya tidak pernah berbeda. Yang per tanggal
+  memakai versi **kecil**: kotak seukuran penuh berulang di tiap baris hari
+  menenggelamkan tanggalnya sendiri. Yang mengecil cuma yang terlihat —
+  sasaran sentuhnya dilebarkan kembali ke atas dan ke bawah lewat `::after`,
+  area tak terlihat yang tidak ikut memakan ruang.
 - **Cari jadwal untuk jenis** — tombol centang Rambut / Exo / Muka, **sama
   persis dengan pemilih di form isi jadwal**. Sengaja bukan dropdown berisi
   tujuh kombinasi jadi: yang dipikirkan operator "rambut sama muka", bukan

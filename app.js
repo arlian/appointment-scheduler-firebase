@@ -1486,6 +1486,55 @@ function tanggalFilter() {
   return adaJadwalnya(); // 'all'
 }
 
+// Kotak angka dengan tombol − dan +. Di iPhone <input type="number"> tidak
+// punya panah sama sekali, dan memanggil papan ketik angka cuma untuk mengubah
+// 2 jadi 3 jauh lebih repot daripada satu ketukan. Kotaknya tetap bisa diketik
+// buat yang mau langsung lompat ke 8.
+function buatStepper({ id, nilai, min, max, aria, onUbah, kecil }) {
+  const kotak = document.createElement('div');
+  // Versi kecil dipakai di judul tiap tanggal. Ukuran penuh di sana terlalu
+  // ramai — satu kotak sebesar itu berulang di tiap baris hari menenggelamkan
+  // tanggalnya sendiri. Sasaran sentuhnya tetap dilebarkan lewat CSS, jadi yang
+  // mengecil cuma yang terlihat.
+  kotak.className = 'stepper' + (kecil ? ' kecil' : '');
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  // inputmode, bukan type=number: papan ketik angka tetap muncul di HP, tapi
+  // tanpa panah kecil bawaan yang di iPhone memang tidak pernah ada dan di
+  // desktop justru menempel di tombol + yang baru dipasang ini.
+  inp.inputMode = 'numeric';
+  inp.autocomplete = 'off';
+  if (id) inp.id = id;
+  inp.value = nilai;
+  inp.setAttribute('aria-label', aria);
+  const batas = (n) => Math.max(min, Math.min(max, n));
+  const pakai = (n, dariTombol) => {
+    const b = batas(n);
+    inp.value = b;
+    onUbah(b, dariTombol);
+  };
+  const tombol = (tanda, delta, judul) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'stepper-btn';
+    b.textContent = tanda;
+    b.title = judul;
+    b.setAttribute('aria-label', judul);
+    b.addEventListener('click', () => pakai(Math.round(+inp.value || min) + delta, true));
+    return b;
+  };
+  // Diketik langsung tidak dibatasi di tiap ketukan — mengetik "12" akan
+  // terpotong jadi "1" lalu ditolak kalau dipaksa membatasi per huruf.
+  inp.addEventListener('input', () => {
+    const n = Math.round(+inp.value);
+    if (Number.isFinite(n) && n >= min && n <= max) onUbah(n, false);
+  });
+  // Yang tidak masuk akal baru dirapikan waktu kotaknya ditinggalkan.
+  inp.addEventListener('blur', () => pakai(Math.round(+inp.value || min), false));
+  kotak.append(tombol('−', -1, 'Kurangi'), inp, tombol('+', +1, 'Tambah'));
+  return kotak;
+}
+
 let pegawaiSlot = PEGAWAI_BAWAAN;
 // Penyimpangan per tanggal. Isinya cuma hari yang benar-benar diubah operator;
 // selebihnya ikut angka bawaan di atas — jadi mengubah bawaannya langsung
@@ -1522,7 +1571,6 @@ const slotHari = (tgl, hariIni) => slotKosong(
 // dibangun ulang, kotak yang sedang diketik ikut terhapus dan kursornya lompat
 // keluar di tengah pengetikan.
 function bangunHariSlot(tgl, hariIni) {
-  const rowsHari = appointments.filter((a) => a.date === tgl);
   const slot = slotHari(tgl, hariIni);
 
   const h = document.createElement('div');
@@ -1533,27 +1581,32 @@ function bangunHariSlot(tgl, hariIni) {
   judul.className = 'slot-head';
   const nama = document.createElement('span');
   nama.textContent = hariBulan(tgl);
-  const jml = document.createElement('span');
-  jml.className = 'slot-jml';
-  jml.textContent = (tgl === hariIni && menitSekarang() > keMenit(JAM_BUKA)
-    ? 'sisa hari ini · ' : '') + rowsHari.length + ' jadwal';
-  const kotak = document.createElement('label');
+  // Jumlah jadwal hari itu tidak ditulis: yang dicari di layar ini justru yang
+  // kosong, dan angka yang terisi sudah terbaca di daftar jadwal sendiri.
+  // Yang tetap perlu disebut cuma kalau harinya sudah terpotong jam berjalan —
+  // tanpa itu, daftar yang mulai jam 14:00 terlihat seperti salah hitung.
+  const kotak = document.createElement('span');
   kotak.className = 'slot-peg-hari' + (pegawaiPerTgl.has(tgl) ? ' ubah' : '');
-  const inp = document.createElement('input');
-  inp.type = 'number'; inp.min = '1'; inp.max = '20'; inp.step = '1';
-  inp.value = pegawaiUntuk(tgl);
-  inp.title = 'Jumlah pegawai pada ' + hariBulan(tgl);
-  inp.setAttribute('aria-label', 'Jumlah pegawai pada ' + hariBulan(tgl));
-  inp.addEventListener('input', () => {
-    const n = Math.max(1, Math.min(20, Math.round(+inp.value || 0)));
-    // Diketik balik sama dengan bawaannya = tidak jadi menyimpang. Dihapus dari
-    // peta, bukan disimpan sebagai angka yang kebetulan sama: hari itu ikut lagi
-    // kalau bawaannya nanti diubah, dan tandanya ikut padam.
-    if (n === pegawaiSlot) pegawaiPerTgl.delete(tgl); else pegawaiPerTgl.set(tgl, n);
-    gantiHariSlot(tgl);
-  });
-  kotak.append(inp, document.createTextNode('pegawai'));
-  judul.append(nama, jml, kotak);
+  kotak.append(buatStepper({
+    kecil: true,
+    nilai: pegawaiUntuk(tgl), min: 1, max: 20,
+    aria: 'Jumlah pegawai pada ' + hariBulan(tgl),
+    onUbah: (n, dariTombol) => {
+      // Diketik balik sama dengan bawaannya = tidak jadi menyimpang. Dihapus dari
+      // peta, bukan disimpan sebagai angka yang kebetulan sama: hari itu ikut lagi
+      // kalau bawaannya nanti diubah, dan tandanya ikut padam.
+      if (n === pegawaiSlot) pegawaiPerTgl.delete(tgl); else pegawaiPerTgl.set(tgl, n);
+      gantiHariSlot(tgl, dariTombol);
+    },
+  }), document.createTextNode('pegawai'));
+  judul.appendChild(nama);
+  if (tgl === hariIni && menitSekarang() > keMenit(JAM_BUKA)) {
+    const sisa = document.createElement('span');
+    sisa.className = 'slot-sisa';
+    sisa.textContent = 'sisa hari ini';
+    judul.appendChild(sisa);
+  }
+  judul.appendChild(kotak);
   h.appendChild(judul);
 
   if (!slot.length) {
@@ -1597,18 +1650,25 @@ function bangunHariSlot(tgl, hariIni) {
 
 // Membangun ulang satu hari saja, di tempatnya. Kursor di kotak pegawai hari
 // itu dikembalikan supaya angkanya bisa terus diketik tanpa terputus.
-function gantiHariSlot(tgl) {
+function gantiHariSlot(tgl, dariTombol) {
   const lama = $('slotHasil').querySelector('.slot-hari[data-tgl="' + tgl + '"]');
   if (!lama) return;
-  const fokus = document.activeElement === lama.querySelector('input');
+  const inpLama = lama.querySelector('.stepper input');
+  const sedangDiketik = document.activeElement === inpLama;
   const baru = bangunHariSlot(tgl, today());
   lama.replaceWith(baru);
-  if (fokus) {
-    const inp = baru.querySelector('input');
+  if (sedangDiketik) {
+    const inp = baru.querySelector('.stepper input');
     inp.focus();
     // Kursor ditaruh di ujung, bukan menyorot seluruh isinya: menyorot membuat
     // angka berikutnya yang diketik menimpa, bukan menyambung.
     inp.setSelectionRange(inp.value.length, inp.value.length);
+  } else if (dariTombol) {
+    // Tombol yang baru ditekan ikut terganti, jadi fokusnya hilang dan ketukan
+    // berikutnya tidak mendarat di mana-mana. Dikembalikan ke tombol yang sama.
+    const tombol = baru.querySelectorAll('.stepper-btn');
+    const kurang = document.activeElement && document.activeElement.textContent === '−';
+    (kurang ? tombol[0] : tombol[1]).focus();
   }
   ringkasSlot();
 }
@@ -1712,11 +1772,14 @@ $('slotWaBtn').addEventListener('click', async () => {
 });
 $('slotTutup').addEventListener('click', tutupSlot);
 $('slotSheet').addEventListener('click', (e) => { if (e.target === $('slotSheet')) tutupSlot(); });
-$('slotPegawai').addEventListener('input', () => {
-  const n = Math.max(1, Math.min(20, Math.round(+$('slotPegawai').value || 0)));
-  pegawaiSlot = n;
-  renderSlot();
+// Kotak bawaan dibangun dengan stepper yang sama; HTML-nya cuma menyediakan
+// tempatnya, supaya bentuk dan perilakunya tidak pernah beda dengan yang per hari.
+const stepperBawaan = buatStepper({
+  id: 'slotPegawai', nilai: PEGAWAI_BAWAAN, min: 1, max: 20,
+  aria: 'Jumlah pegawai bawaan untuk semua hari',
+  onUbah: (n) => { pegawaiSlot = n; renderSlot(); },
 });
+$('slotPegawaiBox').appendChild(stepperBawaan);
 // ============================================================
 // Export & Import data
 // ============================================================
