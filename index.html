@@ -191,6 +191,9 @@
       <div class="card-head">
         <h2>Daftar Jadwal</h2>
         <div class="card-head-btns">
+          <button type="button" class="wa-btn" id="slotBtn" title="Cari jam yang masih ada pegawai luang">
+            <svg class="ico" aria-hidden="true"><use href="#i-jadwal"/></svg>Slot Kosong
+          </button>
           <button type="button" class="wa-btn" id="waBtn" title="Salin jadwal yang tampil dalam format WhatsApp">
             <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin untuk WA
           </button>
@@ -369,6 +372,41 @@
       <button type="button" class="ghost" id="newCustLama">Customer lama, baru dicatat</button>
     </div>
     <button type="button" class="sheet-batal" id="newCustBatal">Batal</button>
+  </div>
+</div>
+<!-- Slot kosong: jam yang masih ada pegawai luang, dihitung dari perkiraan
+     durasi tiap treatment. Isinya ikut filter tanggal yang sedang dipilih. -->
+<div class="sheet-backdrop" id="slotSheet" hidden>
+  <div class="sheet sheet-lebar">
+    <h2>Slot Kosong</h2>
+    <p class="slot-sub">Jam kerja 09:00&ndash;17:00. Slot dihitung muat kalau seluruhnya masih di dalam jam itu.</p>
+    <div class="slot-atur">
+      <label for="slotPegawai">Pegawai hari ini</label>
+      <input type="number" id="slotPegawai" min="1" max="20" step="1" value="2">
+    </div>
+    <!-- Pemilihnya sengaja sama persis dengan yang di form isi jadwal: yang
+         dipikirkan operator "rambut sama muka", bukan mencari baris
+         "Rambut + Muka" di sebuah dropdown berisi tujuh kombinasi. -->
+    <div class="slot-jenis">
+      <label id="slotTreatLabel">Cari jadwal untuk jenis</label>
+      <div class="treat-seg" role="group" aria-labelledby="slotTreatLabel" id="slotTreat">
+        <button type="button" class="treat-btn" data-t="rambut" aria-pressed="false">
+          <svg class="treat-cek" aria-hidden="true"><use href="#i-cek"/></svg>Rambut
+        </button>
+        <button type="button" class="treat-btn" data-t="exo" aria-pressed="false">
+          <svg class="treat-cek" aria-hidden="true"><use href="#i-cek"/></svg>Exo
+        </button>
+        <button type="button" class="treat-btn" data-t="muka" aria-pressed="false">
+          <svg class="treat-cek" aria-hidden="true"><use href="#i-cek"/></svg>Muka
+        </button>
+      </div>
+      <div class="treat-hint" id="slotTreatHint"></div>
+    </div>
+    <p class="slot-ringkas" id="slotRingkas" aria-live="polite"></p>
+    <div id="slotHasil"></div>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="slotTutup">Tutup</button>
+    </div>
   </div>
 </div>
 <div class="sheet-backdrop" id="cabangSheet" hidden>

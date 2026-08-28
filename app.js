@@ -334,6 +334,44 @@ function tandaTreatment(list) {
 // perlu disebut supaya barisnya bisa dibaca berdiri sendiri.
 const namaKombinasi = (t) => (t.length ? t.map(labelT).join(' + ') : 'Belum diisi');
 
+// Perkiraan lama pengerjaan tiap kombinasi, dalam menit. Kuncinya kode yang
+// sudah dirapikan lalu disambung '+', jadi urutannya selalu sama dengan URUT_T.
+// Angkanya bukan hasil hitungan — ini perkiraan dari yang mengerjakan, dan
+// memang di sinilah tempatnya diubah kalau ternyata meleset.
+const DURASI_TREAT = {
+  'rambut': 30,
+  'exo': 30,
+  'muka': 40,
+  'rambut+exo': 60,
+  'rambut+muka': 60,
+  'exo+muka': 60,
+  'rambut+exo+muka': 70,
+};
+// Jadwal yang jenisnya belum diisi dianggap rambut — jenis yang paling sering
+// dan yang sudah tercentang duluan di form (TREAT_BAWAAN).
+const DURASI_BAWAAN = 30;
+const durasiJadwal = (a) => {
+  const t = rapikanTreatment(a && a.treatments);
+  return (t.length && DURASI_TREAT[t.join('+')]) || DURASI_BAWAAN;
+};
+
+// Jendela jam kerja yang dicari slotnya. Slot harus muat seluruhnya di dalam
+// jendela ini — treatment yang baru selesai lewat jam tutup tidak dihitung muat.
+const JAM_BUKA = '09:00';
+const JAM_TUTUP = '17:00';
+const PEGAWAI_BAWAAN = 2;
+// Batas hari yang dihitung sekali jalan. Filter "Semua" bisa menjangkau ratusan
+// hari, dan daftar sepanjang itu tidak ada yang membacanya.
+const MAKS_HARI_SLOT = 31;
+
+const keMenit = (jam) => (+jam.slice(0, 2)) * 60 + (+jam.slice(3, 5));
+const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const labelDurasi = (m) => {
+  const j = Math.floor(m / 60), sisa = m % 60;
+  if (!j) return sisa + ' menit';
+  return j + ' jam' + (sisa ? ' ' + sisa + ' menit' : '');
+};
+
 // [{t: [...kode], n: jumlah}] — kombinasi terbanyak di atas, dan jadwal yang
 // jenisnya belum diisi selalu di baris paling bawah.
 function ringkasTreatment(rows) {
@@ -541,7 +579,10 @@ genderSeg.addEventListener('click', (e) => {
 // Satu pemasang untuk keduanya, jadi perilakunya cuma ditulis sekali dan
 // tidak mungkin beda di dua tempat.
 // ============================================================
-function pasangTreatSeg(segId, hintId) {
+// `opsi.hint` menggantikan keterangan bawaan, `opsi.onUbah` dipanggil tiap kali
+// pilihannya berubah karena ditekan. Keduanya opsional: dua pemakai lama —
+// form isi dan sheet ubah — tidak melewatkan apa pun dan tetap seperti semula.
+function pasangTreatSeg(segId, hintId, opsi = {}) {
   const seg = $(segId), hint = $(hintId);
   let pilih = new Set();
 
@@ -551,6 +592,7 @@ function pasangTreatSeg(segId, hintId) {
       b.classList.toggle('aktif', aktif);
       b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
     });
+    if (opsi.hint) { hint.textContent = opsi.hint(rapikanTreatment([...pilih])); return; }
     // Keterangannya menunjukkan hasil jadinya, bukan aturannya — operator
     // langsung tahu bentuk tulisan yang nanti masuk ke salinan WA.
     const tanda = tandaTreatment([...pilih]);
@@ -567,6 +609,7 @@ function pasangTreatSeg(segId, hintId) {
     const kode = b.dataset.t;
     if (pilih.has(kode)) pilih.delete(kode); else pilih.add(kode);
     gambar();
+    if (opsi.onUbah) opsi.onUbah(rapikanTreatment([...pilih]));
   });
 
   return {
@@ -1011,6 +1054,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('editSheet').hidden) closeEdit();
   if (!$('newCustSheet').hidden) tutupKonfirmasiBaru();
   if (!$('cabangSheet').hidden) closeCabangSheet();
+  if (!$('slotSheet').hidden) tutupSlot();
 });
 
 $('editSave').addEventListener('click', () => {
@@ -1350,6 +1394,197 @@ $('waBtn').addEventListener('click', async () => {
   toast('Jadwal tersalin — tinggal paste di WhatsApp.');
 });
 
+// ============================================================
+// Cari slot kosong
+// ============================================================
+// Yang dicari bukan "jam yang tidak ada jadwalnya", melainkan jam yang masih
+// ada pegawai menganggur. Dua pegawai berarti dua jadwal boleh tumpang tindih;
+// yang ketiga barulah membuat jamnya penuh. Karena itu tiap jadwal dihitung
+// sebagai rentang [mulai, selesai) menurut perkiraan durasinya, bukan sebagai
+// satu titik jam.
+
+// Rentang menganggur di satu hari, sudah dipotong jam buka/tutup.
+// Hasilnya [{a, b, min, max}] — a/b dalam menit sejak tengah malam, min/max
+// jumlah pegawai yang luang di sepanjang rentang itu.
+function slotKosong(rowsHari, pegawai) {
+  const buka = keMenit(JAM_BUKA), tutup = keMenit(JAM_TUTUP);
+  // Jadwal yang seluruhnya di luar jam kerja tidak ikut menyita pegawai di
+  // dalam jendela — tapi yang mulai sebelum buka dan baru selesai sesudahnya
+  // tetap ikut, karena pegawainya memang belum bebas waktu pintu dibuka.
+  const kerja = rowsHari
+    .map((a) => ({ m: keMenit(a.time), s: keMenit(a.time) + durasiJadwal(a) }))
+    .filter((x) => x.s > buka && x.m < tutup);
+
+  // Batas ruas: jam buka, jam tutup, dan tiap awal/akhir jadwal di antaranya.
+  // Di antara dua batas berurutan, jumlah yang sibuk pasti tetap.
+  const batas = new Set([buka, tutup]);
+  kerja.forEach((x) => {
+    if (x.m > buka && x.m < tutup) batas.add(x.m);
+    if (x.s > buka && x.s < tutup) batas.add(x.s);
+  });
+  const titik = [...batas].sort((p, q) => p - q);
+
+  const hasil = [];
+  for (let i = 0; i < titik.length - 1; i++) {
+    const a = titik[i], b = titik[i + 1];
+    const sibuk = kerja.filter((x) => x.m < b && x.s > a).length;
+    const sisa = pegawai - sibuk;
+    if (sisa < 1) continue;
+    // Ruas bersebelahan yang sama-sama masih punya sisa disambung jadi satu
+    // rentang: dua potong 30 menit yang berdempetan itu satu jam yang bisa
+    // dipakai, bukan dua slot terpisah yang masing-masing cuma muat rambut.
+    const akhir = hasil[hasil.length - 1];
+    if (akhir && akhir.b === a) {
+      akhir.b = b;
+      akhir.min = Math.min(akhir.min, sisa);
+      akhir.max = Math.max(akhir.max, sisa);
+    } else {
+      hasil.push({ a, b, min: sisa, max: sisa });
+    }
+  }
+  return hasil;
+}
+
+// Tanggal mana saja yang sedang dicakup filter — bukan tanggal yang kebetulan
+// ada jadwalnya. Hari yang kosong melompong justru yang paling perlu muncul di
+// pencarian slot, dan hari seperti itu tidak pernah lahir dari filteredRows().
+function tanggalFilter() {
+  const deret = (mulai, akhir) => {
+    const out = [];
+    for (let d = mulai; d <= akhir && out.length < MAKS_HARI_SLOT; d = isoGeser(d, 1)) out.push(d);
+    return out;
+  };
+  const adaJadwalnya = () => [...new Set(appointments.map((r) => r.date))].sort().slice(0, MAKS_HARI_SLOT);
+  if (filterMode === 'today') return [today()];
+  if (filterMode === 'day') return $('filterDate').value ? [$('filterDate').value] : [];
+  if (filterMode === 'week') { const [a, b] = thisWeekRange(); return deret(a, b); }
+  if (filterMode === 'pastweek') return deret(hariGeser(-7), today());
+  if (filterMode === 'nextweek') return deret(today(), hariGeser(7));
+  if (filterMode === 'date') {
+    const a = $('filterStart').value, b = $('filterEnd').value;
+    if (a && b) return deret(a, b);
+    // Rentang yang belum diisi lengkap tidak punya ujung. Dipakai tanggal yang
+    // memang ada jadwalnya, daripada melebar ke ribuan hari kosong.
+    return adaJadwalnya();
+  }
+  return adaJadwalnya(); // 'all'
+}
+
+let pegawaiSlot = PEGAWAI_BAWAAN;
+// Jenis yang sedang dicarikan jadwal. Durasinya tidak disimpan terpisah —
+// selalu diturunkan dari pilihan ini lewat tabel yang sama dengan yang dipakai
+// menghitung jadwal yang sudah ada, jadi tidak mungkin keduanya berbeda.
+let treatCari = TREAT_BAWAAN.slice();
+const durasiCari = () => durasiJadwal({ treatments: treatCari });
+const namaCari = () => namaKombinasi(rapikanTreatment(treatCari));
+
+function renderSlot() {
+  const box = $('slotHasil');
+  box.innerHTML = '';
+  const tanggal = tanggalFilter();
+  if (!tanggal.length) {
+    box.innerHTML = '<div class="empty">Pilih dulu filter tanggalnya — mode ini tidak menunjuk hari tertentu.</div>';
+    $('slotRingkas').textContent = '';
+    return;
+  }
+  let adaYangMuat = 0;
+  tanggal.forEach((tgl) => {
+    // Sengaja dari `appointments`, bukan filteredRows(): yang menyita pegawai
+    // adalah seluruh jadwal hari itu, termasuk yang sedang disaring keluar
+    // layar oleh mode riwayat satu customer.
+    const rowsHari = appointments.filter((a) => a.date === tgl);
+    const slot = slotKosong(rowsHari, pegawaiSlot);
+
+    const h = document.createElement('div');
+    h.className = 'slot-hari';
+    const judul = document.createElement('div');
+    judul.className = 'slot-head';
+    judul.textContent = hariBulan(tgl);
+    const jml = document.createElement('span');
+    jml.className = 'slot-jml';
+    jml.textContent = rowsHari.length + ' jadwal';
+    judul.appendChild(jml);
+    h.appendChild(judul);
+
+    if (!slot.length) {
+      const p = document.createElement('div');
+      p.className = 'slot-penuh';
+      p.textContent = 'Penuh — tidak ada pegawai yang luang.';
+      h.appendChild(p);
+    } else {
+      slot.forEach((s) => {
+        const lama = s.b - s.a;
+        const muat = lama >= durasiCari();
+        if (muat) adaYangMuat++;
+        const el = document.createElement('div');
+        el.className = 'slot-item' + (muat ? '' : ' sempit');
+        const jam = document.createElement('span');
+        jam.className = 'slot-jam';
+        jam.textContent = keJam(s.a) + ' – ' + keJam(s.b);
+        const dur = document.createElement('span');
+        dur.className = 'slot-dur';
+        dur.textContent = labelDurasi(lama);
+        const peg = document.createElement('span');
+        peg.className = 'slot-peg';
+        // Rentang yang sisanya berubah di tengah ditulis sebagai kisaran,
+        // supaya tidak terbaca seolah dua pegawai luang sepanjang jam itu.
+        peg.textContent = (s.min === s.max ? s.min : s.min + '–' + s.max) + ' pegawai luang';
+        el.append(jam, dur, peg);
+        if (!muat) {
+          const ket = document.createElement('span');
+          ket.className = 'slot-ket';
+          ket.textContent = 'kurang ' + labelDurasi(durasiCari() - lama);
+          el.appendChild(ket);
+        }
+        h.appendChild(el);
+      });
+    }
+    box.appendChild(h);
+  });
+
+  const sebut = namaCari() + ' (' + labelDurasi(durasiCari()) + ')';
+  const ekor = ' di ' + tanggal.length + ' hari yang diperiksa.';
+  $('slotRingkas').textContent = adaYangMuat
+    ? adaYangMuat + ' slot muat untuk ' + sebut + ekor
+    : 'Tidak ada slot yang muat untuk ' + sebut + ekor;
+}
+
+// Jenisnya dipilih dengan tombol centang yang sama persis seperti di form isi
+// jadwal — bukan dropdown berisi tujuh kombinasi jadi. Yang dipikirkan operator
+// tetap "rambut sama muka", bukan mencari baris "Rambut + Muka" di daftar.
+const treatSlot = pasangTreatSeg('slotTreat', 'slotTreatHint', {
+  hint: (t) => 'Perkiraan ' + labelDurasi(durasiJadwal({ treatments: t }))
+    + (t.length ? '' : ' — jenis kosong dihitung sama dengan rambut saja.'),
+  onUbah: (t) => { treatCari = t; renderSlot(); },
+});
+treatSlot.set(treatCari);
+
+function bukaSlot() {
+  if (!dataSiap[KEY_APPOINTMENTS]) {
+    toast('Jadwal masih dimuat — tunggu sebentar lalu ulangi.', true);
+    return;
+  }
+  $('slotPegawai').value = pegawaiSlot;
+  // Jenisnya dikembalikan ke rambut tiap kali sheet dibuka, bukan cuma sekali
+  // waktu halaman dimuat — sama seperti form isi jadwal yang juga kembali ke
+  // TREAT_BAWAAN sesudah tiap simpan. Pencarian berikutnya hampir selalu untuk
+  // rambut lagi, dan centang sisa pencarian sebelumnya diam-diam mengubah
+  // jawabannya tanpa ada yang menyadari.
+  treatCari = TREAT_BAWAAN.slice();
+  treatSlot.set(treatCari);
+  $('slotSheet').hidden = false;
+  renderSlot();
+}
+function tutupSlot() { $('slotSheet').hidden = true; }
+
+$('slotBtn').addEventListener('click', bukaSlot);
+$('slotTutup').addEventListener('click', tutupSlot);
+$('slotSheet').addEventListener('click', (e) => { if (e.target === $('slotSheet')) tutupSlot(); });
+$('slotPegawai').addEventListener('input', () => {
+  const n = Math.max(1, Math.min(20, Math.round(+$('slotPegawai').value || 0)));
+  pegawaiSlot = n;
+  renderSlot();
+});
 // ============================================================
 // Export & Import data
 // ============================================================

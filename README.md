@@ -248,6 +248,79 @@ Datanya disimpan di field `treatments` pada tiap jadwal, hanya kalau memang
 ada isinya. Jadwal lama yang belum punya field ini tetap sah dan ikut
 export/import seperti biasa.
 
+## Cari slot kosong
+
+Tombol **Slot Kosong** di kepala kartu Daftar Jadwal. Yang dicari bukan "jam
+yang tidak ada jadwalnya", melainkan **jam yang masih ada pegawai menganggur**.
+Dua pegawai berarti dua jadwal boleh tumpang tindih; yang ketiga barulah membuat
+jamnya penuh.
+
+Karena itu tiap jadwal dihitung sebagai rentang `[mulai, selesai)` menurut
+perkiraan durasinya, bukan sebagai satu titik jam.
+
+**Jam kerja 09:00–17:00.** Slot dihitung muat kalau seluruhnya masih di dalam
+jam itu — treatment yang baru selesai lewat jam tutup tidak dianggap muat.
+Jadwal yang mulai sebelum jam buka tetap menyita pegawai selama sisa
+durasinya masih menyeberang ke dalam jendela.
+
+### Perkiraan durasi
+
+| Kombinasi | Menit |
+|---|---|
+| Rambut | 30 |
+| Exo | 30 |
+| Muka | 40 |
+| Rambut + Exo | 60 |
+| Rambut + Muka | 60 |
+| Exo + Muka | 60 |
+| Rambut + Exo + Muka | 70 |
+
+Angkanya perkiraan dari yang mengerjakan, bukan hasil hitungan. Tempatnya di
+`DURASI_TREAT` pada [app.js](app.js) — satu tabel, dan daftar pilihan durasi di
+sheet-nya dibangun dari tabel itu juga, jadi menambah jenis treatment cukup
+diubah di satu tempat.
+
+Jadwal yang **jenisnya belum diisi** dihitung 30 menit, sama dengan rambut —
+jenis yang paling sering dan yang sudah tercentang duluan di form.
+
+### Yang bisa diatur
+
+- **Pegawai hari ini** — bawaannya 2, bisa diubah 1–20. Berlaku untuk seluruh
+  hari yang sedang diperiksa.
+- **Cari jadwal untuk jenis** — tombol centang Rambut / Exo / Muka, **sama
+  persis dengan pemilih di form isi jadwal**. Sengaja bukan dropdown berisi
+  tujuh kombinasi jadi: yang dipikirkan operator "rambut sama muka", bukan
+  mencari baris "Rambut + Muka" di sebuah daftar. Durasinya muncul sendiri di
+  bawah tombolnya begitu jenisnya dicentang, dan hasilnya langsung dihitung
+  ulang tanpa perlu menekan apa pun.
+
+  **Rambut tercentang tiap kali sheet-nya dibuka** — bukan cuma sekali waktu
+  halaman dimuat. Sama seperti form isi jadwal yang juga kembali ke
+  `TREAT_BAWAAN` sesudah tiap simpan: pencarian berikutnya hampir selalu untuk
+  rambut lagi, dan centang sisa pencarian sebelumnya diam-diam mengubah
+  jawabannya tanpa ada yang menyadari.
+
+  Rentang yang terlalu pendek tetap ditampilkan tapi diredupkan, lengkap dengan
+  keterangan kurang berapa lama. Celah yang ada tetap perlu terlihat supaya
+  operator tahu jadwal mana yang tinggal digeser sedikit.
+
+Pemilih jenisnya memakai komponen yang sama (`pasangTreatSeg`) dengan form isi
+dan sheet ubah. Komponen itu diberi dua kait opsional — keterangan sendiri dan
+pemberitahuan saat pilihannya berubah — sedangkan dua pemakai lama tidak
+melewatkan apa pun dan tetap berperilaku seperti semula.
+
+### Hari mana yang diperiksa
+
+Mengikuti **filter tanggal yang sedang dipilih**, dan sengaja dihitung dari
+filternya — bukan dari jadwal yang tampil. Hari yang kosong melompong justru
+yang paling perlu muncul di sini, dan hari seperti itu tidak akan pernah lahir
+dari daftar jadwal. Filter yang tidak menunjuk hari tertentu ("Semua", atau
+rentang tanggal yang belum diisi lengkap) memakai tanggal yang memang ada
+jadwalnya, dibatasi 31 hari sekali jalan.
+
+Jumlah pegawai yang menyita dihitung dari **seluruh jadwal hari itu**, termasuk
+yang sedang disaring keluar layar oleh mode riwayat satu customer.
+
 ## Jadwal disimpan per bulan
 
 Susunan di Firestore:
