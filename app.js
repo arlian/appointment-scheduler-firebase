@@ -1687,11 +1687,6 @@ $('importFile').addEventListener('change', async () => {
     for (const t of tujuan) {
       const id = peta.get(t.nama.toLowerCase());
       try {
-        // Cabang tujuan dipindahkan lebih dulu kalau memang belum. Kalau tidak,
-        // hasil import mendarat di dokumen bulanan sementara riwayat lamanya
-        // masih menumpuk di dokumen lama — dan begitu cabang itu dibuka nanti,
-        // pemindahannya menggabungkan yang lama ke atas yang baru diimpor.
-        await migrasiJadwalBulanan(id);
         for (const b of t.isi) {
           const n = await gabungCabang(id, b);
           totalCust += n.cust; totalAppt += n.appt;
@@ -1793,56 +1788,8 @@ function mulaiSync() {
   );
 }
 
-// Cabang yang sudah dipastikan tidak punya dokumen lama lagi, supaya pindah
-// cabang bolak-balik tidak mengulang transaksi pemeriksaannya tiap kali.
-const sudahDipindah = new Set();
-
-// Pemindahan sekali jalan: satu dokumen data/appointments berisi seluruh
-// riwayat -> satu dokumen per bulan di koleksi appointments.
-//
-// Seluruhnya dalam satu transaksi supaya dua perangkat yang membuka cabang
-// yang sama di saat yang sama tidak sama-sama memindahkan: yang kalah membaca
-// dokumen lama yang sudah tidak ada, lalu berhenti tanpa menulis apa-apa.
-async function migrasiJadwalBulanan(cab) {
-  if (sudahDipindah.has(cab)) return 0;
-  const lama = refData(cab, KEY_APPOINTMENTS);
-  const jml = await runTransaction(db, async (tx) => {
-    const snap = await tx.get(lama);
-    // Sudah tidak ada berarti cabang ini memang sudah dipindahkan sebelumnya.
-    if (!snap.exists()) return 0;
-    const rows = (snap.data().rows || []).filter(tanggalSah);
-    const per = kelompokBulan(rows);
-    // Semua pembacaan harus selesai sebelum penulisan pertama — aturan
-    // transaksi Firestore — jadi dokumen bulanannya dibaca sekaligus di sini.
-    const sudahAda = new Map();
-    for (const k of per.keys()) {
-      const s = await tx.get(refJadwal(cab, k));
-      sudahAda.set(k, s.exists() ? (s.data().rows || []) : []);
-    }
-    per.forEach((isi, k) => {
-      // Digabung, bukan ditimpa. Dokumen bulanan yang sudah terisi bisa lebih
-      // baru daripada dokumen lama ini — import sudah menulis ke sana, atau
-      // perangkat yang aplikasinya belum diperbarui masih sempat menambah
-      // jadwal ke dokumen lama sesudah cabang ini dipindahkan di perangkat
-      // lain. Menimpanya berarti membuang yang lebih baru.
-      const ada = sudahAda.get(k);
-      const punyaId = new Set(ada.map((a) => a.id));
-      const tambahan = isi.filter((a) => !punyaId.has(a.id));
-      if (tambahan.length) tx.set(refJadwal(cab, k), { rows: ada.concat(tambahan) });
-    });
-    // Dihapus di transaksi yang sama: selama dokumen lama masih ada, perangkat
-    // versi lama akan terus menulis ke sana dan tulisannya tidak pernah terbaca
-    // lagi di sini — hilang tanpa ada yang tahu.
-    tx.delete(lama);
-    return rows.length;
-  });
-  sudahDipindah.add(cab);
-  return jml;
-}
-
 function mulaiSyncData() {
   stopData.forEach((lepas) => lepas());
-  stopData = [];
   // Melepas listener tidak membatalkan snapshot yang sudah dalam perjalanan.
   // Tanpa penanda cabang ini, jawaban cabang lama bisa mendarat sesudah operator
   // pindah cabang, menggantikan isi memori, lalu ikut tertulis balik ke cabang
@@ -1868,35 +1815,12 @@ function mulaiSyncData() {
       toast('Gagal memuat data: ' + e.message, true);
     }
   );
-  stopData.push(
-    pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
-    pasang(KEY_STAFF, (rows) => { staff = rows; }),
-  );
-  pasangJadwal(cabangDipasang);
-}
-
-// Jadwal dipasang belakangan karena koleksinya baru boleh didengarkan sesudah
-// pemindahan dari susunan lama selesai. Kalau urutannya dibalik, listener
-// melaporkan koleksi yang masih kosong sebagai "siap": layar menunjukkan
-// cabang tanpa jadwal sama sekali, dan apa pun yang disimpan di detik itu
-// menulis dokumen bulanan yang sebentar lagi ditimpa hasil pemindahan.
-async function pasangJadwal(cab) {
-  try {
-    await migrasiJadwalBulanan(cab);
-  } catch (e) {
-    if (cabangId !== cab) return;
-    // Tanpa pemindahan yang berhasil, gerbang tulis jadwal sengaja dibiarkan
-    // tertutup: dataSiap[appointments] tidak pernah jadi true.
-    setSambung(false);
-    toast('Gagal menyiapkan jadwal cabang ini: ' + e.message
-      + ' — muat ulang halaman untuk mencoba lagi.', true);
-    return;
-  }
-  if (cabangId !== cab) return;
-  const lepas = onSnapshot(
-    refJadwalKol(cab),
+  // Jadwal datang dari koleksi bulanan, jadi listener-nya satu koleksi — bukan
+  // satu dokumen seperti dua di atas. Selebihnya perlakuannya sama persis.
+  const pasangJadwal = () => onSnapshot(
+    refJadwalKol(cabangDipasang),
     (snap) => {
-      if (cabangId !== cab) return;
+      if (cabangId !== cabangDipasang) return;
       // Digabung jadi satu array datar berisi seluruh riwayat. Bentuk di memori
       // sengaja tidak ikut berubah: filteredRows, visitCount, dan analitik
       // semuanya membaca array ini apa adanya seperti sebelum dipecah.
@@ -1907,15 +1831,17 @@ async function pasangJadwal(cab) {
       renderList();
     },
     (e) => {
-      if (cabangId !== cab) return;
+      if (cabangId !== cabangDipasang) return;
       dataSiap[KEY_APPOINTMENTS] = false;
       setSambung(false);
       toast('Gagal memuat jadwal: ' + e.message, true);
     }
   );
-  // Cabangnya bisa saja sudah berganti selagi listener di atas dipasang.
-  if (cabangId !== cab) { lepas(); return; }
-  stopData.push(lepas);
+  stopData = [
+    pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
+    pasang(KEY_STAFF, (rows) => { staff = rows; }),
+    pasangJadwal(),
+  ];
 }
 
 // Login pertama: siapkan cabang default dan angkat data lama ke cabang
@@ -2055,9 +1981,6 @@ if (!configTerisi) {
       customers = []; appointments = []; staff = [];
       cabangList = []; cabangId = null;
       resetDataSiap(); cabangSiap = false; peringatanCabangKosong = false;
-      // Penanda cabang yang sudah dipindah ikut dikosongkan: yang login
-      // berikutnya bisa akun lain, dan cabangnya bukan cabang yang ini.
-      sudahDipindah.clear();
       $('cabangBar').innerHTML = '';
       renderList();
       $('loginScreen').hidden = false;

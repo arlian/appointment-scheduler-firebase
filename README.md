@@ -281,28 +281,24 @@ Filter, hitungan kunjungan, riwayat per customer, dan analitik semuanya
 membacanya persis seperti sebelum dipecah — jadi "customer baru" tetap dihitung
 dari seluruh riwayat, bukan dari bulan yang kebetulan sedang tampil.
 
-### Pemindahan dari susunan lama
+### Pemindahan dari susunan lama — sudah selesai
 
-Cabang yang datanya masih di `data/appointments` dipindahkan otomatis **waktu
-cabang itu dibuka**, dalam satu transaksi: dokumen lama dibaca, dipecah jadi
-dokumen bulanan, lalu dokumen lamanya dihapus. Kalau dua perangkat membuka
-cabang yang sama bersamaan, yang kalah membaca dokumen lama yang sudah tidak
-ada lalu berhenti tanpa menulis apa pun.
+Sampai 28 Agustus 2026 jadwal tersimpan di satu dokumen `data/appointments`
+berisi seluruh riwayat cabang. Pemindahannya berjalan otomatis waktu tiap
+cabang dibuka, dalam satu transaksi: dokumen lama dibaca, dipecah jadi dokumen
+bulanan, lalu dokumen lamanya dihapus.
 
-Pemindahannya **menggabung, bukan menimpa**: dokumen bulanan yang sudah terisi
-bisa saja lebih baru daripada dokumen lama — misalnya karena import sudah
-menulis ke sana lebih dulu. Baris yang id-nya sudah ada tidak ditulis ulang.
+Ketiga cabang sudah dipindahkan, jadi **kode pemindahannya sudah dihapus**.
+Konsekuensinya: kalau suatu saat ada cabang yang isinya masih di
+`data/appointments` — misalnya hasil pemulihan cadangan lama langsung di
+Firestore console — cabang itu akan tampil **tanpa jadwal sama sekali**.
+Dokumen lamanya tidak dibaca lagi oleh layar utama.
 
-Listener jadwal baru dipasang **sesudah** pemindahan selesai. Kalau urutannya
-dibalik, koleksi yang masih kosong akan dilaporkan sebagai "siap": layar
-menunjukkan cabang tanpa jadwal sama sekali, dan apa pun yang disimpan di detik
-itu menulis dokumen bulanan yang sebentar lagi ditimpa hasil pemindahan.
-
-Import ikut memindahkan cabang tujuannya lebih dulu, karena import menulis ke
-cabang yang tidak sedang dibuka — dan cabang itu bisa saja belum pernah
-disentuh sejak versi ini. Export sebaliknya tidak menulis apa-apa: ia membaca
-dokumen bulanan **dan** dokumen lama, lalu menggabungnya, jadi cabang yang
-belum pernah dibuka tetap ikut tercadangkan utuh.
+Satu jaring pengaman sengaja ditinggalkan: **export tetap membaca dokumen
+lama** dan menggabungnya dengan dokumen bulanan ([`bacaCabang()`](app.js)).
+Jadi kalau ada isi yang tertinggal di susunan lama, file cadangan tetap
+memuatnya utuh — dan mengimpor file itu kembali akan mendudukkannya di dokumen
+bulanan yang benar.
 
 Security rules tidak perlu diubah: `match /users/{uid}/{document=**}` sudah
 mencakup koleksi baru ini.
