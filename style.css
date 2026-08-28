@@ -853,13 +853,14 @@ button.primary:active { transform: scale(.985); }
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .slot-jenis { margin-top: 14px; }
+.slot-atur-ket { display: block; font-size: .72rem; color: var(--muted); margin-top: 5px; line-height: 1.45; }
 .slot-ringkas {
   font-size: .8rem; font-weight: 600; color: var(--accent-ink);
   background: var(--accent-soft); border-radius: 10px;
   padding: 9px 11px; margin: 14px 0 4px;
 }
 .slot-head {
-  display: flex; align-items: baseline; gap: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
   font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
   letter-spacing: .07em; margin: 16px 0 6px;
 }
@@ -867,6 +868,26 @@ button.primary:active { transform: scale(.985); }
   margin-left: auto; letter-spacing: 0; text-transform: none;
   font-weight: 600; font-variant-numeric: tabular-nums;
 }
+/* Jumlah pegawai hari itu, bisa disetel sendiri per tanggal. Duduk di judul
+   harinya supaya jelas angkanya milik hari itu, bukan setelan sekali untuk semua. */
+.slot-peg-hari {
+  display: inline-flex; align-items: center; gap: 5px;
+  letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--text-2);
+}
+.slot-peg-hari input {
+  width: 46px; padding: 4px 6px; font: inherit; font-size: .8rem; font-weight: 700;
+  text-align: center; font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--field);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.slot-peg-hari input:focus {
+  outline: none; border-color: var(--accent); background: var(--card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* Hari yang angkanya sengaja dibedakan dari bawaan diberi tanda, supaya tidak
+   ada hari yang diam-diam dihitung dengan angka lain tanpa terlihat. */
+.slot-peg-hari.ubah input { border-color: var(--accent); color: var(--accent-ink); }
+.slot-peg-hari.ubah { color: var(--accent-ink); }
 .slot-item {
   display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;
   padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .86rem;

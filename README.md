@@ -285,8 +285,21 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
 
 ### Yang bisa diatur
 
-- **Pegawai hari ini** — bawaannya 2, bisa diubah 1–20. Berlaku untuk seluruh
-  hari yang sedang diperiksa.
+- **Pegawai** — bawaannya 2, bisa diubah 1–20. Ini angka **bawaan untuk semua
+  hari**; tiap tanggal punya kotaknya sendiri di judul harinya, karena jumlah
+  pegawai memang bisa beda tiap hari.
+
+  Yang disimpan cuma hari yang benar-benar disetel sendiri. Selebihnya ikut
+  angka bawaan — jadi mengubah bawaannya langsung berlaku untuk semua hari yang
+  belum disentuh, dan hari yang sudah disetel tidak ikut tergeser. Hari yang
+  angkanya berbeda dari bawaan diberi tanda warna, supaya tidak ada hari yang
+  diam-diam dihitung dengan angka lain tanpa terlihat. Mengetik angkanya balik
+  sama dengan bawaan menghapus penyimpangannya, bukan menyimpannya sebagai angka
+  yang kebetulan sama.
+
+  Mengubah angka satu hari cuma membangun ulang blok hari itu, bukan seluruh
+  daftar — kalau seluruhnya dibangun ulang, kotak yang sedang diketik ikut
+  terhapus dan kursornya lompat keluar di tengah pengetikan.
 - **Cari jadwal untuk jenis** — tombol centang Rambut / Exo / Muka, **sama
   persis dengan pemilih di form isi jadwal**. Sengaja bukan dropdown berisi
   tujuh kombinasi jadi: yang dipikirkan operator "rambut sama muka", bukan
