@@ -37,6 +37,12 @@ const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, treatm
 // tetap ikut disinkronkan dan ikut terbawa export/import supaya utuh saat fiturnya
 // dinyalakan lagi — begitu juga field done/staff/photos di tiap appointment.
 const KEY_STAFF = 'staff';               // ['Nama Pegawai', ...]
+// Jumlah pegawai yang dipakai pencarian slot, satu angka untuk tiap hari dalam
+// seminggu. Disimpan per cabang, karena Puri dan Bandung tidak pernah punya
+// jumlah pegawai yang sama — dan sebelum ini angkanya cuma satu untuk semua
+// hari, cuma hidup di memori satu tab, ikut terbawa waktu pindah cabang, lalu
+// hilang begitu halaman dimuat ulang.
+const KEY_PEGAWAI = 'pegawai';           // [{hari, n}] — hari 0..6, Minggu = 0
 
 const configTerisi =
   window.FIREBASE_CONFIG && !String(window.FIREBASE_CONFIG.apiKey).startsWith('ISI_');
@@ -80,7 +86,7 @@ let tersambung = false;
 // kosong karena memang dikosongkan operator dengan kosong karena belum dimuat.
 // Ketiganya tetap punya penanda kesiapan sendiri, walau jadwal sekarang datang
 // dari koleksi bulanan dan bukan lagi dari satu dokumen seperti dua yang lain.
-const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF];
+const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI];
 let dataSiap = {};
 const resetDataSiap = () => { dataSiap = {}; };
 const semuaDataSiap = () => !!cabangId && KEYS_DATA.every((k) => dataSiap[k]);
@@ -1519,8 +1525,15 @@ function buatStepper({ id, nilai, min, max, aria, onUbah, kecil }) {
   inp.value = nilai;
   inp.setAttribute('aria-label', aria);
   const batas = (n) => Math.max(min, Math.min(max, n));
+  // Angka sah yang terakhir dilihat kotak ini. Dipakai kalau kotaknya
+  // ditinggalkan dalam keadaan kosong atau berisi yang bukan angka: keadaan itu
+  // dulu jatuh ke `min`, dan itu tidak apa-apa selama min = 1 — tapi min
+  // sekarang 0, yang artinya "tutup". Kotak yang tak sengaja terhapus lalu
+  // ditinggal jangan sampai menutup harinya.
+  let terakhir = nilai;
   const pakai = (n, dariTombol) => {
     const b = batas(n);
+    terakhir = b;
     inp.value = b;
     onUbah(b, dariTombol);
   };
@@ -1537,22 +1550,149 @@ function buatStepper({ id, nilai, min, max, aria, onUbah, kecil }) {
   // Diketik langsung tidak dibatasi di tiap ketukan — mengetik "12" akan
   // terpotong jadi "1" lalu ditolak kalau dipaksa membatasi per huruf.
   inp.addEventListener('input', () => {
+    // Kotak kosong bukan angka nol. Tanpa pemeriksaan ini, +'' = 0 dan harinya
+    // ikut tertutup di detik operator menghapus isinya untuk mengetik ulang.
+    if (!inp.value.trim()) return;
     const n = Math.round(+inp.value);
-    if (Number.isFinite(n) && n >= min && n <= max) onUbah(n, false);
+    if (Number.isFinite(n) && n >= min && n <= max) { terakhir = n; onUbah(n, false); }
   });
-  // Yang tidak masuk akal baru dirapikan waktu kotaknya ditinggalkan.
-  inp.addEventListener('blur', () => pakai(Math.round(+inp.value || min), false));
+  // Yang tidak masuk akal baru dirapikan waktu kotaknya ditinggalkan — kembali
+  // ke angka sah yang terakhir, bukan ke batas bawah.
+  inp.addEventListener('blur', () => {
+    const n = Math.round(+inp.value);
+    pakai(inp.value.trim() && Number.isFinite(n) ? n : terakhir, false);
+  });
   kotak.append(tombol('−', -1, 'Kurangi'), inp, tombol('+', +1, 'Tambah'));
   return kotak;
 }
 
-let pegawaiSlot = PEGAWAI_BAWAAN;
-// Penyimpangan per tanggal. Isinya cuma hari yang benar-benar diubah operator;
-// selebihnya ikut angka bawaan di atas — jadi mengubah bawaannya langsung
-// berlaku untuk semua hari yang belum disentuh, dan hari yang sudah disetel
-// sendiri tidak ikut tergeser.
+// Jumlah pegawai per hari dalam seminggu — inilah acuannya sekarang, dan inilah
+// satu-satunya bagian yang tersimpan ke server. Indeksnya mengikuti
+// Date.getDay(), jadi 0 itu Minggu; urutan bacanya diatur HARI_URUT, bukan
+// urutan indeksnya.
+const HARI_URUT = [1, 2, 3, 4, 5, 6, 0];      // Senin dulu, seperti kalender
+const HARI_SINGKAT = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const HARI_PANJANG = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const pegawaiAwal = () => HARI_SINGKAT.map(() => PEGAWAI_BAWAAN);
+let pegawaiHari = pegawaiAwal();
+
+// Penyimpangan untuk satu tanggal tertentu — Sabtu depan yang kebetulan cuma
+// kebagian satu pegawai, hari kejepit yang justru ditambah. Sengaja tidak ikut
+// disimpan ke server: yang begini umurnya sependek pencarian slot yang sedang
+// berjalan, dan menyimpannya cuma menumpuk tanggal mati di dokumen yang ikut
+// dibaca tiap kali cabangnya dibuka. Hilang begitu halaman dimuat ulang — yang
+// tetap acuan mingguannya.
 const pegawaiPerTgl = new Map();
-const pegawaiUntuk = (tgl) => (pegawaiPerTgl.has(tgl) ? pegawaiPerTgl.get(tgl) : pegawaiSlot);
+const pegawaiAcuan = (tgl) => pegawaiHari[new Date(tgl + 'T00:00:00').getDay()];
+const pegawaiUntuk = (tgl) => (pegawaiPerTgl.has(tgl) ? pegawaiPerTgl.get(tgl) : pegawaiAcuan(tgl));
+
+// Nol pegawai = cabangnya tutup hari itu. Sengaja bukan penanda tersendiri:
+// slotKosong() sudah menghasilkan nol slot untuk nol pegawai, jadi seluruh
+// jalur yang menawarkan jam — salinan slot kosong, tawaran di pesan reminder —
+// melewatinya tanpa perlu tahu apa-apa soal hari tutup. Yang membedakan cuma
+// kalimat di layar: "tutup" dan "penuh" dua hal berbeda buat operator.
+const hariTutup = (tgl) => pegawaiUntuk(tgl) === 0;
+
+// Dokumen -> memori. Baris yang tidak masuk akal — hari di luar 0..6, angka di
+// luar 1..20, baris kosong — dibuang diam-diam: dokumen ini bisa saja ditulis
+// versi aplikasi yang lebih baru, dan satu baris aneh tidak boleh menghapus
+// seluruh setelan cabang ini dari layar. Hari yang tidak disebut dokumennya
+// jatuh ke PEGAWAI_BAWAAN, jadi cabang yang belum punya dokumen ini tetap jalan.
+function terapkanPegawai(rows) {
+  const baru = pegawaiAwal();
+  rows.forEach((r) => {
+    const h = Number(r && r.hari);
+    const n = Math.round(Number(r && r.n));
+    if (!Number.isInteger(h) || h < 0 || h > 6) return;
+    if (!Number.isFinite(n) || n < 0 || n > 20) return;
+    baru[h] = n;
+  });
+  // Snapshot yang isinya sama dengan yang sudah di layar berhenti di sini.
+  // Tiap penyimpanan memantul balik sebagai snapshot — termasuk penyimpanan
+  // dari perangkat ini sendiri — dan kalau pantulan itu ikut menggambar ulang,
+  // kotak angka yang sedang diketik operator ikut terhapus dan kursornya lompat
+  // keluar di tengah pengetikan.
+  if (baru.every((n, i) => n === pegawaiHari[i])) return;
+  pegawaiHari = baru;
+  // Setelannya bisa berubah dari perangkat lain selagi sheet-nya terbuka di
+  // sini. Yang tertutup tidak perlu digambar — bukaSlot() membangunnya ulang
+  // dari angka yang sama waktu dibuka nanti.
+  if (!$('slotSheet').hidden) {
+    renderPegawaiHari();
+    renderSlot();
+  }
+}
+
+// Memori -> dokumen. Ketujuh hari selalu ditulis lengkap, dalam urutan baca
+// Senin..Minggu: dokumennya cuma tujuh baris, jadi tidak ada gunanya berhemat
+// dengan menulis yang berbeda saja — dan yang lengkap jauh lebih mudah dibaca
+// kalau suatu hari perlu diperiksa langsung di konsol Firestore.
+function barisPegawai() {
+  return HARI_URUT.map((h) => ({ hari: h, n: pegawaiHari[h] }));
+}
+
+// Angkanya berubah beberapa kali dalam sedetik — tombol +/- ditekan beruntun,
+// atau angkanya diketik digit demi digit — dan tiap perubahan itu tidak perlu
+// jadi satu tulisan sendiri ke server. Jedanya sekalian membuat pesan "belum
+// tersambung" keluar sekali di ujung, bukan tiap ketukan.
+//
+// Cabangnya dikunci sejak penundaan dimulai: kalau operator pindah cabang
+// sebelum jedanya habis, tulisan yang tertunda itu akan mendarat di cabang yang
+// salah. Itu persis kecelakaan yang dijaga `cabangDipasang` di mulaiSyncData().
+const JEDA_SIMPAN_PEGAWAI = 800;
+let tundaPegawai = null;
+function batalSimpanPegawai() { clearTimeout(tundaPegawai); tundaPegawai = null; }
+function simpanPegawai() {
+  const cab = cabangId;
+  batalSimpanPegawai();
+  tundaPegawai = setTimeout(() => {
+    tundaPegawai = null;
+    if (cabangId !== cab || !bolehUbah()) return;
+    save(KEY_PEGAWAI, barisPegawai());
+  }, JEDA_SIMPAN_PEGAWAI);
+}
+
+// Setelan cabang yang ditinggalkan dilepas seluruhnya — termasuk penyimpangan
+// per tanggal, yang tanggalnya memang milik cabang sebelumnya — dan tulisan
+// yang masih tertunda ikut dibatalkan sebelum sempat mendarat di cabang baru.
+function lupakanPegawai() {
+  batalSimpanPegawai();
+  pegawaiHari = pegawaiAwal();
+  pegawaiPerTgl.clear();
+}
+
+// Tujuh kotak angka, satu tiap hari. Dibangun ulang tiap kali sheet dibuka dan
+// tiap kali setelannya benar-benar berubah — aman, karena terapkanPegawai()
+// sudah menyaring pantulan snapshot yang isinya sama, jadi kotak yang sedang
+// diketik tidak pernah tersapu oleh simpanannya sendiri.
+function renderPegawaiHari() {
+  const box = $('slotPegawaiBox');
+  box.innerHTML = '';
+  HARI_URUT.forEach((h) => {
+    const sel = document.createElement('span');
+    sel.className = 'peg-hari';
+    const nama = document.createElement('span');
+    nama.className = 'peg-hari-nama';
+    nama.textContent = HARI_SINGKAT[h];
+    sel.classList.toggle('tutup', pegawaiHari[h] === 0);
+    sel.append(nama, buatStepper({
+      kecil: true, nilai: pegawaiHari[h], min: 0, max: 20,
+      aria: 'Jumlah pegawai setiap hari ' + HARI_PANJANG[h] + ' (0 = tutup)',
+      onUbah: (n) => {
+        pegawaiHari[h] = n;
+        // Tandanya digeser di tempat, bukan lewat renderPegawaiHari(): membangun
+        // ulang barisnya akan menghapus kotak yang jarinya masih di situ.
+        sel.classList.toggle('tutup', n === 0);
+        // Daftar slot ikut berubah saat itu juga: hari yang angkanya baru saja
+        // dinaikkan langsung memperlihatkan jam yang tadinya terhitung penuh.
+        renderSlot();
+        simpanPegawai();
+      },
+    }));
+    box.appendChild(sel);
+  });
+}
+
 // Tanggal yang sedang tampil, disimpan supaya baris ringkasan bisa dihitung
 // ulang tanpa membangun ulang seluruh daftar.
 let tanggalSlot = [];
@@ -1600,13 +1740,13 @@ function bangunHariSlot(tgl, hariIni) {
   kotak.className = 'slot-peg-hari' + (pegawaiPerTgl.has(tgl) ? ' ubah' : '');
   kotak.append(buatStepper({
     kecil: true,
-    nilai: pegawaiUntuk(tgl), min: 1, max: 20,
-    aria: 'Jumlah pegawai pada ' + hariBulan(tgl),
+    nilai: pegawaiUntuk(tgl), min: 0, max: 20,
+    aria: 'Jumlah pegawai pada ' + hariBulan(tgl) + ' (0 = tutup)',
     onUbah: (n, dariTombol) => {
-      // Diketik balik sama dengan bawaannya = tidak jadi menyimpang. Dihapus dari
-      // peta, bukan disimpan sebagai angka yang kebetulan sama: hari itu ikut lagi
-      // kalau bawaannya nanti diubah, dan tandanya ikut padam.
-      if (n === pegawaiSlot) pegawaiPerTgl.delete(tgl); else pegawaiPerTgl.set(tgl, n);
+      // Diketik balik sama dengan acuan harinya = tidak jadi menyimpang. Dihapus
+      // dari peta, bukan disimpan sebagai angka yang kebetulan sama: tanggal itu
+      // ikut lagi kalau acuan hari itu nanti diubah, dan tandanya ikut padam.
+      if (n === pegawaiAcuan(tgl)) pegawaiPerTgl.delete(tgl); else pegawaiPerTgl.set(tgl, n);
       gantiHariSlot(tgl, dariTombol);
     },
   }), document.createTextNode('pegawai'));
@@ -1622,12 +1762,15 @@ function bangunHariSlot(tgl, hariIni) {
 
   if (!slot.length) {
     const p = document.createElement('div');
-    p.className = 'slot-penuh';
-    // Dua sebab yang berbeda, dan operator perlu tahu bedanya: penuh berarti
-    // masih bisa digeser besok, jam kerja habis berarti hari ini sudah tutup.
-    p.textContent = (tgl === hariIni && menitSekarang() >= keMenit(JAM_TUTUP))
-      ? 'Jam kerja hari ini sudah lewat.'
-      : 'Penuh — tidak ada pegawai yang luang.';
+    p.className = 'slot-penuh' + (hariTutup(tgl) ? ' slot-tutup' : '');
+    // Tiga sebab yang berbeda, dan operator perlu tahu bedanya: tutup berarti
+    // memang tidak ada yang masuk, penuh berarti masih bisa digeser besok, jam
+    // kerja habis berarti hari ini saja yang sudah lewat.
+    p.textContent = hariTutup(tgl)
+      ? 'Tutup — tidak ada pegawai yang masuk hari ini.'
+      : (tgl === hariIni && menitSekarang() >= keMenit(JAM_TUTUP))
+        ? 'Jam kerja hari ini sudah lewat.'
+        : 'Penuh — tidak ada pegawai yang luang.';
     h.appendChild(p);
     return h;
   }
@@ -1691,8 +1834,15 @@ function ringkasSlot() {
   const muat = tanggalSlot.reduce(
     (n, tgl) => n + slotHari(tgl, hariIni).filter((sl) => sl.b - sl.a >= durasiCari()).length, 0);
   const sebut = namaCari() + ' (' + labelDurasi(durasiCari()) + ')';
+  // Hari tutup dan hari lewat sama-sama tidak menyumbang slot, tapi sebabnya
+  // beda — tanpa disebut, "tidak ada slot" di cabang yang tutup dua hari
+  // seminggu terbaca seperti jadwalnya yang kelewat padat.
+  const tutup = tanggalSlot.filter(hariTutup).length;
+  const catatan = [];
+  if (tutup) catatan.push(tutup + ' hari tutup');
+  if (dilewatiSlot) catatan.push(dilewatiSlot + ' hari yang sudah lewat dilewati');
   const ekor = ' di ' + tanggalSlot.length + ' hari yang diperiksa'
-    + (dilewatiSlot ? ' — ' + dilewatiSlot + ' hari yang sudah lewat dilewati' : '') + '.';
+    + (catatan.length ? ' — ' + catatan.join(', ') : '') + '.';
   $('slotRingkas').textContent = muat
     ? muat + ' slot muat untuk ' + sebut + ekor
     : 'Tidak ada slot yang muat untuk ' + sebut + ekor;
@@ -1758,7 +1908,7 @@ function bukaSlot() {
     toast('Jadwal masih dimuat — tunggu sebentar lalu ulangi.', true);
     return;
   }
-  $('slotPegawai').value = pegawaiSlot;
+  renderPegawaiHari();
   // Jenisnya dikembalikan ke rambut tiap kali sheet dibuka, bukan cuma sekali
   // waktu halaman dimuat — sama seperti form isi jadwal yang juga kembali ke
   // TREAT_BAWAAN sesudah tiap simpan. Pencarian berikutnya hampir selalu untuk
@@ -1783,14 +1933,497 @@ $('slotWaBtn').addEventListener('click', async () => {
 });
 $('slotTutup').addEventListener('click', tutupSlot);
 $('slotSheet').addEventListener('click', (e) => { if (e.target === $('slotSheet')) tutupSlot(); });
-// Kotak bawaan dibangun dengan stepper yang sama; HTML-nya cuma menyediakan
-// tempatnya, supaya bentuk dan perilakunya tidak pernah beda dengan yang per hari.
-const stepperBawaan = buatStepper({
-  id: 'slotPegawai', nilai: PEGAWAI_BAWAAN, min: 1, max: 20,
-  aria: 'Jumlah pegawai bawaan untuk semua hari',
-  onUbah: (n) => { pegawaiSlot = n; renderSlot(); },
+// ============================================================
+// Reminder: customer yang belum menjadwalkan lagi
+// ------------------------------------------------------------
+// Yang dicari bukan "siapa yang tidak datang minggu ini", melainkan siapa yang
+// baru saja datang lalu pulang tanpa janji berikutnya. Bedanya penting: orang
+// yang sudah booking untuk minggu depan tetap sepi di minggu berjalan, dan
+// mengingatkan dia cuma membuat operator terbaca tidak memegang catatannya
+// sendiri.
+//
+// Seluruh hitungannya lokal — `appointments` di memori sudah berisi riwayat
+// penuh dari semua dokumen bulanan — jadi membuka daftar ini tidak menambah
+// satu pun pembacaan Firestore.
+// ============================================================
+// Jendela "sudah waktunya dihubungi", dihitung dari kunjungan terakhir.
+// Batas bawahnya bukan nol: orang yang baru datang satu-empat hari lalu belum
+// perlu diingatkan apa-apa, dan pesan yang datang terlalu cepat justru terbaca
+// seperti salon yang tidak ingat ia baru saja ke sini. Batas atasnya menutup
+// ujung yang lain — lewat dua minggu, yang dibutuhkan bukan lagi pengingat.
+const REM_MULAI = 5;   // hari paling cepat sesudah kunjungan terakhir
+const REM_SAMPAI = 14; // hari paling lama yang masih dianggap perlu diingatkan
+
+// Nomor disimpan dalam bentuk yang langsung bisa ditempel ke wa.me: deret angka
+// berformat negara tanpa tanda plus ('628123456789'). Yang diketik operator
+// dibiarkan bebas — '0812-3456-7890', '+62 812 3456 7890', dan '812 3456 7890'
+// semuanya bermuara ke nilai yang sama, karena tiga-tiganya memang cara orang
+// menuliskan nomor yang sama.
+function rapikanNomor(teks) {
+  const d = String(teks || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('62')) return d;
+  if (d.startsWith('0')) return '62' + d.slice(1);
+  // Nol di depan yang kelewat waktu mengetik. Nomor seluler Indonesia selalu
+  // mulai dari 8, jadi tebakannya aman.
+  if (d.startsWith('8')) return '62' + d;
+  return d; // nomor luar negeri: tidak ditebak-tebak, dipakai apa adanya
+}
+
+// Sekadar penjaring salah ketik, bukan pemeriksa nomor sungguhan: yang ditolak
+// cuma panjang yang mustahil. Nomor Indonesia berformat negara jatuh di 11-14
+// angka; jauh di bawah itu hampir pasti kurang satu-dua ketukan.
+const nomorSah = (d) => /^\d{9,15}$/.test(d);
+
+// Dibalik ke bentuk yang biasa dilihat operator waktu ditaruh di kotak isian.
+// '628...' benar buat wa.me tapi susah dicocokkan dengan buku catatan.
+const nomorLokal = (d) => (d && d.startsWith('62') ? '0' + d.slice(2) : (d || ''));
+
+const selisihHari = (dari, sampai) =>
+  Math.round((new Date(sampai + 'T00:00:00') - new Date(dari + 'T00:00:00')) / 86400000);
+
+const labelJeda = (n) => (n <= 0 ? 'hari ini' : n === 1 ? 'kemarin' : n + ' hari lalu');
+
+// Kandidat yang dibawa keluar sengaja cuma id-nya, bukan objek customer-nya.
+// Snapshot customers yang mendarat selagi sheet terbuka mengganti seluruh isi
+// array dengan objek baru; referensi lama yang masih dipegang di sini akan
+// menunjuk objek yatim, dan nomor yang ditulis ke situ tidak akan pernah ikut
+// tersimpan.
+function kandidatReminder() {
+  const hariIni = today();
+  // Kunjungan terakhir dicari dari seluruh riwayat, bukan cuma dari dalam
+  // jendela. Kalau dibatasi jendela, orang yang datang 10 hari lalu dan datang
+  // lagi 2 hari lalu akan terbaca "terakhir 10 hari lalu" — kunjungan barunya
+  // tidak ikut terlihat karena jatuh di luar jendela — lalu diingatkan padahal
+  // ia baru saja pulang dari sini.
+  const terakhir = new Map();  // customerId -> kunjungan terakhir yang tercatat
+  const mendatang = new Set(); // customerId yang sudah punya jadwal sesudah hari ini
+  appointments.forEach((a) => {
+    if (!tanggalSah(a)) return;
+    if (a.date > hariIni) { mendatang.add(a.customerId); return; }
+    const t = terakhir.get(a.customerId);
+    if (!t || a.date > t) terakhir.set(a.customerId, a.date);
+  });
+  const out = [];
+  terakhir.forEach((tgl, id) => {
+    if (mendatang.has(id)) return;
+    // Jendelanya diperiksa di sini, sesudah kunjungan terakhirnya pasti benar.
+    const jeda = selisihHari(tgl, hariIni);
+    if (jeda < REM_MULAI || jeda > REM_SAMPAI) return;
+    const c = customers.find((x) => x.id === id);
+    if (!c) return; // jadwal yatim: customer-nya sudah tidak ada lagi di daftar
+    // Tanda "sudah diingatkan" hanya berlaku sepanjang kunjungan terakhir ini.
+    // Tanda yang lebih tua dari kunjungannya berarti sisa putaran sebelumnya --
+    // ia sudah datang sesudah diingatkan, lalu sepi lagi — dan membawanya ke
+    // putaran ini membuat orangnya tidak pernah terhubungi lagi.
+    const ingat = typeof c.diingatkan === 'string' && c.diingatkan >= tgl ? c.diingatkan : null;
+    out.push({
+      id, nama: c.name, tgl, jeda, total: visitCount(id),
+      ingat, jedaIngat: ingat ? selisihHari(ingat, hariIni) : null,
+    });
+  });
+  // Dua lapis urutan. Yang belum dihubungi selalu di atas: itu yang menunggu
+  // dikerjakan, dan mencampurnya dengan yang sudah selesai membuat operator
+  // harus memilah sendiri tiap kali daftarnya dibuka.
+  //
+  // Di dalam tiap lapis, yang paling baru datang duluan — jadi daftarnya
+  // mengalir dari hari ke-5 turun ke hari ke-14, bukan sebaliknya. Nama dipakai
+  // sebagai pemutus supaya orang-orang di tanggal yang sama tidak bertukar
+  // tempat sendiri tiap kali daftarnya digambar ulang.
+  return out.sort((a, b) =>
+    (a.ingat ? 1 : 0) - (b.ingat ? 1 : 0)
+    || b.tgl.localeCompare(a.tgl)
+    || a.nama.localeCompare(b.nama, 'id'));
+}
+
+// Sebutan tempat untuk teks WhatsApp: nama klinik, lalu nama cabang kalau
+// cabangnya memang lebih dari satu ('Skinwriter Kemayoran'). Dua-duanya boleh
+// tidak ada — akun yang belum mengisi nama klinik dan cuma punya satu cabang
+// mendapat string kosong, dan kalimat yang memakainya menutup sendiri tanpa
+// menyisakan kata 'di' yang menggantung.
+function namaTempat() {
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  return [namaKlinik, cabangList.length > 1 && cabang ? cabang.name : '']
+    .filter(Boolean).join(' ');
+}
+
+// Salam menurut jam di perangkat operator saat tombol kirim ditekan — bukan jam
+// kunjungan customer, yang sudah lewat berhari-hari dan tidak ada hubungannya
+// dengan kapan pesannya dibaca.
+//
+// 'malam' tetap disediakan walau jam kerja tutup pukul 17:00: operator yang
+// membereskan daftar ini selepas tutup bukan hal aneh, dan "Selamat sore"
+// yang terkirim pukul delapan malam justru menandakan pesannya tidak ditulis
+// orang. Batasnya mengikuti pemakaian sehari-hari, bukan pembagian resmi.
+function salamWaktu(sekarang) {
+  const jam = (sekarang || new Date()).getHours();
+  if (jam < 10) return 'Selamat pagi';   // 00:00 - 09:59
+  if (jam < 14) return 'Selamat siang';  // 10:00 - 13:59
+  if (jam < 18) return 'Selamat sore';   // 14:00 - 17:59
+  return 'Selamat malam';                // 18:00 - 23:59
+}
+
+// Namanya dipakai apa adanya, tanpa sapaan tambahan di depannya: di data ini
+// panggilan memang sudah menyatu dengan namanya — "Ibu Siti", "Ci Mei",
+// "Pak Budi" — dan itu justru yang dibaca tebakGender() lewat daftar SAPAAN.
+// Menambahkan "Kak" di depan menghasilkan "Kak Ibu Siti Rahma".
+//
+// Nadanya sengaja lebih formal daripada catatan internal: ini satu-satunya
+// teks di aplikasi ini yang dibaca customer, bukan operator.
+// Jendela tawaran jadwal: besok sampai tujuh hari ke depan. Hari ini sengaja
+// dilewati — sisa jamnya tinggal sedikit dan orang yang baru dihubungi sore ini
+// hampir tidak mungkin datang hari ini juga, jadi menawarkannya lebih sering
+// meleset daripada kena.
+const REM_SLOT_HARI = 7;
+
+// Yang dicari seminggu, tapi yang ditulis di pesan cuma tiga hari pertama yang
+// ada kosongnya, tiga rentang jam tiap hari. Pesan berisi seluruh isi seminggu
+// bukan tawaran lagi — itu jadwal buka, dan orang yang harus menggulir daftar
+// panjang di WhatsApp lebih sering menunda menjawab daripada memilih. Yang
+// terpotong tidak hilang: kalimat penutupnya justru mengajak menyebut jam
+// sendiri, dan operator masih memegang daftar lengkapnya di sheet Slot Kosong.
+const REM_TAWAR_HARI = 3;
+const REM_TAWAR_JAM = 3;
+
+// Tawaran jadwal untuk satu customer, memakai mesin slot yang sama dengan sheet
+// "Slot Kosong" — jadi jam yang ditawarkan ke customer tidak mungkin beda
+// dengan yang dilihat operator di layar.
+//
+// Durasinya diambil dari treatment terakhir orang itu, bukan dari centang di
+// sheet Slot Kosong: pesan ini harus berdiri sendiri, tidak boleh berubah isi
+// gara-gara pilihan yang kebetulan tertinggal di layar lain. Jadwal lama yang
+// tidak punya field treatments jatuh ke durasi bawaan lewat durasiJadwal(),
+// persis seperti perlakuan di seluruh aplikasi.
+//
+// Hasilnya satu blok teks per hari, bukan satu baris berisi deret jam yang
+// dipisah koma: rentang jam yang menyambung jadi satu paragraf panjang justru
+// paling susah dibaca di layar HP, dan itu tepat yang terjadi di hari yang
+// jadwalnya terpecah-pecah.
+function slotTawaran(k) {
+  const hariIni = today();
+  const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
+  const durasi = durasiJadwal(terakhir);
+  const blok = [];
+  for (let i = 1; i <= REM_SLOT_HARI && blok.length < REM_TAWAR_HARI; i++) {
+    const tgl = hariGeser(i);
+    const muat = slotHari(tgl, hariIni).filter((s) => s.b - s.a >= durasi);
+    // Hari yang penuh tidak ditulis sama sekali — sama seperti salinan slot
+    // kosong. Baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
+    if (!muat.length) continue;
+    // Susunannya mengikuti salinan jadwal dan salinan slot kosong — nama hari
+    // ditebalkan, jamnya turun satu per satu di bawahnya — cuma penandanya yang
+    // berbeda: di sana emoji, di sini guillemet dan bullet. Sebabnya ditulis di
+    // catatan atas buildReminderText().
+    blok.push(['\u00BB *' + hariBulan(tgl) + '*'].concat(
+      muat.slice(0, REM_TAWAR_JAM)
+        .map((s) => '\u2022 ' + keJam(s.a) + '–' + keJam(s.b))).join('\n'));
+  }
+  return blok;
+}
+
+// Satu-satunya teks di aplikasi ini yang berangkat lewat URL (wa.me), bukan
+// lewat clipboard seperti salinan jadwal, salinan slot kosong, dan salinan
+// daftar reminder. Di jalan menuju WhatsApp ada tahap yang menjatuhkan karakter
+// di luar Windows-1252: emoji sampai di kotak ketik WhatsApp sebagai tanda
+// tanya, sementara en dash dan em dash selamat. Karena itu hiasannya di sini
+// cuma guillemet dan bullet — dua-duanya ada di Windows-1252 — dan emoji tidak
+// dipakai sama sekali. Salinan yang lewat clipboard tidak kena batasan itu,
+// jadi emoji di sana tetap.
+function buildReminderText(k) {
+  const tempat = namaTempat();
+  const tawaran = slotTawaran(k);
+  const ajakan = 'Sudah waktunya untuk perawatan berikutnya.';
+  // Dua penutup, masing-masing untuk keadaannya sendiri. Yang dapat daftar
+  // jadwal tidak perlu ditanya lagi "boleh kami bantu jadwalkan?" — yang
+  // dibutuhkannya justru izin menyebut jam di luar daftar, karena daftarnya
+  // memang sengaja dipendekkan.
+  const tutupTawar = 'Kalau jam di atas kurang pas, sebut saja jam yang paling cocok — nanti kami carikan.';
+  const tutupKosong = 'Boleh kami bantu jadwalkan?';
+  return salamWaktu() + ', ' + k.nama + '.\n\n'
+    + 'Terima kasih sudah treatment' + (tempat ? ' di ' + tempat : '')
+    // hariBulan(), bukan tglSingkat(), supaya nama harinya ikut disebut.
+    // Bentuknya sama persis dengan judul hari di daftar reminder dan di
+    // salinan jadwal, jadi tanggal yang sama tidak pernah tertulis dua rupa.
+    + ' pada ' + hariBulan(k.tgl) + '.\n'
+    // Seminggu ke depan yang penuh sama sekali bukan alasan menahan pesannya:
+    // ajakannya tetap terkirim, cuma tanpa daftar tawaran.
+    + (tawaran.length
+      ? ajakan + ' Ini beberapa jam yang masih kosong:\n\n'
+        // Antarhari dipisah baris kosong, bukan cuma ganti baris: tanpa jeda
+        // itu judul hari berikutnya menempel di jam terakhir hari sebelumnya.
+        + tawaran.join('\n\n') + '\n\n' + tutupTawar
+      : ajakan + ' ' + tutupKosong);
+}
+
+// Daftar untuk dibaca sendiri/diteruskan ke pemilik, bukan untuk dikirim ke
+// customer — jadi isinya nama dan jarak waktunya, bukan kalimat ajakan.
+// Yang disalin daftar kerjanya, bukan seluruh isi layar: yang sudah dihubungi
+// tidak perlu dikerjakan lagi, jadi ia cukup jadi satu baris hitungan di bawah.
+function buildReminderListText(semua) {
+  const daftar = semua.filter((k) => !k.ingat);
+  const sudah = semua.length - daftar.length;
+  if (!daftar.length) return null;
+  const tempat = namaTempat();
+  const lines = ['*PERLU DIINGATKAN' + (tempat ? ' ' + tempat.toUpperCase() : '')
+    + '* \u{1F514}'];
+  // Dikelompokkan per hari kunjungan terakhir, dan nomornya mulai dari 1 lagi
+  // di tiap hari — sama persis dengan bentuk salinan jadwal, supaya yang
+  // menerimanya di WA tidak perlu membaca dua susunan yang berbeda.
+  let lastDate = null;
+  let n = 0;
+  daftar.forEach((k) => {
+    if (k.tgl !== lastDate) {
+      lines.push('', '\u{1F4C5} *' + hariBulan(k.tgl) + '* — ' + labelJeda(k.jeda));
+      lastDate = k.tgl;
+      n = 0;
+    }
+    n++;
+    lines.push(n + '. ' + k.nama);
+  });
+  if (sudah) lines.push('', '_' + sudah + ' orang lain sudah diingatkan._');
+  return lines.join('\n');
+}
+
+let daftarReminder = [];
+
+function renderReminder() {
+  const box = $('remHasil');
+  box.innerHTML = '';
+  daftarReminder = kandidatReminder();
+  const n = daftarReminder.length;
+  const belum = daftarReminder.filter((k) => !k.ingat).length;
+  const sudah = n - belum;
+  $('remRingkas').textContent = n
+    ? (belum ? belum + ' belum dihubungi' : 'Semuanya sudah dihubungi')
+      + (sudah ? ', ' + sudah + ' sudah diingatkan' : '')
+      + ' \u2014 terakhir datang ' + REM_MULAI + '-' + REM_SAMPAI + ' hari lalu.'
+    : 'Tidak ada yang terakhir datang ' + REM_MULAI + '-' + REM_SAMPAI
+      + ' hari lalu tanpa jadwal berikutnya.';
+  if (!n) {
+    box.innerHTML = '<div class="empty">Tidak ada yang perlu diingatkan.</div>';
+    return;
+  }
+  // Jumlah per hari dihitung per bagian, bukan sekali untuk seluruh daftar:
+  // satu tanggal bisa muncul di dua bagian sekaligus — dua orang datang di
+  // hari yang sama, yang satu sudah dihubungi dan yang satu belum — dan angka
+  // yang dihitung menyeluruh akan menulis "2 orang" di kedua judulnya.
+  const perHari = new Map();
+  daftarReminder.forEach((k) => {
+    const kunci = (k.ingat ? 'y' : 't') + k.tgl;
+    perHari.set(kunci, (perHari.get(kunci) || 0) + 1);
+  });
+  // Judul bagian cuma dipasang kalau memang ada yang sudah dihubungi. Selama
+  // belum ada, daftarnya tidak perlu diberi tahu bahwa isinya "yang belum" --
+  // memang itu seluruh isinya.
+  const adaSudah = daftarReminder.some((k) => k.ingat);
+  let bagianTerakhir = null;
+  let tglTerakhir = null;
+  daftarReminder.forEach((k) => {
+    const bagian = !!k.ingat;
+    if (adaSudah && bagian !== bagianTerakhir) {
+      const b = document.createElement('div');
+      b.className = 'rem-bagian';
+      b.textContent = bagian ? 'Sudah diingatkan' : 'Belum dihubungi';
+      box.appendChild(b);
+      bagianTerakhir = bagian;
+      tglTerakhir = null; // tanggal yang sama boleh muncul lagi di bagian berikutnya
+    }
+    if (k.tgl !== tglTerakhir) {
+      const h = document.createElement('div');
+      h.className = 'day-head';
+      h.textContent = hariBulan(k.tgl);
+      const ket = document.createElement('span');
+      ket.className = 'day-jml';
+      ket.textContent = labelJeda(k.jeda) + ' · '
+        + perHari.get((k.ingat ? 'y' : 't') + k.tgl) + ' orang';
+      h.appendChild(ket);
+      box.appendChild(h);
+      tglTerakhir = k.tgl;
+    }
+    const c = customers.find((x) => x.id === k.id);
+    const el = document.createElement('div');
+    el.className = 'rem-item';
+    el.innerHTML =
+      '<button type="button" class="rem-nama"></button>'
+      + '<button type="button" class="rem-hp"></button>'
+      + '<button type="button" class="rem-wa"></button>';
+    el.classList.toggle('sudah', !!k.ingat);
+    el.querySelector('.rem-wa').textContent = k.ingat ? 'Kirim lagi' : 'Kirim WA';
+
+    const namaEl = el.querySelector('.rem-nama');
+    namaEl.textContent = k.nama;
+    namaEl.title = 'Lihat semua kunjungan ' + k.nama;
+    // Pintu yang sama dengan nama di daftar jadwal: sebelum menghubungi orangnya,
+    // yang paling sering ditanya adalah "dia biasanya berapa lama sekali datang".
+    namaEl.onclick = () => { tutupReminder(); cariCustomer(k.id); };
+
+    // Nomornya ditampilkan supaya operator bisa memastikan ia menghubungi orang
+    // yang benar sebelum menekan kirim, dan sekaligus jadi jalan mengoreksinya
+    // kalau salah ketik. Yang belum punya nomor tetap diberi tempat yang sama,
+    // jadi tinggi tiap barisnya tidak berubah-ubah.
+    const hpEl = el.querySelector('.rem-hp');
+    const nomor = c && c.phone ? nomorLokal(c.phone) : '';
+    hpEl.textContent = nomor || 'belum ada nomor';
+    hpEl.classList.toggle('kosong', !nomor);
+    hpEl.title = nomor ? 'Ubah nomor ' + k.nama : 'Isi nomor ' + k.nama;
+    hpEl.onclick = () => bukaHp(k, false);
+
+    el.querySelector('.rem-wa').onclick = () => {
+      // Belum ada nomornya: yang muncul kotak isiannya dulu, lalu WhatsApp
+      // terbuka sendiri begitu disimpan — bukan pesan error yang menyuruh
+      // operator mencari sendiri di mana nomornya diisi.
+      if (!nomor) { bukaHp(k, true); return; }
+      kirimWa(k, rapikanNomor(nomor));
+    };
+
+    // Baris kedua, cuma untuk yang sudah dihubungi. Tandanya sekaligus tombol
+    // pencabutnya: kalau ternyata WhatsApp cuma terbuka lalu ditutup tanpa
+    // mengirim, catatannya tidak boleh terlanjur mengunci orangnya di bawah.
+    if (k.ingat) {
+      const tanda = document.createElement('button');
+      tanda.type = 'button';
+      tanda.className = 'rem-tanda';
+      tanda.textContent = 'diingatkan ' + labelJeda(k.jedaIngat);
+      tanda.title = 'Cabut tanda ini — ' + k.nama + ' kembali ke daftar yang belum dihubungi';
+      tanda.onclick = () => cabutIngat(k.id);
+      el.appendChild(tanda);
+    }
+
+    box.appendChild(el);
+  });
+}
+
+// Membuka WhatsApp dengan pesan yang sudah tersusun. Dipanggil dari dua tempat
+// — tombol kirim di baris, dan sesudah nomor baru disimpan — jadi bentuk
+// tautannya cuma tertulis sekali.
+function kirimWa(k, nomor) {
+  window.open('https://wa.me/' + nomor + '?text=' + encodeURIComponent(buildReminderText(k)),
+    '_blank', 'noopener');
+  tandaiIngat(k.id);
+}
+
+// Yang tercatat sebenarnya "pesannya sudah dibuka di WhatsApp", bukan "sudah
+// terkirim": wa.me cuma menyiapkan pesannya, dan operator masih harus menekan
+// kirim sendiri di sana. Halaman ini tidak pernah tahu apakah itu jadi
+// dilakukan — karena itu kata yang dipakai di layar "diingatkan", bukan
+// "terkirim", dan tandanya bisa dicabut lagi kalau ternyata batal.
+function tandaiIngat(id) {
+  const c = customers.find((x) => x.id === id);
+  if (!c) return;
+  const hari = today();
+  if (c.diingatkan === hari) return; // sudah ditandai hari ini, tidak perlu tulis ulang
+  // Gagal menyimpan tandanya tidak menghalangi pesannya dikirim — WhatsApp
+  // sudah terbuka duluan. Yang hilang cuma catatannya, dan bolehUbah() sudah
+  // memberi tahu sebabnya.
+  if (!bolehUbah()) return;
+  c.diingatkan = hari;
+  save(KEY_CUSTOMERS, customers);
+  renderReminder();
+}
+
+function cabutIngat(id) {
+  const c = customers.find((x) => x.id === id);
+  if (!c || !c.diingatkan) return;
+  if (!bolehUbah()) return;
+  const nama = c.name;
+  delete c.diingatkan;
+  save(KEY_CUSTOMERS, customers);
+  renderReminder();
+  toast('Tanda "sudah diingatkan" pada ' + nama + ' dicabut.');
+}
+
+// Kotak isian nomor. Yang dipegang cuma id customer-nya, bukan objeknya:
+// snapshot customers yang mendarat selagi kotak ini terbuka mengganti seluruh
+// isi array dengan objek baru, dan nomor yang ditulis ke objek lama tidak akan
+// pernah ikut tersimpan.
+let hpTarget = null;
+// Dibuka dari tombol kirim, bukan dari nomornya. Bedanya menentukan apa yang
+// terjadi sesudah simpan: langsung membuka WhatsApp, atau berhenti di situ.
+let hpLanjutKirim = false;
+
+function bukaHp(k, lanjutKirim) {
+  const c = customers.find((x) => x.id === k.id);
+  hpTarget = k;
+  hpLanjutKirim = lanjutKirim;
+  $('hpNama').textContent = k.nama;
+  $('hpInput').value = nomorLokal(c && c.phone);
+  $('hpKet').textContent = lanjutKirim
+    ? 'Nomornya disimpan dulu, lalu WhatsApp langsung terbuka dengan pesannya.'
+    : 'Kosongkan lalu simpan kalau nomornya mau dihapus.';
+  $('hpSheet').hidden = false;
+  $('hpInput').focus();
+  $('hpInput').select();
+}
+
+function tutupHp() {
+  $('hpSheet').hidden = true;
+  hpTarget = null;
+  hpLanjutKirim = false;
+}
+
+function simpanHp() {
+  if (!hpTarget) return;
+  const k = hpTarget, lanjut = hpLanjutKirim;
+  const isi = $('hpInput').value.trim();
+  const d = rapikanNomor(isi);
+  if (isi && !nomorSah(d)) {
+    toast('Nomor "' + isi + '" sepertinya belum lengkap.', true);
+    return;
+  }
+  // Dibuka dari tombol kirim tapi dikosongkan: tidak ada yang bisa dihubungi,
+  // jadi kotaknya ditahan tetap terbuka daripada menutup tanpa hasil apa pun.
+  if (lanjut && !d) {
+    toast('Isi nomornya dulu supaya WhatsApp bisa dibuka.', true);
+    return;
+  }
+  const asli = customers.find((x) => x.id === k.id);
+  if (!asli) { tutupHp(); return; }
+  const berubah = (asli.phone || '') !== d;
+  if (berubah) {
+    // Menyimpan nomor berarti menulis ulang seluruh dokumen customers, jadi ia
+    // lewat gerbang yang sama dengan perubahan data lainnya.
+    if (!bolehUbah()) return;
+    if (d) asli.phone = d; else delete asli.phone;
+    save(KEY_CUSTOMERS, customers);
+  }
+  const nama = asli.name;
+  tutupHp();
+  renderReminder();
+  // window.open masih dihitung lanjutan dari ketukan tombol Simpan, jadi ia
+  // tidak kena penghadang popup.
+  if (lanjut) { kirimWa(k, d); return; }
+  if (berubah) toast(d ? 'Nomor ' + nama + ' tersimpan.' : 'Nomor ' + nama + ' dihapus.');
+}
+
+$('hpSimpan').addEventListener('click', simpanHp);
+$('hpBatal').addEventListener('click', tutupHp);
+$('hpSheet').addEventListener('click', (e) => { if (e.target === $('hpSheet')) tutupHp(); });
+$('hpInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); simpanHp(); }
 });
-$('slotPegawaiBox').appendChild(stepperBawaan);
+
+function bukaReminder() {
+  if (!dataSiap[KEY_APPOINTMENTS] || !dataSiap[KEY_CUSTOMERS]) {
+    toast('Data masih dimuat — tunggu sebentar lalu ulangi.', true);
+    return;
+  }
+  $('reminderSheet').hidden = false;
+  renderReminder();
+}
+function tutupReminder() { $('reminderSheet').hidden = true; }
+
+$('reminderBtn').addEventListener('click', bukaReminder);
+$('remTutup').addEventListener('click', tutupReminder);
+$('reminderSheet').addEventListener('click', (e) => {
+  if (e.target === $('reminderSheet')) tutupReminder();
+});
+$('remSalinBtn').addEventListener('click', async () => {
+  const text = buildReminderListText(daftarReminder);
+  if (!text) { toast('Tidak ada yang perlu diingatkan — tidak ada yang bisa disalin.', true); return; }
+  await salinTeks(text);
+  toast('Daftar tersalin — tinggal paste di WhatsApp.');
+});
+
 // ============================================================
 // Export & Import data
 // ============================================================
@@ -2300,6 +2933,7 @@ function mulaiSyncData() {
   stopData = [
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
+    pasang(KEY_PEGAWAI, terapkanPegawai),
     pasangJadwal(),
   ];
 }
@@ -2384,6 +3018,10 @@ function pilihCabang(id) {
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
+  // Jumlah pegawai milik cabang sebelumnya — termasuk tulisan yang masih
+  // tertunda — tidak boleh ikut menyeberang. Angkanya kembali ke bawaan sampai
+  // setelan cabang yang baru datang dari server.
+  lupakanPegawai();
   // Array di atas sekarang kosong bukan karena cabang barunya kosong, tapi
   // karena isinya belum sempat datang. Gerbangnya ditutup di detik yang sama.
   resetDataSiap();
@@ -2435,10 +3073,13 @@ if (!configTerisi) {
     } else {
       uid = null;
       if (stopCabangList) { stopCabangList(); stopCabangList = null; }
+      if (stopProfil) { stopProfil(); stopProfil = null; }
+      namaKlinik = '';
       stopData.forEach((lepas) => lepas());
       stopData = [];
       setSambung(false); // palang ikut disembunyikan karena uid sudah kosong
       customers = []; appointments = []; staff = [];
+      lupakanPegawai();
       cabangList = []; cabangId = null;
       resetDataSiap(); cabangSiap = false; peringatanCabangKosong = false;
       $('cabangBar').innerHTML = '';
