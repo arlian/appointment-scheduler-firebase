@@ -2111,18 +2111,19 @@ const REM_SLOT_HARI = 7;
 // lengkapnya di sheet Slot Kosong.
 const REM_TAWAR_JAM = 3;
 
-// Emoji di pesan reminder. Satu sakelar, karena nasibnya beda per perangkat:
+// Emoji di judul hari. Satu sakelar, karena nasibnya beda per perangkat:
 // dikirim dari HP emojinya utuh, dikirim dari PC ia bisa jatuh jadi tanda tanya
 // di kotak ketik WhatsApp — jalur wa.me di desktop melewati tahap yang
 // menjatuhkan karakter di luar Windows-1252. Kalau itu terjadi lagi, ubah satu
-// baris ini ke false dan penandanya kembali ke ASCII polos.
+// baris ini ke false dan judul harinya kembali polos.
 //
-// Harganya juga tidak gratis: encodeURIComponent mengubah satu emoji jadi 12
-// karakter URL, jadi menyalakannya menambah sekitar 340 karakter pada pesan
-// tujuh hari. Masih jauh di bawah BATAS_URL, dan pemotong hari tetap berjaga.
+// Cuma judul hari yang dapat emoji, dan itu bukan soal selera: satu emoji jadi
+// 12 karakter URL, sedangkan judul hari cuma tujuh buah per pesan sementara
+// baris jam bisa dua puluh satu. Penanda yang paling sering muncul yang paling
+// mahal, jadi baris jam tetap tanda hubung biasa — 84 karakter, bukan 336.
 const REM_EMOJI = true;
 const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
-const TANDA_JAM = REM_EMOJI ? '\u{1F552} ' : '- ';
+const TANDA_JAM = '- ';
 
 // Tawaran jadwal untuk satu customer, memakai mesin slot yang sama dengan sheet
 // "Slot Kosong" — jadi jam yang ditawarkan ke customer tidak mungkin beda
@@ -2150,8 +2151,7 @@ function slotTawaran(k) {
     // kosong. Baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
     if (!muat.length) continue;
     // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
-    // ditebalkan, jamnya turun satu per satu di bawahnya. Penandanya ikut
-    // REM_EMOJI — kalender dan jam kalau menyala, tanda hubung kalau tidak.
+    // ditebalkan, jamnya turun satu per satu di bawahnya.
     blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(
       muat.slice(0, REM_TAWAR_JAM)
         .map((s) => TANDA_JAM + keJam(s.a) + '-' + keJam(s.b))).join('\n'));
@@ -2192,19 +2192,18 @@ const panjangUrl = (teks) =>
 //
 // Salinan yang lewat clipboard tidak kena dua-duanya sama sekali.
 function buildReminderText(k) {
-  const tempat = namaTempat();
   const tawaran = slotTawaran(k);
   // Ajakannya berbentuk pertanyaan, bukan pemberitahuan: yang diminta dari
   // pembacanya memang satu jawaban, dan kalimat begini yang paling sering
   // dibalas. Ia juga sudah lengkap berdiri sendiri, jadi cabang yang tidak
   // punya daftar jadwal berhenti di sini tanpa perlu penutup tambahan.
   const ajakan = 'Apakah mau kami jadwalkan untuk treatment berikutnya?';
-  const kepala = salamWaktu() + ', ' + k.nama + '.\n\n'
-    + 'Terima kasih sudah treatment' + (tempat ? ' di ' + tempat : '')
-    // hariBulan(), bukan tglSingkat(), supaya nama harinya ikut disebut.
-    // Bentuknya sama persis dengan judul hari di daftar reminder dan di
-    // salinan jadwal, jadi tanggal yang sama tidak pernah tertulis dua rupa.
-    + ' pada ' + hariBulan(k.tgl) + '.\n';
+  // Salam, lalu langsung ke maksudnya. Kalimat "terima kasih sudah treatment
+  // pada tanggal sekian" sudah tidak ada: yang membacanya tahu sendiri kapan ia
+  // datang, dan mengulanginya cuma menunda kalimat yang benar-benar meminta
+  // jawaban. namaTempat() tetap dipakai salinan daftar reminder, jadi nama
+  // kliniknya tidak jadi hilang dari mana-mana.
+  const kepala = salamWaktu() + ', ' + k.nama + '.\n\n';
   // Seminggu ke depan yang penuh sama sekali bukan alasan menahan pesannya:
   // ajakannya tetap terkirim, cuma tanpa daftar tawaran. Antarhari dipisah
   // baris kosong, bukan cuma ganti baris: tanpa jeda itu judul hari berikutnya
