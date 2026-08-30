@@ -1257,19 +1257,45 @@ function renderList() {
   jadwalkanAnalitik();
 }
 
+// Nomor customer sebagai tombol: menampilkan nomornya sekaligus jadi jalan
+// mengubahnya. Sheet isiannya sama persis dengan yang dipakai daftar reminder,
+// jadi aturan nomor sah dan cara menyimpannya cuma tertulis di satu tempat.
+function tombolNomor(id, sendiri) {
+  const c = customers.find((x) => x.id === id);
+  const nomor = c && c.phone ? nomorLokal(c.phone) : '';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'hp-ubah' + (nomor ? '' : ' kosong') + (sendiri ? ' sendiri' : '');
+  b.textContent = nomor || 'belum ada nomor';
+  b.title = (nomor ? 'Ubah nomor ' : 'Isi nomor ') + nameOf(id);
+  b.onclick = () => bukaHp({ id, nama: nameOf(id) }, false);
+  return b;
+}
+
 // Total jadwal yang sedang tampil — supaya jumlahnya tidak perlu dihitung sendiri
 function setRingkasList(rows) {
   const box = $('listTotal');
-  if (!rows.length) { box.textContent = ''; return; }
+  box.textContent = '';
   // Mode riwayat menanyakan hal lain: bukan berapa jadwal hari itu, tapi sudah
   // berapa kali orangnya datang dan sejak kapan. rows sudah urut tanggal.
-  if (filterMode === 'cust') {
-    const awal = rows[0].date, akhir = rows[rows.length - 1].date;
-    box.textContent = rows.length + 'x kunjungan · ' + (awal === akhir
-      ? tglSingkat(awal)
-      : 'pertama ' + tglSingkat(awal) + ' · terakhir ' + tglSingkat(akhir));
+  if (filterMode === 'cust' && custCari) {
+    if (rows.length) {
+      const awal = rows[0].date, akhir = rows[rows.length - 1].date;
+      box.textContent = rows.length + 'x kunjungan · ' + (awal === akhir
+        ? tglSingkat(awal)
+        : 'pertama ' + tglSingkat(awal) + ' · terakhir ' + tglSingkat(akhir));
+    }
+    // Jalan kedua ke nomor customer. Sebelum ini nomornya cuma bisa disunting
+    // dari sheet Reminder, dan sheet itu isinya cuma yang terakhir datang
+    // REM_MULAI-REM_SAMPAI hari lalu — jadi nomor orang yang baru kemarin
+    // datang tidak bisa dikoreksi sampai namanya kebetulan masuk daftar itu.
+    // Di sini tempatnya justru wajar: layar ini memang dibuka ketika yang
+    // dicari satu orang tertentu. Ikut muncul walau kunjungannya belum ada satu
+    // pun — customer yang baru dicatat yang paling sering perlu diisikan nomor.
+    box.appendChild(tombolNomor(custCari, !rows.length));
     return;
   }
+  if (!rows.length) return;
   const hari = new Set(rows.map((r) => r.date)).size;
   box.textContent = hari > 1
     ? rows.length + ' jadwal · ' + hari + ' hari'
@@ -2076,14 +2102,27 @@ function salamWaktu(sekarang) {
 // meleset daripada kena.
 const REM_SLOT_HARI = 7;
 
-// Yang dicari seminggu, tapi yang ditulis di pesan cuma tiga hari pertama yang
-// ada kosongnya, tiga rentang jam tiap hari. Pesan berisi seluruh isi seminggu
-// bukan tawaran lagi — itu jadwal buka, dan orang yang harus menggulir daftar
-// panjang di WhatsApp lebih sering menunda menjawab daripada memilih. Yang
-// terpotong tidak hilang: kalimat penutupnya justru mengajak menyebut jam
-// sendiri, dan operator masih memegang daftar lengkapnya di sheet Slot Kosong.
-const REM_TAWAR_HARI = 3;
+// Seluruh hari dalam jendela pencarian ikut ditulis — tidak ada batas jumlah
+// hari yang terpisah dari REM_SLOT_HARI. Yang tetap dibatasi cuma rentang jam
+// tiap harinya: hari yang jadwalnya terpecah bisa menghasilkan lima-enam baris
+// sendiri, dan itu yang membuat pesannya berubah jadi dinding jam. Tiga baris
+// per hari sudah cukup memberi pilihan. Yang terpotong tidak hilang: kalimat
+// penutupnya mengajak menyebut jam sendiri, dan operator masih memegang daftar
+// lengkapnya di sheet Slot Kosong.
 const REM_TAWAR_JAM = 3;
+
+// Emoji di pesan reminder. Satu sakelar, karena nasibnya beda per perangkat:
+// dikirim dari HP emojinya utuh, dikirim dari PC ia bisa jatuh jadi tanda tanya
+// di kotak ketik WhatsApp — jalur wa.me di desktop melewati tahap yang
+// menjatuhkan karakter di luar Windows-1252. Kalau itu terjadi lagi, ubah satu
+// baris ini ke false dan penandanya kembali ke ASCII polos.
+//
+// Harganya juga tidak gratis: encodeURIComponent mengubah satu emoji jadi 12
+// karakter URL, jadi menyalakannya menambah sekitar 340 karakter pada pesan
+// tujuh hari. Masih jauh di bawah BATAS_URL, dan pemotong hari tetap berjaga.
+const REM_EMOJI = true;
+const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
+const TANDA_JAM = REM_EMOJI ? '\u{1F552} ' : '- ';
 
 // Tawaran jadwal untuk satu customer, memakai mesin slot yang sama dengan sheet
 // "Slot Kosong" — jadi jam yang ditawarkan ke customer tidak mungkin beda
@@ -2104,55 +2143,86 @@ function slotTawaran(k) {
   const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
   const durasi = durasiJadwal(terakhir);
   const blok = [];
-  for (let i = 1; i <= REM_SLOT_HARI && blok.length < REM_TAWAR_HARI; i++) {
+  for (let i = 1; i <= REM_SLOT_HARI; i++) {
     const tgl = hariGeser(i);
     const muat = slotHari(tgl, hariIni).filter((s) => s.b - s.a >= durasi);
     // Hari yang penuh tidak ditulis sama sekali — sama seperti salinan slot
     // kosong. Baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
     if (!muat.length) continue;
-    // Susunannya mengikuti salinan jadwal dan salinan slot kosong — nama hari
-    // ditebalkan, jamnya turun satu per satu di bawahnya — cuma penandanya yang
-    // berbeda: di sana emoji, di sini guillemet dan bullet. Sebabnya ditulis di
-    // catatan atas buildReminderText().
-    blok.push(['\u00BB *' + hariBulan(tgl) + '*'].concat(
+    // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
+    // ditebalkan, jamnya turun satu per satu di bawahnya. Penandanya ikut
+    // REM_EMOJI — kalender dan jam kalau menyala, tanda hubung kalau tidak.
+    blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(
       muat.slice(0, REM_TAWAR_JAM)
-        .map((s) => '\u2022 ' + keJam(s.a) + '–' + keJam(s.b))).join('\n'));
+        .map((s) => TANDA_JAM + keJam(s.a) + '-' + keJam(s.b))).join('\n'));
   }
   return blok;
 }
 
+// Batas panjang URL wa.me. Tidak ada batas baku untuk URL, tapi 2048 adalah
+// angka yang dihormati semua browser dan semua jalur penyerahan ke aplikasi
+// WhatsApp. Yang dijaga bukan cuma "gagal terbuka": URL yang kepanjangan bisa
+// terpotong diam-diam, dan pesan yang terpenggal di tengah baris jam tetap
+// terkirim tanpa ada yang menyadarinya.
+//
+// Dengan setelan sekarang — tujuh hari, tiga rentang jam tiap hari — pesan
+// terpanjang berhenti di sekitar 1.450, jadi penjaga ini memang menganggur. Ia
+// baru bekerja kalau REM_TAWAR_JAM atau REM_SLOT_HARI dinaikkan, jam kerjanya
+// diperpanjang, atau nama kliniknya panjang sekali.
+const BATAS_URL = 2048;
+
+// Panjang URL seandainya pesannya jadi dikirim. Nomor tujuannya belum tentu
+// diketahui waktu pesannya disusun, jadi yang dihitung nomor terpanjang yang
+// masuk akal — lebih baik memotong sehari terlalu cepat daripada kelewatan.
+const panjangUrl = (teks) =>
+  'https://wa.me/'.length + 15 + '?text='.length + encodeURIComponent(teks).length;
+
 // Satu-satunya teks di aplikasi ini yang berangkat lewat URL (wa.me), bukan
 // lewat clipboard seperti salinan jadwal, salinan slot kosong, dan salinan
-// daftar reminder. Di jalan menuju WhatsApp ada tahap yang menjatuhkan karakter
-// di luar Windows-1252: emoji sampai di kotak ketik WhatsApp sebagai tanda
-// tanya, sementara en dash dan em dash selamat. Karena itu hiasannya di sini
-// cuma guillemet dan bullet — dua-duanya ada di Windows-1252 — dan emoji tidak
-// dipakai sama sekali. Salinan yang lewat clipboard tidak kena batasan itu,
-// jadi emoji di sana tetap.
+// daftar reminder. Dua hal yang perlu diingat waktu menyentuh teksnya:
+//
+// Pertama, di jalan menuju WhatsApp ada tahap yang bisa menjatuhkan karakter di
+// luar Windows-1252 — emoji sampai di kotak ketik sebagai tanda tanya kalau
+// dikirim dari PC, tapi utuh kalau dikirim dari HP. Itu yang diatur REM_EMOJI.
+//
+// Kedua, encodeURIComponent menagih mahal untuk apa pun di luar ASCII: satu
+// emoji jadi 12 karakter URL, satu bullet sembilan. Karena itu pemisah jam
+// tetap tanda hubung biasa — ia muncul di tiap baris, dan yang paling sering
+// muncul yang paling mahal.
+//
+// Salinan yang lewat clipboard tidak kena dua-duanya sama sekali.
 function buildReminderText(k) {
   const tempat = namaTempat();
   const tawaran = slotTawaran(k);
-  const ajakan = 'Sudah waktunya untuk perawatan berikutnya.';
-  // Dua penutup, masing-masing untuk keadaannya sendiri. Yang dapat daftar
-  // jadwal tidak perlu ditanya lagi "boleh kami bantu jadwalkan?" — yang
-  // dibutuhkannya justru izin menyebut jam di luar daftar, karena daftarnya
-  // memang sengaja dipendekkan.
-  const tutupTawar = 'Kalau jam di atas kurang pas, sebut saja jam yang paling cocok — nanti kami carikan.';
-  const tutupKosong = 'Boleh kami bantu jadwalkan?';
-  return salamWaktu() + ', ' + k.nama + '.\n\n'
+  // Ajakannya berbentuk pertanyaan, bukan pemberitahuan: yang diminta dari
+  // pembacanya memang satu jawaban, dan kalimat begini yang paling sering
+  // dibalas. Ia juga sudah lengkap berdiri sendiri, jadi cabang yang tidak
+  // punya daftar jadwal berhenti di sini tanpa perlu penutup tambahan.
+  const ajakan = 'Apakah mau kami jadwalkan untuk treatment berikutnya?';
+  const kepala = salamWaktu() + ', ' + k.nama + '.\n\n'
     + 'Terima kasih sudah treatment' + (tempat ? ' di ' + tempat : '')
     // hariBulan(), bukan tglSingkat(), supaya nama harinya ikut disebut.
     // Bentuknya sama persis dengan judul hari di daftar reminder dan di
     // salinan jadwal, jadi tanggal yang sama tidak pernah tertulis dua rupa.
-    + ' pada ' + hariBulan(k.tgl) + '.\n'
-    // Seminggu ke depan yang penuh sama sekali bukan alasan menahan pesannya:
-    // ajakannya tetap terkirim, cuma tanpa daftar tawaran.
-    + (tawaran.length
-      ? ajakan + ' Ini beberapa jam yang masih kosong:\n\n'
-        // Antarhari dipisah baris kosong, bukan cuma ganti baris: tanpa jeda
-        // itu judul hari berikutnya menempel di jam terakhir hari sebelumnya.
-        + tawaran.join('\n\n') + '\n\n' + tutupTawar
-      : ajakan + ' ' + tutupKosong);
+    + ' pada ' + hariBulan(k.tgl) + '.\n';
+  // Seminggu ke depan yang penuh sama sekali bukan alasan menahan pesannya:
+  // ajakannya tetap terkirim, cuma tanpa daftar tawaran. Antarhari dipisah
+  // baris kosong, bukan cuma ganti baris: tanpa jeda itu judul hari berikutnya
+  // menempel di jam terakhir hari sebelumnya.
+  const susun = (blok) => kepala + (blok.length
+    ? ajakan + ' Berikut jadwal yang masih tersedia:\n\n' + blok.join('\n\n')
+    : ajakan);
+  let teks = susun(tawaran);
+  // Hari terjauh dibuang lebih dulu, satu per satu sampai muat: besok dan lusa
+  // yang paling mungkin dipilih orang, jadi hari ketujuh yang paling sedikit
+  // ruginya kalau hilang. Dipotong per hari, bukan per baris jam, supaya tidak
+  // ada hari yang tampil dengan daftar jamnya separuh — yang membacanya akan
+  // mengira memang cuma segitu yang tersedia.
+  while (tawaran.length && panjangUrl(teks) > BATAS_URL) {
+    tawaran.pop();
+    teks = susun(tawaran);
+  }
+  return teks;
 }
 
 // Daftar untuk dibaca sendiri/diteruskan ke pemilik, bukan untuk dikirim ke
@@ -2389,6 +2459,9 @@ function simpanHp() {
   const nama = asli.name;
   tutupHp();
   renderReminder();
+  // Sheet ini sekarang bisa dibuka dari luar daftar reminder, jadi yang
+  // digambar ulang bukan cuma daftar itu.
+  renderList();
   // window.open masih dihitung lanjutan dari ketukan tombol Simpan, jadi ia
   // tidak kena penghadang popup.
   if (lanjut) { kirimWa(k, d); return; }
