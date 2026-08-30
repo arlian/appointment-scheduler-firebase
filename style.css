@@ -171,9 +171,16 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px;
 }
 .card h2 { font-size: .9375rem; font-weight: 700; margin: 0; letter-spacing: -.012em; }
-.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+/* flex-wrap bukan hiasan: sejak tombolnya bertiga, deretnya butuh 348px
+   sedangkan ruang di dalam kartu cuma 345px bahkan di iPhone paling lebar.
+   Tanpa jalan turun, deretnya menembus kartu dan membuat seluruh halaman bisa
+   digeser ke samping. Yang turun judulnya dulu, baru tombolnya antar sesama. */
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; margin-bottom: 14px;
+}
 .card-sub { margin: -8px 0 14px; font-size: .8125rem; color: var(--text-2); line-height: 1.45; }
-.card-head-btns { display: flex; gap: 7px; }
+.card-head-btns { display: flex; flex-wrap: wrap; gap: 7px; }
 .wa-btn {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 7px 12px; font-size: .78rem; font-weight: 600; font-family: inherit;
@@ -182,6 +189,17 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 }
 .wa-btn:hover { background: var(--hover-accent); }
 .wa-btn:active { transform: scale(.97); }
+/* Layar telepon: tombolnya dirapatkan supaya ketiganya masih muat satu baris
+   sesudah turun ke bawah judul, bukan pecah lagi jadi dua baris.
+
+   Letaknya harus SESUDAH aturan dasar .wa-btn di atas: media query tidak
+   menambah specificity, jadi kalau ia berdiri lebih dulu, padding dan
+   font-size bawaanlah yang menang dan aturan ini tidak pernah terpakai. */
+@media (max-width: 480px) {
+  .card-head { gap: 8px 10px; }
+  .card-head-btns { gap: 6px; }
+  .wa-btn { padding: 7px 10px; font-size: .74rem; gap: 4px; }
+}
 
 /* ---- Filter ---- */
 .filter-bar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }

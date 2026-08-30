@@ -1,6 +1,7 @@
 // ============================================================
 // Penyimpanan (Firestore) — server satu-satunya sumber kebenaran.
-// Susunan: users/{uid}/cabang/{id}/data/{customers|staff} — satu dokumen
+// Susunan: users/{uid}/data/profil — nama klinik, satu dokumen tingkat akun —
+// users/{uid}/cabang/{id}/data/{customers|staff} — satu dokumen
 // berisi { rows: [...] } meniru bentuk array lama — dan jadwal di
 // users/{uid}/cabang/{id}/appointments/{YYYY-MM}, satu dokumen per bulan.
 //
@@ -28,7 +29,7 @@ import {
   setDoc, deleteDoc, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?}]
+const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?, phone?, diingatkan?}]
 // Bukan lagi nama dokumen seperti dua yang lain, melainkan nama koleksi
 // bulanannya — sekaligus tetap dipakai sebagai kunci di `dataSiap`.
 const KEY_APPOINTMENTS = 'appointments'; // [{id, customerId, date, time, treatments?}]
@@ -51,6 +52,12 @@ if (configTerisi) {
 let customers = [];
 let appointments = [];
 let staff = [];
+
+// Nama klinik, dipakai di pesan WhatsApp supaya penerimanya tahu ini dari
+// siapa. Kosong selama dokumen profilnya belum ada — dan memang boleh kosong:
+// seluruh teks yang memakainya jatuh kembali ke bentuk lamanya, jadi akun yang
+// belum sempat mengisinya tidak jadi rusak.
+let namaKlinik = '';
 
 // Tiap cabang punya data sendiri di users/{uid}/cabang/{id}/data/...
 // Daftar cabangnya tersimpan di users/{uid}/data/branches.
@@ -1058,10 +1065,14 @@ $('editSheet').addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  // Kotak nomor berdiri di atas sheet reminder. Tanpa berhenti di sini, satu
+  // ketukan Esc menutup dua-duanya sekaligus dan daftarnya ikut hilang.
+  if (!$('hpSheet').hidden) { tutupHp(); return; }
   if (!$('editSheet').hidden) closeEdit();
   if (!$('newCustSheet').hidden) tutupKonfirmasiBaru();
   if (!$('cabangSheet').hidden) closeCabangSheet();
   if (!$('slotSheet').hidden) tutupSlot();
+  if (!$('reminderSheet').hidden) tutupReminder();
 });
 
 $('editSave').addEventListener('click', () => {
@@ -1968,6 +1979,21 @@ function gabungData(isi, dariFile) {
     // seseorang diakui customer lama, tidak ada file yang bisa mencabutnya —
     // ketiadaan penanda di file cuma berarti file itu belum tahu.
     if (c.sudahLama && !existing.sudahLama) { existing.sudahLama = true; berubah = true; }
+    // Nomor WhatsApp ikut terbawa, tapi cuma untuk mengisi yang masih kosong.
+    // Nomor yang sudah ada di sini lebih baru daripada isi file cadangan, dan
+    // menimpanya berarti mengembalikan nomor lama yang mungkin sudah diperbaiki.
+    if (!existing.phone && typeof c.phone === 'string' && /^\d{9,15}$/.test(c.phone)) {
+      existing.phone = c.phone;
+      berubah = true;
+    }
+    // Tanda "sudah diingatkan" ikut terbawa kalau file punya yang lebih baru.
+    // Yang lebih tua tidak pernah menang: memundurkan tanggalnya cuma membuat
+    // orang yang sudah dihubungi kemarin terbaca belum dihubungi lagi.
+    if (typeof c.diingatkan === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.diingatkan)
+        && (!existing.diingatkan || c.diingatkan > existing.diingatkan)) {
+      existing.diingatkan = c.diingatkan;
+      berubah = true;
+    }
     // Gender ikut terbawa: koreksi manual dari file menang atas tebakan yang
     // belum dikoreksi, tapi koreksi manual yang sudah ada di sini tidak pernah
     // ditimpa. Tebakan lawan tebakan sama saja hasilnya, jadi tidak diapa-apakan.
@@ -2143,6 +2169,7 @@ function ambilLokalLama(key) { // data versi lama (localStorage), untuk migrasi
 }
 
 let stopCabangList = null;
+let stopProfil = null;
 let stopData = [];
 // Sekali cukup: dengan includeMetadataChanges, keadaan buntu ini akan menyala
 // lagi tiap kali metadata snapshot-nya berubah, dan toast-nya jadi beruntun.
@@ -2152,6 +2179,20 @@ function mulaiSync() {
   setSambung(false); // dianggap belum tersambung sampai server yang bilang lain
   cabangSiap = false;
   resetDataSiap();
+  // Nama klinik berdiri di tingkat akun, sejajar dengan daftar cabang — bukan
+  // di dalam cabang — jadi ia tidak ikut dilepas-pasang tiap pindah cabang.
+  //
+  // Kegagalannya sengaja tidak menutup gerbang tulis dan tidak mengubah status
+  // sambungan seperti listener lain: yang hilang cuma satu nama di teks pesan,
+  // dan menghentikan seluruh aplikasi karena itu jelas berlebihan.
+  stopProfil = onSnapshot(
+    doc(db, 'users', uid, 'data', 'profil'),
+    (snap) => {
+      const n = snap.exists() ? snap.data().nama : '';
+      namaKlinik = typeof n === 'string' ? n.trim() : '';
+    },
+    () => { namaKlinik = ''; }
+  );
   stopCabangList = onSnapshot(
     doc(db, 'users', uid, 'data', 'branches'),
     // includeMetadataChanges: tanpa ini listener diam saja waktu sambungan
