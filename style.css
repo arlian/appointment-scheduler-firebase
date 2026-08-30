@@ -856,7 +856,7 @@ button.primary:active { transform: scale(.985); }
    tiap hari punya beberapa baris rentang jam sendiri. */
 .sheet-lebar { max-width: 560px; max-height: 86vh; overflow-y: auto; }
 .slot-sub { font-size: .78rem; color: var(--muted); margin: 0 0 14px; }
-.slot-atur label, .slot-jenis label {
+.slot-atur label, .slot-jenis label, .slot-atur-judul {
   display: block; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 4px;
 }
 /* Kotak angka dengan tombol − dan +. Dibuat besar dengan sengaja: di iPhone
@@ -901,6 +901,19 @@ button.primary:active { transform: scale(.985); }
 }
 .slot-jenis { margin-top: 14px; }
 .slot-atur-ket { display: block; font-size: .72rem; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+/* Tujuh kotak angka Senin..Minggu. Grid, bukan flex: jumlah kolomnya menyesuaikan
+   lebar layar sendiri — ketujuhnya sebaris di sheet yang lebar, tiga-tiga di HP —
+   dan tidak ada kotak yang terpotong di tepi mana pun. Lebar minimumnya dihitung
+   dari kotak kecil itu sendiri: 28 + 30 + 28. */
+.slot-peg-minggu {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 12px 4px; justify-items: center;
+}
+.peg-hari { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.peg-hari-nama {
+  font-size: .68rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
 .slot-ringkas {
   font-size: .8rem; font-weight: 600; color: var(--accent-ink);
   background: var(--accent-soft); border-radius: 10px;
@@ -952,3 +965,87 @@ button.primary:active { transform: scale(.985); }
 .slot-item.sempit .slot-dur { color: var(--muted); }
 .slot-ket { font-size: .72rem; color: var(--muted); font-style: italic; }
 .slot-penuh { font-size: .84rem; color: var(--text-2); padding: 9px 0; }
+/* Hari tutup dibedakan dari hari penuh: yang satu keadaan tetap, yang satu lagi
+   kebetulan hari itu saja. Warnanya diredupkan, bukan dimerahkan — tutup bukan
+   masalah yang perlu diperbaiki operator. */
+.slot-tutup { font-style: italic; opacity: .8; }
+.peg-hari.tutup .peg-hari-nama { text-decoration: line-through; opacity: .65; }
+.peg-hari.tutup .stepper { border-style: dashed; }
+.peg-hari.tutup .stepper input { color: var(--muted); }
+
+/* --- Daftar reminder ------------------------------------------------------
+   Dua baris per orang: keterangan di atas, alat kerjanya di bawah. Nomor dan
+   tombol kirim sengaja tidak dipadatkan ke baris nama — kotak isian setinggi
+   jempol adalah yang paling sering disentuh di sheet ini. */
+/* Dua bagian: yang belum dihubungi, lalu yang sudah. Judulnya sengaja lebih
+   berat daripada judul hari di bawahnya — yang dipisahkannya keadaan kerja,
+   sedangkan judul hari cuma memilah tanggal di dalam satu keadaan. */
+.rem-bagian {
+  font-size: .78rem; font-weight: 700; color: var(--accent-ink);
+  letter-spacing: -.01em; margin: 20px 0 2px;
+  padding-bottom: 7px; border-bottom: 1.5px solid var(--accent-ring);
+}
+.rem-bagian:first-child { margin-top: 4px; }
+.rem-item {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+/* Yang sudah dihubungi diredupkan, bukan disembunyikan: pekerjaannya memang
+   sudah selesai, tapi ia tetap perlu terlihat supaya ketahuan siapa yang
+   ternyata tidak kunjung membalas. */
+.rem-item.sudah { opacity: .62; }
+.rem-item.sudah:hover, .rem-item.sudah:focus-within { opacity: 1; }
+/* Baris kedua, cuma ada di baris yang sudah ditandai. Bentuknya keterangan,
+   tapi ia tombol — menekannya mencabut tandanya. */
+.rem-tanda {
+  flex: 1 0 100%; order: 4; margin: -2px 0 0;
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: .72rem; font-style: italic; color: var(--muted);
+  text-align: left;
+}
+.rem-tanda::after { content: ' \00d7'; font-style: normal; font-weight: 700; }
+.rem-tanda:hover { color: var(--red-ink); }
+.rem-item:last-child { border-bottom: 0; }
+/* <button>, bukan <span>: sama seperti nama di daftar jadwal, ia pintu menuju
+   riwayat kunjungan orangnya. */
+.rem-nama {
+  border: 0; background: none; padding: 0; font: inherit; cursor: pointer;
+  font-size: .9rem; font-weight: 700; color: var(--text); letter-spacing: -.012em;
+  text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rem-nama:hover { color: var(--accent-ink); }
+/* Nomornya sekaligus tombol koreksi, tapi bentuknya sengaja tetap seperti
+   keterangan biasa — yang harus menonjol di baris ini cuma tombol kirimnya. */
+.rem-hp {
+  border: 0; background: none; padding: 0; font: inherit; cursor: pointer;
+  font-size: .74rem; color: var(--text-2); font-variant-numeric: tabular-nums;
+  white-space: nowrap; text-align: left;
+  /* Tidak ikut menyusut waktu barisnya sempit: yang mengalah namanya, karena
+     cuma nama yang masih terbaca setelah dipotong ellipsis. Nomor yang
+     terpotong separuh tidak menerangkan apa-apa. */
+  flex: none;
+}
+.rem-hp:hover { color: var(--accent-ink); text-decoration: underline; }
+/* Belum ada nomornya. Ini cuma penanda keadaan, bukan data — jadi kalau
+   barisnya sempit dialah yang mengalah lebih dulu (menyusut 5x lebih cepat
+   daripada nama), supaya nama orangnya tetap utuh selama mungkin. */
+.rem-hp.kosong {
+  color: var(--muted); font-style: italic;
+  flex: 0 5 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.rem-wa {
+  margin-left: auto; flex: none; cursor: pointer;
+  font-size: .8rem; font-weight: 700; letter-spacing: -.01em;
+  padding: 9px 15px; border: 0; border-radius: 11px;
+  color: #fff; background: var(--accent);
+}
+.rem-wa:hover { background: var(--accent-deep); }
+.rem-wa:active { transform: scale(.97); }
+/* Judul harinya memakai .day-head/.day-jml yang sama dengan daftar jadwal —
+   konsepnya memang sama, dan dua tumpukan aturan untuk satu bentuk yang sama
+   cuma menunggu salah satunya berubah sendiri. */
+#remHasil .day-head { margin-top: 16px; }
+/* Kotak nomor berdiri di atas sheet yang memanggilnya, tapi tetap di bawah
+   toast (40) supaya pesan gagal simpan tidak tertimbun olehnya. */
+.sheet-backdrop.atas { z-index: 25; }
