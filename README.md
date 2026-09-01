@@ -264,6 +264,46 @@ perkiraan durasinya, bukan sebagai satu titik jam.
 mulai sebelum jam buka tetap menyita pegawai selama sisa durasinya masih
 menyeberang ke dalam jendela.
 
+### Yang ditampilkan: jam mulai, bukan rentang
+
+Hitungannya menghasilkan rentang menganggur, tapi yang ditampilkan **jam-jam
+yang bisa dipakai mulai** — karena itu yang ditanyakan customer. "Kosongnya
+10:00 sampai 12:00" masih menyisakan satu pertanyaan lagi; "bisa jam 10:00,
+10:30, 11:00, atau 11:30" sudah bisa langsung dijawab.
+
+Rentang luang 10:00–12:00 untuk rambut (30 menit) jadi:
+
+```
+[10:00]  [10:30]  [11:00]  [11:30]
+```
+
+Aturannya:
+
+- **Kisinya setengah jam** (`KISI_SLOT` di [app.js](app.js)), dihitung dari
+  tengah malam dan bukan dari jam buka. Jam bulat dan setengahan itu jam yang
+  memang orang sebut waktu membuat janji, dan cabang yang buka 10:30 tetap
+  menawarkan 11:00 dan 11:30 — bukan kisi yang ikut bergeser jadi 11:00, 11:30
+  di satu cabang dan 10:45, 11:15 di cabang sebelah.
+- **Jam terakhir harus selesai di dalam rentangnya.** 11:30 ikut karena rambut
+  selesai pas 12:00; kalau yang dicari rambut + exo + muka (70 menit), rentang
+  yang sama cuma menawarkan 10:00 dan 10:30.
+- **Awal rentang selalu ikut walau tidak jatuh di kisi.** Celah yang mulai 10:15
+  karena jadwal sebelumnya baru selesai di situ tetap menawarkan 10:15 —
+  membulatkannya ke 10:30 membuang seperempat jam yang sebetulnya luang.
+- **Jam yang lebih dari satu pegawainya luang diberi tanda `×2`.** Jam seperti
+  itu muat dua orang sekaligus; tanpa penandanya ia terbaca sebagai satu tempat
+  saja dan yang kedua tidak pernah ditawarkan ke siapa pun. Angkanya dihitung
+  dari sisa **paling sedikit** di sepanjang treatment itu, bukan di titik
+  mulainya saja: mulai 10:30 selama sejam sementara satu pegawai sudah terisi
+  dari jam 11:00 berarti cuma satu yang benar-benar bebas.
+- Mengganti jenis treatment langsung menghitung ulang seluruh daftarnya —
+  durasinya berubah, jadi jam mulai yang muat ikut berubah.
+
+Hari yang celahnya ada tapi semuanya kurang panjang tidak berbunyi "penuh",
+melainkan menyebut celah terpanjangnya dan kurang berapa lama — harinya masih
+bisa dipakai kalau satu-dua jadwal digeser sedikit, dan itu keputusan yang cuma
+bisa diambil kalau angkanya kelihatan.
+
 ### Perkiraan durasi
 
 | Kombinasi | Menit |
@@ -378,9 +418,9 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
   rambut lagi, dan centang sisa pencarian sebelumnya diam-diam mengubah
   jawabannya tanpa ada yang menyadari.
 
-  Rentang yang terlalu pendek tetap ditampilkan tapi diredupkan, lengkap dengan
-  keterangan kurang berapa lama. Celah yang ada tetap perlu terlihat supaya
-  operator tahu jadwal mana yang tinggal digeser sedikit.
+  Hari yang celahnya ada tapi semuanya terlalu pendek tidak berbunyi "penuh":
+  yang tertulis celah terpanjangnya dan kurang berapa lama. Celah yang ada tetap
+  perlu terlihat supaya operator tahu hari mana yang tinggal digeser sedikit.
 
 Pemilih jenisnya memakai komponen yang sama (`pasangTreatSeg`) dengan form isi
 dan sheet ubah. Komponen itu diberi dua kait opsional — keterangan sendiri dan
@@ -401,32 +441,36 @@ yang sedang disaring keluar layar oleh mode riwayat satu customer.
 
 ### Salin slot ke WhatsApp
 
-Tombol **Salin untuk WA** di dalam sheet-nya. Isinya sengaja **cuma rentang
-jamnya**:
+Tombol **Salin untuk WA** di dalam sheet-nya. Isinya sengaja **cuma jam
+mulainya**, empat sebaris:
 
 ```
 *SLOT KOSONG PURI* 🕒
 
 📅 *Selasa, 1 September 2026*
-16:15 – 17:00
+16:15  ·  16:30
 
 📅 *Rabu, 2 September 2026*
-09:00 – 17:00
+10:00  ·  10:30  ·  11:00  ·  11:30
+12:00  ·  12:30  ·  13:00  ·  13:30
+14:00  ·  14:30  ·  15:00  ·  15:30
+16:00  ·  16:30
 ```
 
-Tidak ada jumlah pegawai luang, tidak ada lama rentangnya. Yang dikirim ke
-customer adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya di
-sana.
+Tidak ada jumlah pegawai luang, tidak ada tanda `×2`. Yang dikirim ke customer
+adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya di sana.
+Empat sebaris karena hari yang lowong sejak pagi menghasilkan belasan pilihan,
+dan belasan baris membuat pesannya perlu digulir jauh cuma untuk sampai ke hari
+berikutnya.
 
 Dua hal yang disaring diam-diam, dan keduanya disengaja:
 
-- **Rentang yang tidak muat** untuk jenis yang sedang dicari tidak ikut.
-  Menawarkan celah 20 menit untuk treatment 60 menit sama saja dengan tidak
-  menawarkan.
+- **Jam yang tidak muat** untuk jenis yang sedang dicari tidak ikut. Menawarkan
+  celah 20 menit untuk treatment 60 menit sama saja dengan tidak menawarkan.
 - **Hari yang penuh tidak ditulis sama sekali.** Daftar ini isinya tawaran;
   baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
 
-Kalau tidak ada satu pun rentang yang muat, tidak ada yang disalin — yang keluar
+Kalau tidak ada satu pun jam yang muat, tidak ada yang disalin — yang keluar
 pesan galat, bukan pesan berisi judul saja.
 
 Nama cabang ikut di judul hanya kalau cabangnya lebih dari satu, aturan yang
@@ -444,8 +488,9 @@ Slot yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari:
   adanya, bukan daftar kosong tanpa keterangan. Berapa hari yang dilewati
   disebut di baris ringkasan.
 - **Hari ini dipotong dari jam sekarang**, dibulatkan ke atas ke kelipatan 15
-  menit. Slot yang berbunyi "14:07" terbaca seperti salah hitung; 14:15 itu jam
-  yang memang dipakai orang waktu membuat janji. Judul harinya diberi tanda
+  menit. Jam mulai yang berbunyi "14:07" terbaca seperti salah hitung; 14:15 itu
+  jam yang memang dipakai orang waktu membuat janji. Sesudah itu kisi setengah
+  jamnya jalan seperti biasa — 14:15, lalu 14:30, 15:00, dan seterusnya. Judul harinya diberi tanda
   "sisa hari ini" supaya jelas angkanya bukan hitungan sehari penuh.
 - Kalau jam kerja hari ini memang sudah habis, yang tertulis "Jam kerja hari ini
   sudah lewat" — bukan "Penuh". Dua sebab yang berbeda: penuh berarti masih bisa

@@ -968,19 +968,23 @@ button.primary:active { transform: scale(.985); }
 .slot-peg-hari.ubah .stepper { border-color: var(--accent); }
 .slot-peg-hari.ubah .stepper input { color: var(--accent-ink); }
 .slot-peg-hari.ubah { color: var(--accent-ink); }
-.slot-item {
-  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;
-  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .86rem;
+/* Jam mulai yang ditawarkan, satu kotak satu jam. Grid auto-fill, bukan flex
+   wrap: kolomnya sama lebar sehingga angkanya ikut berbaris rapi ke bawah juga.
+   Daftar jam yang tidak sejajar terbaca seperti tumpukan acak, dan mata yang
+   sedang mencari "ada yang jam sebelas tidak" jadi harus membaca satu-satu. */
+.slot-jam-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 6px; padding: 4px 0 2px;
 }
-.slot-item:last-child { border-bottom: 0; }
-.slot-jam { font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.slot-dur { color: var(--accent-ink); font-weight: 600; }
-.slot-peg { margin-left: auto; font-size: .78rem; color: var(--text-2); }
-/* Rentang yang ada tapi terlalu pendek tetap ditampilkan — operator perlu tahu
-   celahnya ada, sekaligus tahu kurang berapa lama supaya bisa menggeser jadwal. */
-.slot-item.sempit { opacity: .55; }
-.slot-item.sempit .slot-dur { color: var(--muted); }
-.slot-ket { font-size: .72rem; color: var(--muted); font-style: italic; }
+.slot-chip {
+  display: flex; align-items: baseline; justify-content: center; gap: 3px;
+  padding: 9px 4px; border: 1px solid var(--border-kuat); border-radius: 10px;
+  background: var(--card); color: var(--text); font-size: .86rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+/* Jam yang pegawainya luang lebih dari satu muat lebih dari satu orang. Angkanya
+   dibuat kecil dan tidak setebal jamnya: yang dicari duluan tetap jamnya. */
+.slot-chip-peg { font-size: .68rem; font-weight: 600; color: var(--accent-ink); }
 .slot-penuh { font-size: .84rem; color: var(--text-2); padding: 9px 0; }
 /* Hari tutup dibedakan dari hari penuh: yang satu keadaan tetap, yang satu lagi
    kebetulan hari itu saja. Warnanya diredupkan, bukan dimerahkan — tutup bukan

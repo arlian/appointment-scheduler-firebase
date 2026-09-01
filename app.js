@@ -385,6 +385,12 @@ const PEGAWAI_BAWAAN = 2;
 // Batas hari yang dihitung sekali jalan. Filter "Semua" bisa menjangkau ratusan
 // hari, dan daftar sepanjang itu tidak ada yang membacanya.
 const MAKS_HARI_SLOT = 31;
+// Kisi jam mulai yang ditawarkan. Yang ditanyakan customer bukan "rentangnya
+// dari jam berapa sampai jam berapa", melainkan "bisanya jam berapa saja" — dan
+// jawaban itu selalu jam bulat atau setengahan, bukan 10:07. Kisinya dihitung
+// dari tengah malam, bukan dari jam buka: cabang yang buka 10:30 tetap
+// menawarkan 10:30, 11:00, 11:30 — bukan 10:30, 11:00 yang bergeser sendiri.
+const KISI_SLOT = 30;
 
 const keMenit = (jam) => (+jam.slice(0, 2)) * 60 + (+jam.slice(3, 5));
 // Jam sekarang, dibulatkan ke atas ke kelipatan 15 menit. Slot yang dimulai
@@ -1501,16 +1507,48 @@ function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
     // Ruas bersebelahan yang sama-sama masih punya sisa disambung jadi satu
     // rentang: dua potong 30 menit yang berdempetan itu satu jam yang bisa
     // dipakai, bukan dua slot terpisah yang masing-masing cuma muat rambut.
+    //
+    // Ruas aslinya tetap disimpan di seg[]. Sesudah disambung, sisa pegawai di
+    // tiap bagian rentang tidak bisa dibaca lagi dari min/max, padahal jam mulai
+    // yang ditawarkan perlu tahu sisanya persis di sepanjang treatment itu saja.
     const akhir = hasil[hasil.length - 1];
     if (akhir && akhir.b === a) {
       akhir.b = b;
       akhir.min = Math.min(akhir.min, sisa);
       akhir.max = Math.max(akhir.max, sisa);
+      akhir.seg.push({ a, b, sisa });
     } else {
-      hasil.push({ a, b, min: sisa, max: sisa });
+      hasil.push({ a, b, min: sisa, max: sisa, seg: [{ a, b, sisa }] });
     }
   }
   return hasil;
+}
+
+// Jam mulai yang bisa ditawarkan di dalam satu rentang luang, untuk treatment
+// selama `durasi`. Bukan tiap titik di rentang itu, melainkan kisi setengah jam:
+// rentang 10:00–12:00 untuk rambut menghasilkan 10:00, 10:30, 11:00, 11:30 —
+// yang terakhir masih selesai pas jam 12:00.
+//
+// Awal rentangnya sendiri selalu ikut walau tidak jatuh di kisi. Rentang yang
+// mulai 10:15 karena jadwal sebelumnya baru selesai di situ tetap menawarkan
+// 10:15; membulatkannya ke 10:30 membuang seperempat jam yang sebetulnya luang.
+//
+// Hasilnya [{m, peg}] — m menit mulai, peg jumlah pegawai yang luang di
+// sepanjang treatment kalau dimulai jam itu. Yang dipakai sisa paling sedikit,
+// karena rentang panjang bisa berubah sisanya di tengah.
+function jamMulaiSlot(sl, durasi) {
+  const out = [];
+  const paling = sl.b - durasi;
+  if (paling < sl.a) return out;
+  const luang = (m) => Math.min(...sl.seg
+    .filter((x) => x.a < m + durasi && x.b > m)
+    .map((x) => x.sisa));
+  out.push({ m: sl.a, peg: luang(sl.a) });
+  // +1 supaya awal rentang yang kebetulan sudah jatuh di kisi tidak keluar dua kali.
+  for (let m = Math.ceil((sl.a + 1) / KISI_SLOT) * KISI_SLOT; m <= paling; m += KISI_SLOT) {
+    out.push({ m, peg: luang(m) });
+  }
+  return out;
 }
 
 // Tanggal mana saja yang sedang dicakup filter — bukan tanggal yang kebetulan
@@ -1911,6 +1949,17 @@ const slotHari = (tgl, hariIni) => slotKosong(
   jamUntuk(tgl),
 );
 
+// Semua jam mulai di satu hari, dari seluruh rentang luangnya, sudah menurut
+// jenis yang sedang dicari. Ini yang dihitung di mana-mana sekarang — daftar di
+// layar, baris ringkasan, dan salinan WhatsApp — supaya ketiganya tidak mungkin
+// menyebut angka yang berbeda.
+//
+// Namanya bukan jamHari(): itu sudah dipakai jam buka/tutup tiap hari dalam
+// seminggu, dan keduanya memang beda — yang itu jendela harinya, yang ini
+// jam-jam yang bisa dipakai mulai di dalam jendela itu.
+const jamMulaiHari = (tgl, hariIni) =>
+  slotHari(tgl, hariIni).flatMap((sl) => jamMulaiSlot(sl, durasiCari()));
+
 // Satu blok hari, lengkap dengan kotak jumlah pegawainya sendiri.
 //
 // Dibangun sebagai satu elemen yang berdiri sendiri supaya mengubah angka
@@ -1968,50 +2017,58 @@ function bangunHariSlot(tgl, hariIni) {
   judul.appendChild(kotak);
   h.appendChild(judul);
 
-  if (!slot.length) {
+  // `jam` di atas sudah dipakai jam kerja hari itu, jadi daftar jam mulainya
+  // pakai nama sendiri — dua hal yang beda: yang satu jendela harinya, yang satu
+  // jam-jam yang bisa dipakai mulai di dalam jendela itu.
+  const jamMulai = slot.flatMap((sl) => jamMulaiSlot(sl, durasiCari()));
+
+  if (!jamMulai.length) {
     const p = document.createElement('div');
     p.className = 'slot-penuh' + (hariTutup(tgl) ? ' slot-tutup' : '');
-    // Tiga sebab yang berbeda, dan operator perlu tahu bedanya: tutup berarti
-    // memang tidak ada yang masuk, penuh berarti masih bisa digeser besok, jam
-    // kerja habis berarti hari ini saja yang sudah lewat.
+    // Lima sebab yang berbeda, dan operator perlu tahu bedanya: tutup berarti
+    // memang tidak ada yang masuk, jam terbalik berarti setelannya yang salah,
+    // jam kerja habis berarti hari ini saja yang sudah lewat, penuh berarti
+    // masih bisa digeser ke besok, dan celah yang kurang panjang berarti harinya
+    // masih bisa dipakai kalau satu-dua jadwal digeser sedikit.
+    const terpanjang = slot.reduce((m, sl) => Math.max(m, sl.b - sl.a), 0);
     p.textContent = hariTutup(tgl)
       ? 'Tutup — tidak ada pegawai yang masuk hari ini.'
-      // Sebab keempat, dan yang ini salah setelan, bukan keadaan hari itu:
-      // tanpa disebut, jam yang terbalik cuma terbaca sebagai "penuh" dan tidak
-      // ada yang tahu kenapa harinya tidak pernah punya slot.
+      // Yang ini salah setelan, bukan keadaan hari itu: tanpa disebut, jam yang
+      // terbalik cuma terbaca sebagai "penuh" dan tidak ada yang tahu kenapa
+      // harinya tidak pernah punya slot.
       : jamTerbalik(jam)
         ? 'Jam kerjanya belum benar — jam tutup harus lewat dari jam buka.'
         : (tgl === hariIni && menitSekarang() >= keMenit(jam.tutup))
           ? 'Jam kerja hari ini sudah lewat.'
-          : 'Penuh — tidak ada pegawai yang luang.';
+          : !slot.length
+            ? 'Penuh — tidak ada pegawai yang luang.'
+            : 'Celah terpanjang cuma ' + labelDurasi(terpanjang) + ' — kurang '
+              + labelDurasi(durasiCari() - terpanjang) + ' untuk ' + namaCari() + '.';
     h.appendChild(p);
     return h;
   }
-  slot.forEach((sl) => {
-    const lama = sl.b - sl.a;
-    const muat = lama >= durasiCari();
-    const el = document.createElement('div');
-    el.className = 'slot-item' + (muat ? '' : ' sempit');
-    const jam = document.createElement('span');
-    jam.className = 'slot-jam';
-    jam.textContent = keJam(sl.a) + ' – ' + keJam(sl.b);
-    const dur = document.createElement('span');
-    dur.className = 'slot-dur';
-    dur.textContent = labelDurasi(lama);
-    const peg = document.createElement('span');
-    peg.className = 'slot-peg';
-    // Rentang yang sisanya berubah di tengah ditulis sebagai kisaran, supaya
-    // tidak terbaca seolah dua pegawai luang sepanjang jam itu.
-    peg.textContent = (sl.min === sl.max ? sl.min : sl.min + '–' + sl.max) + ' pegawai luang';
-    el.append(jam, dur, peg);
-    if (!muat) {
-      const ket = document.createElement('span');
-      ket.className = 'slot-ket';
-      ket.textContent = 'kurang ' + labelDurasi(durasiCari() - lama);
-      el.appendChild(ket);
+
+  const daftar = document.createElement('div');
+  daftar.className = 'slot-jam-list';
+  jamMulai.forEach((j) => {
+    const el = document.createElement('span');
+    el.className = 'slot-chip';
+    const t = document.createElement('span');
+    t.textContent = keJam(j.m);
+    el.appendChild(t);
+    // Jam yang dua pegawainya sama-sama luang muat dua orang sekaligus. Tanpa
+    // penanda ini jam seperti itu terbaca sebagai satu tempat saja, dan yang
+    // kedua tidak pernah ditawarkan ke siapa pun.
+    if (j.peg > 1) {
+      const p = document.createElement('span');
+      p.className = 'slot-chip-peg';
+      p.textContent = '×' + j.peg;
+      el.appendChild(p);
+      el.title = j.peg + ' pegawai luang kalau mulai jam ' + keJam(j.m);
     }
-    h.appendChild(el);
+    daftar.appendChild(el);
   });
+  h.appendChild(daftar);
   return h;
 }
 
@@ -2044,8 +2101,7 @@ function gantiHariSlot(tgl, dariTombol) {
 // daftarnya dibangun — supaya penggantian satu hari pun tetap memperbaruinya.
 function ringkasSlot() {
   const hariIni = today();
-  const muat = tanggalSlot.reduce(
-    (n, tgl) => n + slotHari(tgl, hariIni).filter((sl) => sl.b - sl.a >= durasiCari()).length, 0);
+  const muat = tanggalSlot.reduce((n, tgl) => n + jamMulaiHari(tgl, hariIni).length, 0);
   const sebut = namaCari() + ' (' + labelDurasi(durasiCari()) + ')';
   // Hari tutup dan hari lewat sama-sama tidak menyumbang slot, tapi sebabnya
   // beda — tanpa disebut, "tidak ada slot" di cabang yang tutup dua hari
@@ -2057,8 +2113,8 @@ function ringkasSlot() {
   const ekor = ' di ' + tanggalSlot.length + ' hari yang diperiksa'
     + (catatan.length ? ' — ' + catatan.join(', ') : '') + '.';
   $('slotRingkas').textContent = muat
-    ? muat + ' slot muat untuk ' + sebut + ekor
-    : 'Tidak ada slot yang muat untuk ' + sebut + ekor;
+    ? muat + ' pilihan jam untuk ' + sebut + ekor
+    : 'Tidak ada jam yang muat untuk ' + sebut + ekor;
 }
 
 function renderSlot() {
@@ -2095,13 +2151,18 @@ function buildSlotWaText() {
   const lines = ['*SLOT KOSONG' + judulCabang + '* 🕒'];
   let ada = 0;
   tanggal.forEach((tgl) => {
-    const slot = slotHari(tgl, hariIni).filter((s) => s.b - s.a >= durasiCari());
+    const jam = jamMulaiHari(tgl, hariIni);
     // Hari yang penuh tidak ditulis sama sekali. Daftar ini isinya tawaran;
     // baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
-    if (!slot.length) return;
-    ada += slot.length;
+    if (!jam.length) return;
+    ada += jam.length;
     lines.push('', '📅 *' + hariBulan(tgl) + '*');
-    slot.forEach((s) => lines.push(keJam(s.a) + ' – ' + keJam(s.b)));
+    // Empat jam sebaris: hari yang lowong sejak pagi bisa menghasilkan enam
+    // belas pilihan, dan enam belas baris membuat pesannya perlu digulir jauh
+    // cuma untuk sampai ke hari berikutnya.
+    for (let i = 0; i < jam.length; i += 4) {
+      lines.push(jam.slice(i, i + 4).map((j) => keJam(j.m)).join('  ·  '));
+    }
   });
   return ada ? lines.join('\n') : null;
 }
@@ -2140,7 +2201,7 @@ $('slotBtn').addEventListener('click', bukaSlot);
 $('slotWaBtn').addEventListener('click', async () => {
   const text = buildSlotWaText();
   if (!text) {
-    toast('Tidak ada slot yang muat untuk ' + namaCari() + ' — tidak ada yang bisa disalin.', true);
+    toast('Tidak ada jam yang muat untuk ' + namaCari() + ' — tidak ada yang bisa disalin.', true);
     return;
   }
   await salinTeks(text);
@@ -2291,14 +2352,20 @@ function salamWaktu(sekarang) {
 // meleset daripada kena.
 const REM_SLOT_HARI = 7;
 
-// Seluruh hari dalam jendela pencarian ikut ditulis — tidak ada batas jumlah
-// hari yang terpisah dari REM_SLOT_HARI. Yang tetap dibatasi cuma rentang jam
-// tiap harinya: hari yang jadwalnya terpecah bisa menghasilkan lima-enam baris
-// sendiri, dan itu yang membuat pesannya berubah jadi dinding jam. Tiga baris
-// per hari sudah cukup memberi pilihan. Yang terpotong tidak hilang: kalimat
-// penutupnya mengajak menyebut jam sendiri, dan operator masih memegang daftar
-// lengkapnya di sheet Slot Kosong.
-const REM_TAWAR_JAM = 3;
+// Seluruh jam yang muat ikut ditulis — tidak ada lagi batas berapa jam yang
+// boleh disebut per hari. Orang yang cuma bisa jam tertentu perlu melihat jam
+// itu ada di daftarnya; tawaran yang dipangkas membuat dia menjawab "tidak ada
+// yang cocok" padahal jamnya kosong.
+//
+// Yang menjaga panjangnya tinggal BATAS_URL di bawah, dan ia memotong per hari
+// dari yang terjauh — bukan memotong jam di hari yang sudah terlanjur ditulis.
+//
+// Supaya belasan jam tidak jadi belasan baris, jamnya dikelompokkan empat
+// sebaris. Pemisahnya koma biasa, bukan titik tengah seperti salinan slot
+// kosong: yang ini berangkat lewat URL wa.me, dan satu '·' beserta spasi
+// pengapitnya jadi 18 karakter URL — tujuh hari penuh sudah cukup untuk
+// melewati batasnya sendirian.
+const REM_JAM_SEBARIS = 4;
 
 // Emoji di judul hari. Satu sakelar, karena nasibnya beda per perangkat:
 // dikirim dari HP emojinya utuh, dikirim dari PC ia bisa jatuh jadi tanda tanya
@@ -2308,8 +2375,8 @@ const REM_TAWAR_JAM = 3;
 //
 // Cuma judul hari yang dapat emoji, dan itu bukan soal selera: satu emoji jadi
 // 12 karakter URL, sedangkan judul hari cuma tujuh buah per pesan sementara
-// baris jam bisa dua puluh satu. Penanda yang paling sering muncul yang paling
-// mahal, jadi baris jam tetap tanda hubung biasa — 84 karakter, bukan 336.
+// baris jam bisa dua puluh delapan. Penanda yang paling sering muncul yang
+// paling mahal, jadi baris jam tetap tanda hubung biasa.
 const REM_EMOJI = true;
 const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
 const TANDA_JAM = '- ';
@@ -2324,10 +2391,10 @@ const TANDA_JAM = '- ';
 // tidak punya field treatments jatuh ke durasi bawaan lewat durasiJadwal(),
 // persis seperti perlakuan di seluruh aplikasi.
 //
-// Hasilnya satu blok teks per hari, bukan satu baris berisi deret jam yang
-// dipisah koma: rentang jam yang menyambung jadi satu paragraf panjang justru
-// paling susah dibaca di layar HP, dan itu tepat yang terjadi di hari yang
-// jadwalnya terpecah-pecah.
+// Hasilnya satu blok teks per hari — judul harinya, lalu jam-jamnya empat
+// sebaris. Bukan satu baris panjang berisi seluruh jam hari itu: deret yang
+// menyambung sampai membungkus tiga kali justru paling susah dibaca di layar HP,
+// dan mata yang mencari satu jam tertentu kehilangan tempatnya.
 function slotTawaran(k) {
   const hariIni = today();
   const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
@@ -2335,15 +2402,17 @@ function slotTawaran(k) {
   const blok = [];
   for (let i = 1; i <= REM_SLOT_HARI; i++) {
     const tgl = hariGeser(i);
-    const muat = slotHari(tgl, hariIni).filter((s) => s.b - s.a >= durasi);
+    const jam = slotHari(tgl, hariIni).flatMap((sl) => jamMulaiSlot(sl, durasi));
     // Hari yang penuh tidak ditulis sama sekali — sama seperti salinan slot
     // kosong. Baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
-    if (!muat.length) continue;
+    if (!jam.length) continue;
     // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
-    // ditebalkan, jamnya turun satu per satu di bawahnya.
-    blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(
-      muat.slice(0, REM_TAWAR_JAM)
-        .map((s) => TANDA_JAM + keJam(s.a) + '-' + keJam(s.b))).join('\n'));
+    // ditebalkan, jamnya turun di bawahnya.
+    const baris = [];
+    for (let i = 0; i < jam.length; i += REM_JAM_SEBARIS) {
+      baris.push(TANDA_JAM + jam.slice(i, i + REM_JAM_SEBARIS).map((j) => keJam(j.m)).join(', '));
+    }
+    blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(baris).join('\n'));
   }
   return blok;
 }
@@ -2354,10 +2423,12 @@ function slotTawaran(k) {
 // terpotong diam-diam, dan pesan yang terpenggal di tengah baris jam tetap
 // terkirim tanpa ada yang menyadarinya.
 //
-// Dengan setelan sekarang — tujuh hari, tiga rentang jam tiap hari — pesan
-// terpanjang berhenti di sekitar 1.450, jadi penjaga ini memang menganggur. Ia
-// baru bekerja kalau REM_TAWAR_JAM atau REM_SLOT_HARI dinaikkan, jam kerjanya
-// diperpanjang, atau nama kliniknya panjang sekali.
+// Sejak seluruh jam ikut ditulis, penjaga ini tidak lagi menganggur. Dengan jam
+// kerja bawaan 10:00–17:00 — empat belas jam mulai tiap hari — seminggu penuh
+// berhenti di sekitar 1.870 dan ketujuh harinya terkirim. Cabang yang buka
+// sampai jam 21:00 punya dua puluh dua jam mulai per hari, dan di situ hari
+// keenam dan ketujuh mulai dipotong. Itu memang urutan yang dikehendaki: besok dan
+// lusa yang paling mungkin dipilih orang.
 const BATAS_URL = 2048;
 
 // Panjang URL seandainya pesannya jadi dikirim. Nomor tujuannya belum tentu
@@ -2398,7 +2469,7 @@ function buildReminderText(k) {
   // baris kosong, bukan cuma ganti baris: tanpa jeda itu judul hari berikutnya
   // menempel di jam terakhir hari sebelumnya.
   const susun = (blok) => kepala + (blok.length
-    ? ajakan + ' Berikut jadwal yang masih tersedia:\n\n' + blok.join('\n\n')
+    ? ajakan + ' Berikut jam yang masih tersedia:\n\n' + blok.join('\n\n')
     : ajakan);
   let teks = susun(tawaran);
   // Hari terjauh dibuang lebih dulu, satu per satu sampai muat: besok dan lusa
