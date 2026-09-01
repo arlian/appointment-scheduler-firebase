@@ -934,7 +934,10 @@ button.primary:active { transform: scale(.985); }
   padding: 9px 11px; margin: 14px 0 4px;
 }
 .slot-head {
-  display: flex; align-items: center; gap: 8px;
+  /* Boleh membungkus: kalau minggunya tidak seragam, judulnya bisa memuat
+     tanggal + jam kerja + "sisa hari ini" + kotak pegawai sekaligus, dan di
+     layar sempit keempatnya tidak muat sebaris. */
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
   letter-spacing: .07em; margin: 16px 0 6px;
 }
@@ -986,6 +989,56 @@ button.primary:active { transform: scale(.985); }
 .peg-hari.tutup .peg-hari-nama { text-decoration: line-through; opacity: .65; }
 .peg-hari.tutup .stepper { border-style: dashed; }
 .peg-hari.tutup .stepper input { color: var(--muted); }
+/* Dua kotak setelan berturut-turut — pegawai lalu jam kerja — perlu dipisah,
+   kalau tidak judul yang kedua menempel ke keterangan yang pertama dan keduanya
+   terbaca seperti satu blok. */
+.slot-atur + .slot-atur { margin-top: 16px; }
+/* Tujuh baris jam buka/tutup, satu kolom. Lebar minimumnya dihitung dari isi
+   kotaknya yang paling panjang, bukan dari yang biasa terlihat: perangkat yang
+   bahasanya Inggris menampilkan "05:00 PM", bukan "17:00", dan kotak yang cuma
+   cukup untuk yang kedua memotong AM/PM-nya — 17:00 jadi terbaca "05:00".
+   Dua kolom sudah tidak muat di lebar sheet ini kalau ruangnya dihitung segitu,
+   jadi dibiarkan satu kolom sampai ada layar yang benar-benar cukup. */
+.slot-jam-minggu {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 8px 16px;
+}
+.jam-hari { display: flex; align-items: center; gap: 7px; }
+/* Lebarnya dikunci supaya ketujuh baris rata kirinya, walau "Sen" dan "Kam"
+   tidak pernah selebar satu sama lain. */
+.jam-hari-nama {
+  flex: none; width: 30px;
+  font-size: .68rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+/* Ukuran hurufnya tetap 16px seperti kotak isian lain: apa pun yang lebih kecil
+   membuat Safari iOS memperbesar seluruh halaman begitu kotaknya disentuh, dan
+   sheet-nya tidak pernah kembali ke ukuran semula sesudah itu. */
+.jam-hari input[type="time"] {
+  /* Melar mengikuti barisnya, tapi ada batas atasnya: kotak jam selebar
+     setengah sheet terlihat seperti kolom isian, bukan jam. */
+  flex: 1 1 auto; width: auto; min-width: 118px; max-width: 168px; padding: 8px 9px;
+  border: 1px solid var(--border); border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.jam-hari-pisah { flex: none; color: var(--muted); font-size: .8rem; }
+/* Hari tanpa pegawai: jamnya masih tersimpan dan masih bisa diubah, tapi hari
+   itu memang tutup — jadi diredupkan, bukan dimatikan. Mematikannya akan
+   memaksa operator menaikkan pegawainya dulu cuma untuk membetulkan jam. */
+.jam-hari.tutup .jam-hari-nama { text-decoration: line-through; opacity: .65; }
+.jam-hari.tutup input[type="time"] { color: var(--muted); border-style: dashed; }
+/* Jam tutup yang tidak lewat dari jam buka menghasilkan nol slot sepanjang
+   hari. Itu keadaan yang harus terlihat di kotaknya sendiri, bukan cuma di
+   kalimat yang muncul jauh di bawah daftar. */
+.jam-hari.salah input[type="time"] { border-color: var(--red-border); color: var(--red-ink); }
+.jam-hari.salah .jam-hari-nama { color: var(--red-ink); }
+/* Jam kerja hari itu di judul tanggalnya, cuma muncul kalau minggunya tidak
+   seragam. Duduk persis sesudah tanggalnya — yang di kanan sudah dipakai
+   "sisa hari ini" dan kotak pegawai. */
+.slot-jam-hari {
+  letter-spacing: 0; text-transform: none; font-weight: 600;
+  color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 
 /* --- Daftar reminder ------------------------------------------------------
    Dua baris per orang: keterangan di atas, alat kerjanya di bawah. Nomor dan

@@ -258,10 +258,11 @@ jamnya penuh.
 Karena itu tiap jadwal dihitung sebagai rentang `[mulai, selesai)` menurut
 perkiraan durasinya, bukan sebagai satu titik jam.
 
-**Jam kerja 09:00–17:00.** Slot dihitung muat kalau seluruhnya masih di dalam
-jam itu — treatment yang baru selesai lewat jam tutup tidak dianggap muat.
-Jadwal yang mulai sebelum jam buka tetap menyita pegawai selama sisa
-durasinya masih menyeberang ke dalam jendela.
+**Jam kerjanya disetel sendiri untuk tiap hari dalam seminggu**, bawaannya
+10:00–17:00. Slot dihitung muat kalau seluruhnya masih di dalam jam **hari itu**
+— treatment yang baru selesai lewat jam tutup tidak dianggap muat. Jadwal yang
+mulai sebelum jam buka tetap menyita pegawai selama sisa durasinya masih
+menyeberang ke dalam jendela.
 
 ### Perkiraan durasi
 
@@ -323,6 +324,47 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
   menenggelamkan tanggalnya sendiri. Yang mengecil cuma yang terlihat —
   sasaran sentuhnya dilebarkan kembali ke atas dan ke bawah lewat `::after`,
   area tak terlihat yang tidak ikut memakan ruang.
+- **Jam kerja tiap hari** — tujuh baris, satu untuk tiap hari: nama hari, jam
+  buka, jam tutup. Bawaannya **10:00–17:00** untuk ketujuhnya, dan seperti
+  jumlah pegawai, jamnya **tersimpan sendiri-sendiri tiap cabang** di
+  `users/{uid}/cabang/{id}/data/jam`. Alasan yang sama pula: cabang yang satu
+  tutup jam 17:00 sementara yang sebelah masih buka sampai malam, dan Sabtu
+  hampir tidak pernah sama dengan hari kerja.
+
+  Kotaknya `<input type="time">` bawaan perangkat, bukan tombol − / + seperti
+  pegawai: yang diubah di sini jam dan menit sekaligus, dan pemilih jam bawaan
+  sudah jauh lebih cepat untuk itu daripada dua puluh ketukan tombol +. Ukuran
+  hurufnya tetap 16px seperti kotak isian lain — apa pun yang lebih kecil
+  membuat Safari iOS memperbesar seluruh halaman begitu kotaknya disentuh, dan
+  sheet-nya tidak pernah kembali ke ukuran semula sesudah itu.
+
+  **Tidak ada penyimpangan per tanggal** seperti kotak pegawai. Hari yang
+  jamnya benar-benar lain biasanya hari libur, dan itu sudah terwakili dengan
+  menaruh nol pegawai di hari itu.
+
+  Hari yang jumlah pegawainya nol diredupkan di daftar jam — jamnya masih
+  tersimpan dan masih bisa diubah, tapi hari itu memang tutup. Sengaja tidak
+  dimatikan: mematikannya akan memaksa operator menaikkan pegawainya dulu cuma
+  untuk membetulkan jam.
+
+  **Jam tutup yang tidak lewat dari jam buka** tetap disimpan apa adanya, bukan
+  diam-diam ditolak — yang salah ketik perlu melihat angkanya masih di situ
+  supaya tahu apa yang harus dibetulkan. Yang menanganinya tampilan: kotaknya
+  diberi tanda merah, dan hari itu berbunyi "Jam kerjanya belum benar — jam
+  tutup harus lewat dari jam buka", bukan "Penuh". Tanpa itu, jam yang terbalik
+  cuma terbaca sebagai hari yang tidak pernah punya slot tanpa sebab yang
+  terlihat.
+
+  Kalau ketujuh harinya memakai jam yang sama — keadaan yang paling sering —
+  jamnya disebut sekali di kalimat di bawah judul sheet. Kalau beda-beda,
+  kalimat itu cuma menyebut aturannya, dan jam hari itu ikut ditulis di judul
+  tiap tanggal: tanpa itu, daftar yang berhenti jam 14:00 di satu hari dan jam
+  20:00 di hari lain terbaca seperti salah hitung.
+
+  Penyimpanannya ditunda 800 ms seperti kotak pegawai — kotak jam berubah tiap
+  komponen yang disentuh, jamnya dulu lalu menitnya — dan cabangnya dikunci
+  sejak penundaan dimulai, supaya tulisan yang tertunda tidak mendarat di cabang
+  yang keburu dipindahi.
 - **Cari jadwal untuk jenis** — tombol centang Rambut / Exo / Muka, **sama
   persis dengan pemilih di form isi jadwal**. Sengaja bukan dropdown berisi
   tujuh kombinasi jadi: yang dipikirkan operator "rambut sama muka", bukan
@@ -407,7 +449,8 @@ Slot yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari:
   "sisa hari ini" supaya jelas angkanya bukan hitungan sehari penuh.
 - Kalau jam kerja hari ini memang sudah habis, yang tertulis "Jam kerja hari ini
   sudah lewat" — bukan "Penuh". Dua sebab yang berbeda: penuh berarti masih bisa
-  digeser ke besok, jam kerja habis berarti hari itu memang sudah tutup.
+  digeser ke besok, jam kerja habis berarti hari itu memang sudah tutup. Yang
+  dibandingkan jam tutup **hari itu**, bukan satu jam tutup untuk semua hari.
 
 ## Jadwal disimpan per bulan
 
@@ -417,6 +460,8 @@ Susunan di Firestore:
 users/{uid}/data/branches                      -> { rows: [{id, name}, ...] }
 users/{uid}/cabang/{id}/data/customers         -> { rows: [...] }
 users/{uid}/cabang/{id}/data/staff             -> { rows: [...] }
+users/{uid}/cabang/{id}/data/pegawai           -> { rows: [{hari, n}, ...] }
+users/{uid}/cabang/{id}/data/jam               -> { rows: [{hari, buka, tutup}, ...] }
 users/{uid}/cabang/{id}/appointments/{YYYY-MM} -> { rows: [...] }   <- satu dokumen per bulan
 users/{uid}/cabang/{id}/photos/{fotoId}
 ```

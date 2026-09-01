@@ -43,6 +43,12 @@ const KEY_STAFF = 'staff';               // ['Nama Pegawai', ...]
 // hari, cuma hidup di memori satu tab, ikut terbawa waktu pindah cabang, lalu
 // hilang begitu halaman dimuat ulang.
 const KEY_PEGAWAI = 'pegawai';           // [{hari, n}] — hari 0..6, Minggu = 0
+// Jam buka dan tutup, juga satu baris untuk tiap hari dalam seminggu. Alasannya
+// sama dengan pegawai: cabang yang satu tutup jam 17:00 dan yang sebelah masih
+// buka sampai malam, dan Sabtu hampir tidak pernah sama dengan hari kerja.
+// Sebelum ini jamnya satu pasang tetap di dalam kode — tidak ada yang bisa
+// mengubahnya tanpa mengubah app.js.
+const KEY_JAM = 'jam';                   // [{hari, buka, tutup}] — 'HH:MM'
 
 const configTerisi =
   window.FIREBASE_CONFIG && !String(window.FIREBASE_CONFIG.apiKey).startsWith('ISI_');
@@ -86,7 +92,7 @@ let tersambung = false;
 // kosong karena memang dikosongkan operator dengan kosong karena belum dimuat.
 // Ketiganya tetap punya penanda kesiapan sendiri, walau jadwal sekarang datang
 // dari koleksi bulanan dan bukan lagi dari satu dokumen seperti dua yang lain.
-const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI];
+const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI, KEY_JAM];
 let dataSiap = {};
 const resetDataSiap = () => { dataSiap = {}; };
 const semuaDataSiap = () => !!cabangId && KEYS_DATA.every((k) => dataSiap[k]);
@@ -370,8 +376,11 @@ const durasiJadwal = (a) => {
 
 // Jendela jam kerja yang dicari slotnya. Slot harus muat seluruhnya di dalam
 // jendela ini — treatment yang baru selesai lewat jam tutup tidak dihitung muat.
-const JAM_BUKA = '09:00';
-const JAM_TUTUP = '17:00';
+// Ini cuma bawaannya: jam yang benar-benar dipakai datang dari setelan cabang,
+// satu pasang untuk tiap hari dalam seminggu (lihat jamHari di bawah).
+const JAM_BUKA_BAWAAN = '10:00';
+const JAM_TUTUP_BAWAAN = '17:00';
+const JAM_BAWAAN = { buka: JAM_BUKA_BAWAAN, tutup: JAM_TUTUP_BAWAAN };
 const PEGAWAI_BAWAAN = 2;
 // Batas hari yang dihitung sekali jalan. Filter "Semua" bisa menjangkau ratusan
 // hari, dan daftar sepanjang itu tidak ada yang membacanya.
@@ -1461,11 +1470,11 @@ $('waBtn').addEventListener('click', async () => {
 // Rentang menganggur di satu hari, sudah dipotong jam buka/tutup.
 // Hasilnya [{a, b, min, max}] — a/b dalam menit sejak tengah malam, min/max
 // jumlah pegawai yang luang di sepanjang rentang itu.
-function slotKosong(rowsHari, pegawai, palingAwal = 0) {
+function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
   // `palingAwal` memotong jendela dari depan — dipakai untuk hari ini, supaya
   // jam yang sudah lewat tidak ditawarkan sebagai slot yang masih bisa diisi.
-  const buka = Math.max(keMenit(JAM_BUKA), palingAwal);
-  const tutup = keMenit(JAM_TUTUP);
+  const buka = Math.max(keMenit(jam.buka), palingAwal);
+  const tutup = keMenit(jam.tutup);
   if (buka >= tutup) return [];
   // Jadwal yang seluruhnya di luar jam kerja tidak ikut menyita pegawai di
   // dalam jendela — tapi yang mulai sebelum buka dan baru selesai sesudahnya
@@ -1645,6 +1654,9 @@ function terapkanPegawai(rows) {
   // dari angka yang sama waktu dibuka nanti.
   if (!$('slotSheet').hidden) {
     renderPegawaiHari();
+    // Baris jamnya tidak dibangun ulang — cuma penandanya yang digeser, supaya
+    // pemilih jam yang mungkin sedang terbuka di sini tidak ikut tertutup.
+    HARI_URUT.forEach(segarkanTandaJam);
     renderSlot();
   }
 }
@@ -1687,6 +1699,160 @@ function lupakanPegawai() {
   pegawaiPerTgl.clear();
 }
 
+// ── Jam kerja tiap hari ──────────────────────────────────────────────────
+// Sepasang jam buka/tutup untuk tiap hari dalam seminggu, bersebelahan dengan
+// jumlah pegawai dan disimpan dengan cara yang sama persis: satu dokumen per
+// cabang, ketujuh harinya ditulis lengkap. Tidak ada penyimpangan per tanggal
+// seperti pegawaiPerTgl — hari yang jamnya benar-benar lain biasanya hari libur,
+// dan itu sudah terwakili dengan menaruh nol pegawai di hari itu.
+const jamAwal = () => HARI_SINGKAT.map(() => ({ ...JAM_BAWAAN }));
+let jamHari = jamAwal();
+const jamUntuk = (tgl) => jamHari[new Date(tgl + 'T00:00:00').getDay()];
+// Jam yang terbalik — tutup lebih awal daripada buka — tetap disimpan apa
+// adanya, bukan diam-diam ditolak: yang salah ketik perlu melihat angkanya
+// masih di situ supaya tahu apa yang harus dibetulkan. Yang menanganinya
+// tampilan, lewat penanda di kotaknya dan kalimatnya sendiri di daftar hari.
+const jamTerbalik = (jam) => keMenit(jam.buka) >= keMenit(jam.tutup);
+const JAM_POLA = /^([01]\d|2[0-3]):[0-5]\d$/;
+const jamSah = (v) => typeof v === 'string' && JAM_POLA.test(v);
+// Seluruh minggu memakai jam yang sama itu keadaan yang paling sering, dan
+// layarnya menyebut jamnya sekali di atas kalau begitu — bukan mengulanginya di
+// tiap hari.
+const jamSeragam = () => jamHari.every((j) => j.buka === jamHari[0].buka && j.tutup === jamHari[0].tutup);
+
+// Dokumen -> memori. Sama seperti terapkanPegawai(): baris yang tidak masuk akal
+// dibuang diam-diam, hari yang tidak disebut jatuh ke jam bawaan, dan snapshot
+// yang isinya sama persis dengan yang sudah di layar berhenti di sini supaya
+// kotak jam yang sedang diketik tidak tersapu pantulan simpanannya sendiri.
+function terapkanJam(rows) {
+  const baru = jamAwal();
+  rows.forEach((r) => {
+    const h = Number(r && r.hari);
+    if (!Number.isInteger(h) || h < 0 || h > 6) return;
+    if (!jamSah(r.buka) || !jamSah(r.tutup)) return;
+    baru[h] = { buka: r.buka, tutup: r.tutup };
+  });
+  if (baru.every((j, i) => j.buka === jamHari[i].buka && j.tutup === jamHari[i].tutup)) return;
+  jamHari = baru;
+  if (!$('slotSheet').hidden) {
+    renderJamHari();
+    // Kalimat di bawah judul ikut dihitung ulang: setelan yang datang dari
+    // perangkat lain bisa membuat minggunya berhenti seragam, dan kalimat yang
+    // tertinggal masih menyebut satu pasang jam untuk seluruh minggu.
+    tandaiSubJam();
+    renderSlot();
+  }
+}
+
+// Memori -> dokumen. Ketujuh hari lengkap, urutan baca Senin..Minggu — persis
+// alasan yang sama dengan barisPegawai().
+function barisJam() {
+  return HARI_URUT.map((h) => ({ hari: h, buka: jamHari[h].buka, tutup: jamHari[h].tutup }));
+}
+
+// Kotak jam berubah tiap komponen yang disentuh — jamnya dulu, menitnya
+// menyusul — jadi penundaannya sama perlunya dengan di kotak pegawai, dan
+// cabangnya dikunci sejak penundaan dimulai karena alasan yang sama.
+const JEDA_SIMPAN_JAM = 800;
+let tundaJam = null;
+function batalSimpanJam() { clearTimeout(tundaJam); tundaJam = null; }
+function simpanJam() {
+  const cab = cabangId;
+  batalSimpanJam();
+  tundaJam = setTimeout(() => {
+    tundaJam = null;
+    if (cabangId !== cab || !bolehUbah()) return;
+    save(KEY_JAM, barisJam());
+  }, JEDA_SIMPAN_JAM);
+}
+
+function lupakanJam() {
+  batalSimpanJam();
+  jamHari = jamAwal();
+}
+
+// Tujuh baris, satu tiap hari: nama hari, jam buka, jam tutup. Kotaknya
+// <input type="time"> bawaan, bukan stepper seperti pegawai — yang diubah di
+// sini jam dan menit sekaligus, dan pemilih jam bawaan perangkat sudah jauh
+// lebih cepat untuk itu daripada dua puluh ketukan tombol +.
+function renderJamHari() {
+  const box = $('slotJamBox');
+  box.innerHTML = '';
+  HARI_URUT.forEach((h) => {
+    // Sengaja <div>, bukan <label>: aturan `.slot-atur label` di style.css
+    // memaksa display:block dan akan meratakan barisnya jadi tumpukan. Kotaknya
+    // sudah punya aria-label sendiri, jadi tidak ada yang hilang.
+    const baris = document.createElement('div');
+    baris.className = 'jam-hari';
+    baris.dataset.hari = h;
+
+    const nama = document.createElement('span');
+    nama.className = 'jam-hari-nama';
+    nama.textContent = HARI_SINGKAT[h];
+
+    const buatKotak = (bagian) => {
+      const inp = document.createElement('input');
+      inp.type = 'time';
+      inp.value = jamHari[h][bagian];
+      inp.setAttribute('aria-label',
+        'Jam ' + (bagian === 'buka' ? 'buka' : 'tutup') + ' hari ' + HARI_PANJANG[h]);
+      inp.addEventListener('input', () => {
+        // Kotak yang sedang dikosongkan di tengah pengetikan tidak boleh
+        // menghapus jam yang sudah tersimpan. Yang belum lengkap dibiarkan
+        // menunggu ketukan berikutnya, bukan disimpan sebagai jam kosong.
+        if (!jamSah(inp.value)) return;
+        jamHari[h][bagian] = inp.value;
+        // Penandanya digeser di tempat: membangun ulang barisnya akan menutup
+        // pemilih jam yang jarinya masih di situ.
+        tandaiJamHari(baris, h);
+        tandaiSubJam();
+        renderSlot();
+        simpanJam();
+      });
+      // Kotak yang ditinggalkan belum lengkap dikembalikan ke jam yang tersimpan
+      // begitu jarinya pindah. Kalau dibiarkan, kotaknya terlihat kosong padahal
+      // hari itu tetap dihitung memakai jam lamanya — persis keadaan yang bikin
+      // operator mengira jamnya sudah terhapus.
+      inp.addEventListener('blur', () => { inp.value = jamHari[h][bagian]; });
+      return inp;
+    };
+
+    const pisah = document.createElement('span');
+    pisah.className = 'jam-hari-pisah';
+    pisah.textContent = '–';
+    baris.append(nama, buatKotak('buka'), pisah, buatKotak('tutup'));
+    tandaiJamHari(baris, h);
+    box.appendChild(baris);
+  });
+}
+
+// Dua penanda di satu baris jam: hari yang tidak ada pegawainya diredupkan —
+// jamnya masih tersimpan, tapi hari itu memang tutup — dan jam yang terbalik
+// diberi tanda salah supaya tidak diam-diam menghasilkan nol slot tanpa sebab
+// yang terlihat.
+function tandaiJamHari(baris, h) {
+  baris.classList.toggle('tutup', pegawaiHari[h] === 0);
+  baris.classList.toggle('salah', jamTerbalik(jamHari[h]));
+}
+
+// Baris jam pegawai ikut menyesuaikan waktu angka pegawai hari itu diubah —
+// tanpa ini, hari yang baru saja disetel nol pegawai masih terlihat seperti
+// hari kerja biasa di kotak jamnya.
+function segarkanTandaJam(h) {
+  const baris = $('slotJamBox').querySelector('.jam-hari[data-hari="' + h + '"]');
+  if (baris) tandaiJamHari(baris, h);
+}
+
+// Kalimat di bawah judul sheet. Jam yang sama sepanjang minggu disebut sekali
+// di sini; kalau harinya berbeda-beda, yang disebut cuma aturannya — jam tiap
+// harinya sudah terbaca di kotak setelan dan di judul tiap hari.
+function tandaiSubJam() {
+  $('slotSub').textContent = (jamSeragam()
+    ? 'Jam kerja ' + jamHari[0].buka + '–' + jamHari[0].tutup + '. '
+    : 'Jam kerjanya beda-beda tiap hari. ')
+    + 'Slot dihitung muat kalau seluruhnya masih di dalam jam hari itu.';
+}
+
 // Tujuh kotak angka, satu tiap hari. Dibangun ulang tiap kali sheet dibuka dan
 // tiap kali setelannya benar-benar berubah — aman, karena terapkanPegawai()
 // sudah menyaring pantulan snapshot yang isinya sama, jadi kotak yang sedang
@@ -1709,6 +1875,9 @@ function renderPegawaiHari() {
         // Tandanya digeser di tempat, bukan lewat renderPegawaiHari(): membangun
         // ulang barisnya akan menghapus kotak yang jarinya masih di situ.
         sel.classList.toggle('tutup', n === 0);
+        // Baris jam hari itu ikut diredupkan/dinyalakan di detik yang sama:
+        // nol pegawai berarti hari itu tutup, dan jamnya tidak berlaku hari itu.
+        segarkanTandaJam(h);
         // Daftar slot ikut berubah saat itu juga: hari yang angkanya baru saja
         // dinaikkan langsung memperlihatkan jam yang tadinya terhitung penuh.
         renderSlot();
@@ -1739,6 +1908,7 @@ const slotHari = (tgl, hariIni) => slotKosong(
   pegawaiUntuk(tgl),
   // Hari ini dipotong dari jam sekarang; hari-hari berikutnya utuh sejak buka.
   tgl === hariIni ? menitSekarang() : 0,
+  jamUntuk(tgl),
 );
 
 // Satu blok hari, lengkap dengan kotak jumlah pegawainya sendiri.
@@ -1749,6 +1919,7 @@ const slotHari = (tgl, hariIni) => slotKosong(
 // keluar di tengah pengetikan.
 function bangunHariSlot(tgl, hariIni) {
   const slot = slotHari(tgl, hariIni);
+  const jam = jamUntuk(tgl);
 
   const h = document.createElement('div');
   h.className = 'slot-hari';
@@ -1777,7 +1948,18 @@ function bangunHariSlot(tgl, hariIni) {
     },
   }), document.createTextNode('pegawai'));
   judul.appendChild(nama);
-  if (tgl === hariIni && menitSekarang() > keMenit(JAM_BUKA)) {
+  // Jam kerja hari itu ditulis di judulnya cuma kalau minggunya memang tidak
+  // seragam. Kalau ketujuh harinya sama, jamnya sudah disebut sekali di atas —
+  // mengulanginya di tiap hari cuma memenuhi baris yang sudah padat. Kalau
+  // beda-beda, tanpa ini daftar yang berhenti jam 14:00 di satu hari dan jam
+  // 20:00 di hari lain terbaca seperti salah hitung.
+  if (!jamSeragam() && !hariTutup(tgl)) {
+    const jamEl = document.createElement('span');
+    jamEl.className = 'slot-jam-hari';
+    jamEl.textContent = jam.buka + '–' + jam.tutup;
+    judul.appendChild(jamEl);
+  }
+  if (tgl === hariIni && menitSekarang() > keMenit(jam.buka)) {
     const sisa = document.createElement('span');
     sisa.className = 'slot-sisa';
     sisa.textContent = 'sisa hari ini';
@@ -1794,9 +1976,14 @@ function bangunHariSlot(tgl, hariIni) {
     // kerja habis berarti hari ini saja yang sudah lewat.
     p.textContent = hariTutup(tgl)
       ? 'Tutup — tidak ada pegawai yang masuk hari ini.'
-      : (tgl === hariIni && menitSekarang() >= keMenit(JAM_TUTUP))
-        ? 'Jam kerja hari ini sudah lewat.'
-        : 'Penuh — tidak ada pegawai yang luang.';
+      // Sebab keempat, dan yang ini salah setelan, bukan keadaan hari itu:
+      // tanpa disebut, jam yang terbalik cuma terbaca sebagai "penuh" dan tidak
+      // ada yang tahu kenapa harinya tidak pernah punya slot.
+      : jamTerbalik(jam)
+        ? 'Jam kerjanya belum benar — jam tutup harus lewat dari jam buka.'
+        : (tgl === hariIni && menitSekarang() >= keMenit(jam.tutup))
+          ? 'Jam kerja hari ini sudah lewat.'
+          : 'Penuh — tidak ada pegawai yang luang.';
     h.appendChild(p);
     return h;
   }
@@ -1935,6 +2122,8 @@ function bukaSlot() {
     return;
   }
   renderPegawaiHari();
+  renderJamHari();
+  tandaiSubJam();
   // Jenisnya dikembalikan ke rambut tiap kali sheet dibuka, bukan cuma sekali
   // waktu halaman dimuat — sama seperti form isi jadwal yang juga kembali ke
   // TREAT_BAWAAN sesudah tiap simpan. Pencarian berikutnya hampir selalu untuk
@@ -3006,6 +3195,7 @@ function mulaiSyncData() {
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
     pasang(KEY_PEGAWAI, terapkanPegawai),
+    pasang(KEY_JAM, terapkanJam),
     pasangJadwal(),
   ];
 }
@@ -3090,10 +3280,11 @@ function pilihCabang(id) {
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
-  // Jumlah pegawai milik cabang sebelumnya — termasuk tulisan yang masih
-  // tertunda — tidak boleh ikut menyeberang. Angkanya kembali ke bawaan sampai
-  // setelan cabang yang baru datang dari server.
+  // Jumlah pegawai dan jam kerja milik cabang sebelumnya — termasuk tulisan yang
+  // masih tertunda — tidak boleh ikut menyeberang. Keduanya kembali ke bawaan
+  // sampai setelan cabang yang baru datang dari server.
   lupakanPegawai();
+  lupakanJam();
   // Array di atas sekarang kosong bukan karena cabang barunya kosong, tapi
   // karena isinya belum sempat datang. Gerbangnya ditutup di detik yang sama.
   resetDataSiap();
@@ -3152,6 +3343,7 @@ if (!configTerisi) {
       setSambung(false); // palang ikut disembunyikan karena uid sudah kosong
       customers = []; appointments = []; staff = [];
       lupakanPegawai();
+      lupakanJam();
       cabangList = []; cabangId = null;
       resetDataSiap(); cabangSiap = false; peringatanCabangKosong = false;
       $('cabangBar').innerHTML = '';

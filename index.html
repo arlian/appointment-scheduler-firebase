@@ -386,13 +386,22 @@
 <div class="sheet-backdrop" id="slotSheet" hidden>
   <div class="sheet sheet-lebar">
     <h2>Slot Kosong</h2>
-    <p class="slot-sub">Jam kerja 09:00&ndash;17:00. Slot dihitung muat kalau seluruhnya masih di dalam jam itu.</p>
+    <!-- Kalimatnya diisi app.js: jam kerjanya bisa berbeda tiap hari, jadi tidak
+         ada satu pasang jam yang boleh ditulis tetap di sini. -->
+    <p class="slot-sub" id="slotSub"></p>
     <div class="slot-atur">
       <span class="slot-atur-judul">Pegawai tiap hari</span>
       <!-- Ketujuh kotaknya dibangun app.js lewat buatStepper(), sama dengan yang
            per tanggal — supaya bentuk dan perilakunya tidak pernah beda. -->
       <div id="slotPegawaiBox" class="slot-peg-minggu"></div>
       <span class="slot-atur-ket">Acuan cabang ini, tersimpan sendiri-sendiri tiap cabang. Tanggal tertentu masih bisa disetel di daftar bawah — yang itu cuma berlaku selama halaman ini terbuka.</span>
+    </div>
+    <div class="slot-atur">
+      <span class="slot-atur-judul">Jam kerja tiap hari</span>
+      <!-- Tujuh barisnya dibangun app.js, sederet dengan kotak pegawai di atas:
+           dua setelan yang sama-sama menentukan bentuk satu hari. -->
+      <div id="slotJamBox" class="slot-jam-minggu"></div>
+      <span class="slot-atur-ket">Bawaannya 10:00–17:00, tersimpan sendiri-sendiri tiap cabang. Hari yang jumlah pegawainya nol tetap tutup, berapa pun jamnya.</span>
     </div>
     <!-- Pemilihnya sengaja sama persis dengan yang di form isi jadwal: yang
          dipikirkan operator "rambut sama muka", bukan mencari baris
