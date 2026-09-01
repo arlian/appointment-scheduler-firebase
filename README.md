@@ -448,13 +448,13 @@ mulainya**, empat sebaris:
 *SLOT KOSONG PURI* 🕒
 
 📅 *Selasa, 1 September 2026*
-16:15  ·  16:30
+16:15, 16:30
 
 📅 *Rabu, 2 September 2026*
-10:00  ·  10:30  ·  11:00  ·  11:30
-12:00  ·  12:30  ·  13:00  ·  13:30
-14:00  ·  14:30  ·  15:00  ·  15:30
-16:00  ·  16:30
+10:00, 10:30, 11:00, 11:30
+12:00, 12:30, 13:00, 13:30
+14:00, 14:30, 15:00, 15:30
+16:00, 16:30
 ```
 
 Tidak ada jumlah pegawai luang, tidak ada tanda `×2`. Yang dikirim ke customer
@@ -462,6 +462,35 @@ adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya di sana.
 Empat sebaris karena hari yang lowong sejak pagi menghasilkan belasan pilihan,
 dan belasan baris membuat pesannya perlu digulir jauh cuma untuk sampai ke hari
 berikutnya.
+
+Bentuknya — empat sebaris, dipisah koma — dipegang `JAM_SEBARIS` dan
+`PISAH_JAM` di [app.js](app.js), dan **pesan reminder memakai keduanya juga**.
+Komanya dipilih karena paling gampang dibaca: deretan jam yang dipisah titik
+tengah terbaca seperti satu blok, sedangkan koma memberi tiap jam ujungnya
+sendiri.
+
+Yang perlu diingat kalau bentuknya nanti diubah: pesan reminder berangkat lewat
+URL `wa.me`, dan di situ spasi pengapit berharga. Titiknya sendiri gratis — `·`
+jadi 6 karakter URL, sama persis dengan `, ` — tapi tiap spasi menambah 6 lagi.
+Diukur di seminggu penuh dengan jam kerja bawaan:
+
+| Pemisah | Panjang URL |
+|---|---|
+| `, ` koma (dipakai) | 1.874 |
+| `·` rapat | 1.874 |
+| ` · ` satu spasi | 2.294 |
+| `  ·  ` dua spasi | 2.714 |
+
+`BATAS_URL` sekarang **4.096**, naik dari 2.048. Dengan tujuh hari sekaligus dan
+rambut 30 menit: jam kerja bawaan berhenti di 1.874, cabang yang buka sampai
+21:00 di 2.616, dan cabang yang buka 08:00–22:00 di 3.169 — ketiganya terkirim
+utuh. Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi
+koma: yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
+sampai malam sudah lewat batas itu dan kehilangan dua hari.
+
+Yang tidak bisa diukur dari sini: apakah jalur `wa.me` sendiri memotong di suatu
+tempat. Kalau suatu saat ada pesan yang sampai dalam keadaan terpenggal, angka
+itu yang pertama diturunkan.
 
 Dua hal yang disaring diam-diam, dan keduanya disengaja:
 

@@ -392,6 +392,25 @@ const MAKS_HARI_SLOT = 31;
 // menawarkan 10:30, 11:00, 11:30 — bukan 10:30, 11:00 yang bergeser sendiri.
 const KISI_SLOT = 30;
 
+// Bentuk daftar jam waktu dikirim sebagai teks — salinan Slot Kosong maupun
+// pesan reminder. Satu pasang angka untuk keduanya, bukan sendiri-sendiri: dua
+// daftar yang isinya sama persis tapi bentuknya beda cuma membuat yang
+// membacanya bertanya-tanya apa bedanya.
+//
+// Empat sebaris karena hari yang lowong sejak pagi punya belasan jam mulai, dan
+// belasan baris per hari membuat pesannya berubah jadi dinding jam.
+const JAM_SEBARIS = 4;
+// Pemisahnya koma, dipilih karena paling gampang dibaca — deretan jam yang
+// dipisah titik tengah terbaca seperti satu blok, sedangkan koma memberi tiap
+// jam ujungnya sendiri.
+//
+// Ongkos URL-nya kebetulan yang paling murah juga, dan itu perlu diingat kalau
+// bentuk ini nanti diubah: pesan reminder berangkat lewat wa.me, dan di situ
+// ', ' jadi 6 karakter URL sementara ' · ' jadi 12. Selisihnya di seminggu penuh
+// sekitar 420 karakter — dulu itu cukup untuk membuat hari terjauh dipotong,
+// sebelum BATAS_URL di bawah dinaikkan.
+const PISAH_JAM = ', ';
+
 const keMenit = (jam) => (+jam.slice(0, 2)) * 60 + (+jam.slice(3, 5));
 // Jam sekarang, dibulatkan ke atas ke kelipatan 15 menit. Slot yang dimulai
 // "14:07" terbaca seperti salah hitung; 14:15 itu jam yang memang orang pakai
@@ -2157,11 +2176,9 @@ function buildSlotWaText() {
     if (!jam.length) return;
     ada += jam.length;
     lines.push('', '📅 *' + hariBulan(tgl) + '*');
-    // Empat jam sebaris: hari yang lowong sejak pagi bisa menghasilkan enam
-    // belas pilihan, dan enam belas baris membuat pesannya perlu digulir jauh
-    // cuma untuk sampai ke hari berikutnya.
-    for (let i = 0; i < jam.length; i += 4) {
-      lines.push(jam.slice(i, i + 4).map((j) => keJam(j.m)).join('  ·  '));
+    // Bentuknya sama persis dengan pesan reminder — lihat JAM_SEBARIS.
+    for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
+      lines.push(jam.slice(i, i + JAM_SEBARIS).map((j) => keJam(j.m)).join(PISAH_JAM));
     }
   });
   return ada ? lines.join('\n') : null;
@@ -2352,21 +2369,6 @@ function salamWaktu(sekarang) {
 // meleset daripada kena.
 const REM_SLOT_HARI = 7;
 
-// Seluruh jam yang muat ikut ditulis — tidak ada lagi batas berapa jam yang
-// boleh disebut per hari. Orang yang cuma bisa jam tertentu perlu melihat jam
-// itu ada di daftarnya; tawaran yang dipangkas membuat dia menjawab "tidak ada
-// yang cocok" padahal jamnya kosong.
-//
-// Yang menjaga panjangnya tinggal BATAS_URL di bawah, dan ia memotong per hari
-// dari yang terjauh — bukan memotong jam di hari yang sudah terlanjur ditulis.
-//
-// Supaya belasan jam tidak jadi belasan baris, jamnya dikelompokkan empat
-// sebaris. Pemisahnya koma biasa, bukan titik tengah seperti salinan slot
-// kosong: yang ini berangkat lewat URL wa.me, dan satu '·' beserta spasi
-// pengapitnya jadi 18 karakter URL — tujuh hari penuh sudah cukup untuk
-// melewati batasnya sendirian.
-const REM_JAM_SEBARIS = 4;
-
 // Emoji di judul hari. Satu sakelar, karena nasibnya beda per perangkat:
 // dikirim dari HP emojinya utuh, dikirim dari PC ia bisa jatuh jadi tanda tanya
 // di kotak ketik WhatsApp — jalur wa.me di desktop melewati tahap yang
@@ -2391,10 +2393,20 @@ const TANDA_JAM = '- ';
 // tidak punya field treatments jatuh ke durasi bawaan lewat durasiJadwal(),
 // persis seperti perlakuan di seluruh aplikasi.
 //
-// Hasilnya satu blok teks per hari — judul harinya, lalu jam-jamnya empat
-// sebaris. Bukan satu baris panjang berisi seluruh jam hari itu: deret yang
-// menyambung sampai membungkus tiga kali justru paling susah dibaca di layar HP,
-// dan mata yang mencari satu jam tertentu kehilangan tempatnya.
+// Seluruh jam yang muat ikut ditulis — tidak ada batas berapa jam yang boleh
+// disebut per hari. Orang yang cuma bisa jam tertentu perlu melihat jam itu ada
+// di daftarnya; tawaran yang dipangkas membuat dia menjawab "tidak ada yang
+// cocok" padahal jamnya kosong. Yang menjaga panjang pesannya tinggal BATAS_URL
+// di bawah, dan ia memotong per hari dari yang terjauh — bukan memotong jam di
+// hari yang sudah terlanjur ditulis.
+//
+// Hasilnya satu blok teks per hari: judul harinya, lalu jam-jamnya menurut
+// JAM_SEBARIS dan PISAH_JAM — bentuk yang sama persis dengan salinan Slot
+// Kosong, karena yang dilihat operator di layar dan yang dibaca customer di
+// WhatsApp tidak boleh cuma mirip. Bukan satu baris panjang berisi seluruh jam
+// hari itu: deret yang menyambung sampai membungkus tiga kali justru paling
+// susah dibaca di layar HP, dan mata yang mencari satu jam tertentu kehilangan
+// tempatnya.
 function slotTawaran(k) {
   const hariIni = today();
   const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
@@ -2409,27 +2421,38 @@ function slotTawaran(k) {
     // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
     // ditebalkan, jamnya turun di bawahnya.
     const baris = [];
-    for (let i = 0; i < jam.length; i += REM_JAM_SEBARIS) {
-      baris.push(TANDA_JAM + jam.slice(i, i + REM_JAM_SEBARIS).map((j) => keJam(j.m)).join(', '));
+    for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
+      baris.push(TANDA_JAM + jam.slice(i, i + JAM_SEBARIS).map((j) => keJam(j.m)).join(PISAH_JAM));
     }
     blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(baris).join('\n'));
   }
   return blok;
 }
 
-// Batas panjang URL wa.me. Tidak ada batas baku untuk URL, tapi 2048 adalah
-// angka yang dihormati semua browser dan semua jalur penyerahan ke aplikasi
-// WhatsApp. Yang dijaga bukan cuma "gagal terbuka": URL yang kepanjangan bisa
-// terpotong diam-diam, dan pesan yang terpenggal di tengah baris jam tetap
-// terkirim tanpa ada yang menyadarinya.
+// Batas panjang URL wa.me. Tidak ada batas baku untuk URL. Yang dijaga bukan
+// cuma "gagal terbuka": URL yang kepanjangan bisa terpotong diam-diam, dan pesan
+// yang terpenggal di tengah baris jam tetap terkirim tanpa ada yang menyadarinya.
 //
-// Sejak seluruh jam ikut ditulis, penjaga ini tidak lagi menganggur. Dengan jam
-// kerja bawaan 10:00–17:00 — empat belas jam mulai tiap hari — seminggu penuh
-// berhenti di sekitar 1.870 dan ketujuh harinya terkirim. Cabang yang buka
-// sampai jam 21:00 punya dua puluh dua jam mulai per hari, dan di situ hari
-// keenam dan ketujuh mulai dipotong. Itu memang urutan yang dikehendaki: besok dan
-// lusa yang paling mungkin dipilih orang.
-const BATAS_URL = 2048;
+// Angkanya 2048 selama pesannya masih pendek — batas lama Internet Explorer,
+// dipakai karena tidak ada ruginya waktu itu. Ia mulai memotong hari begitu
+// seluruh jam ikut ditulis dan pemisahnya diberi spasi, jadi dinaikkan ke 4096:
+// masih jauh di bawah kemampuan semua browser yang dipakai sekarang (Chrome
+// ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
+//
+// Diukur dengan bentuk sekarang, tujuh hari sekaligus, rambut 30 menit: jam
+// kerja bawaan 10:00–17:00 berhenti di 1.874, buka sampai 21:00 di 2.616, dan
+// buka 08:00–22:00 — empat belas jam sehari — di 3.169. Ketiganya terkirim utuh
+// dan masih bersisa, jadi tidak ada cabang yang kehilangan hari terjauhnya.
+//
+// Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
+// koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
+// sampai malam sudah lewat batas itu dan kehilangan dua hari — persis keadaan
+// yang tidak kelihatan sampai ada yang mengeluh tawarannya cuma sampai Jumat.
+//
+// Yang belum bisa diukur dari sini cuma satu: apakah jalur wa.me sendiri
+// memotong di suatu tempat. Kalau suatu hari ada pesan yang sampai dalam
+// keadaan terpenggal, angka inilah yang pertama diturunkan.
+const BATAS_URL = 4096;
 
 // Panjang URL seandainya pesannya jadi dikirim. Nomor tujuannya belum tentu
 // diketahui waktu pesannya disusun, jadi yang dihitung nomor terpanjang yang
