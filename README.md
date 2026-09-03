@@ -767,13 +767,14 @@ disimpan, WhatsApp terbuka sendiri dengan pesannya. Persis perlakuan yang sudah
 berlaku untuk nomor yang belum ada — bukan pesan galat yang menyuruh operator
 mencari sendiri di mana isiannya.
 
-**Isian awalnya nama lengkapnya.** Yang belum pernah diisi tidak dibiarkan
-kosong: kotaknya sudah terisi nama lengkap orangnya — persis yang dipakai pesan
-ini sebelum ada kolom sapaan — jadi operator yang langsung menekan **Simpan**
-tidak mengubah bunyi pesannya sama sekali. Yang perlu ia lakukan cuma memangkas
-yang berlebih. Kotaknya juga menampilkan **contoh kalimat pembukanya**, ikut
-berubah tiap ketikan: yang sedang disusun teks yang dibaca customer, jadi bentuk
-jadinya tidak perlu dibayangkan.
+**Isian awalnya kata paling depan dari namanya.** Yang belum pernah diisi tidak
+dibiarkan kosong: kotaknya sudah terisi kata pertama nama orangnya — "Ibu Siti
+Rahma" jadi `Ibu`, "Ci Mei Lin" jadi `Ci`. Nama di aplikasi ini selalu diawali
+panggilannya, jadi kata pertamanya hampir selalu kata yang memang dipakai
+menyapa. Yang perlu dipanjangkan tinggal dipanjangkan jadi `Ibu Siti` sebelum
+disimpan. Kotaknya juga menampilkan **contoh kalimat pembukanya**, ikut berubah
+tiap ketikan: yang sedang disusun teks yang dibaca customer, jadi bentuk jadinya
+tidak perlu dibayangkan.
 
 Kosong tidak boleh disimpan — pesannya dibuka dengan itu.
 

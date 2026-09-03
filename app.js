@@ -279,6 +279,13 @@ const sudahLamaDatang = (customerId, totalVisits) => {
 // spasi lolos dari pemeriksaan "sudah ada isinya" dan pesannya berangkat
 // menyapa ruang kosong. Kotak isiannya sendiri sudah menolak yang kosong, tapi
 // data ini juga bisa datang dari file cadangan dan dari perangkat lain.
+// Isian awal untuk yang sapaannya belum pernah diisi: kata paling depan dari
+// namanya. Nama di data ini selalu diawali panggilannya — "Ibu Siti Rahma",
+// "Ci Mei Lin" — jadi kata pertamanya hampir selalu kata yang memang dipakai
+// menyapa orangnya. Ini cuma isian awal: kotaknya terbuka dan bisa dipanjangkan
+// jadi "Ibu Siti" sebelum disimpan.
+const sapaanBawaan = (nama) => String(nama || '').trim().split(/\s+/)[0] || '';
+
 const sapaanCustomer = (customerId) => {
   const c = customers.find((x) => x.id === customerId);
   return (c && c.sapaan ? c.sapaan.trim() : '');
@@ -2863,9 +2870,9 @@ function bukaHp(k, lanjutKirim) {
   hpLanjutKirim = lanjutKirim;
   $('hpNama').textContent = k.nama;
   $('hpInput').value = nomorLokal(c && c.phone);
-  // Sama seperti kotak sapaan: yang belum pernah diisi jatuh ke nama lengkapnya,
-  // jadi menekan Simpan tanpa menyentuhnya tidak mengubah bunyi pesan.
-  $('hpSapaan').value = (c && c.sapaan) || k.nama;
+  // Sama seperti kotak sapaan: yang belum pernah diisi jatuh ke kata paling
+  // depan dari namanya.
+  $('hpSapaan').value = (c && c.sapaan) || sapaanBawaan(k.nama);
   perbaruiContohHp();
   $('hpKet').textContent = lanjutKirim
     ? 'Keduanya disimpan dulu, lalu WhatsApp langsung terbuka dengan pesannya.'
@@ -2965,11 +2972,11 @@ function bukaSapaan(k, nomor) {
   sapaanTarget = k;
   sapaanNomor = nomor || null;
   $('sapaanNama').textContent = k.nama;
-  // Belum pernah diisi: kotaknya tidak dibiarkan kosong. Nama lengkapnya yang
-  // jadi isian awal — itu persis yang dipakai pesan ini sebelum ada kolom
-  // sapaan, jadi operator yang langsung menekan Simpan tidak mengubah bunyi
-  // pesannya sama sekali. Yang perlu ia lakukan cuma memangkas yang berlebih.
-  $('sapaanInput').value = (c && c.sapaan) || k.nama;
+  // Belum pernah diisi: kotaknya tidak dibiarkan kosong, isinya kata paling
+  // depan dari namanya — bentuk terpendek yang sudah bisa langsung dipakai
+  // menyapa. Yang perlu dipanjangkan tinggal dipanjangkan; contoh kalimatnya di
+  // bawah kotak memperlihatkan bunyinya sebelum disimpan.
+  $('sapaanInput').value = (c && c.sapaan) || sapaanBawaan(k.nama);
   $('sapaanKet').textContent = sapaanNomor
     ? 'Sapaannya disimpan dulu, lalu WhatsApp langsung terbuka dengan pesannya.'
     : 'Tersimpan di data customer, jadi cuma ditanyakan sekali.';
