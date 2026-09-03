@@ -145,6 +145,13 @@ WA, export/import), ditambah:
     barisnya sendiri (abu-abu, selalu paling bawah) supaya persen yang lain
     tidak melar; kalau sebulan itu tidak ada satu pun yang diisi, kartunya
     berisi keterangan, bukan satu batang "Belum diisi 100%";
+  - **pegawai** — berapa treatment yang sudah ditandai selesai bulan itu, dipecah
+    per pegawai yang menangani. Pembaginya jumlah yang **selesai**, bukan seluruh
+    treatment bulan itu: kalau dibagi seluruhnya, bulan yang baru separuh
+    ditandai membuat semua pegawai terbaca berkinerja setengah, padahal yang
+    belum ditandai belum tentu belum dikerjakan. Yang selesai tapi pegawainya
+    tidak disebut tetap dihitung sebagai barisnya sendiri (abu-abu, paling
+    bawah) supaya jumlah seluruh barisnya tetap sama dengan jumlah yang selesai;
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
     dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
     HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
@@ -676,6 +683,9 @@ terpisah:
 - **Batalkan tanda selesai** cuma muncul di jadwal yang sudah ditandai. Tanda
   selesai dan catatan pegawainya dicabut bersamaan: kalau treatment-nya ternyata
   belum dikerjakan, catatan siapa yang mengerjakan ikut kehilangan artinya.
+
+Di **Analitik** ada kartu **Pegawai**: berapa yang diselesaikan tiap pegawai
+bulan itu, ikut di tabel angka dan ikut di gambar "Salin sebagai Gambar".
 
 Di daftar jadwal, yang sudah selesai diredupkan sedikit (sama seperti baris
 reminder yang sudah dihubungi — pekerjaannya selesai, tapi tetap perlu terlihat)

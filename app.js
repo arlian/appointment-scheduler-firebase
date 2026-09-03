@@ -474,6 +474,28 @@ function ringkasTreatment(rows) {
     || namaKombinasi(a.t).localeCompare(namaKombinasi(b.t), 'id'));
 }
 
+// Berapa treatment yang sudah ditandai selesai bulan itu, dipecah per pegawai.
+// Yang belum ditandai selesai sama sekali tidak ikut: pertanyaannya "siapa
+// mengerjakan berapa", dan jadwal yang belum dikerjakan belum punya jawabannya.
+//
+// Yang selesai tapi pegawainya tidak disebut tetap dihitung, sebagai barisnya
+// sendiri paling bawah — kalau dibuang, jumlah seluruh baris tidak lagi sama
+// dengan jumlah yang selesai, dan angka yang tidak menjumlah membuat orang
+// mencari-cari selisihnya.
+function ringkasPegawai(rows) {
+  const selesai = rows.filter((a) => a.done === true);
+  const peta = new Map();
+  selesai.forEach((a) => {
+    const nama = (a.staff || '').trim();
+    peta.set(nama, (peta.get(nama) || 0) + 1);
+  });
+  const daftar = [...peta.entries()]
+    .map(([nama, n]) => ({ nama, n }))
+    .sort((a, b) => Number(!a.nama) - Number(!b.nama) || b.n - a.n
+      || a.nama.localeCompare(b.nama, 'id'));
+  return { selesai: selesai.length, daftar };
+}
+
 // ============================================================
 // Gender customer
 // Gender disimpan di customer.gender, diisi saat mendaftar. Isiannya
@@ -4184,6 +4206,67 @@ function renderKomb(kini) {
   });
 }
 
+// --- Berapa yang diselesaikan tiap pegawai ---
+// Bentuknya sama persis dengan kartu kombinasi treatment di atasnya: baris,
+// angka, persen, batang. Yang beda cuma pembaginya — di sini jumlah yang
+// selesai, bukan seluruh treatment bulan itu. Kalau dibagi seluruh treatment,
+// bulan yang baru separuh ditandai membuat semua pegawai terbaca berkinerja
+// setengah, padahal yang belum ditandai belum tentu belum dikerjakan.
+function renderPegawai(kini) {
+  const box = $('chartPegawai');
+  box.innerHTML = '';
+  if (!kini.rows.length) {
+    box.innerHTML = '<div class="empty">Belum ada jadwal di bulan ini.</div>';
+    return;
+  }
+  const { selesai, daftar } = ringkasPegawai(kini.rows);
+  if (!selesai) {
+    box.innerHTML = '<div class="empty">Belum ada treatment yang ditandai selesai bulan ini.</div>';
+    return;
+  }
+  daftar.forEach((k) => {
+    const persen = Math.round(k.n / selesai * 100);
+    const nama = k.nama || 'Tanpa pegawai';
+
+    const baris = document.createElement('div');
+    baris.className = 'gen-row';
+    baris.tabIndex = 0;
+
+    const label = document.createElement('div');
+    label.className = 'gen-label';
+    const teksLabel = document.createElement('span');
+    teksLabel.textContent = nama;
+    label.appendChild(teksLabel);
+
+    const nilai = document.createElement('div');
+    nilai.className = 'gen-val';
+    nilai.textContent = String(k.n);
+    const pct = document.createElement('span');
+    pct.className = 'gen-persen';
+    pct.textContent = persen + '%';
+    nilai.appendChild(pct);
+
+    const atas = document.createElement('div');
+    atas.className = 'gen-atas';
+    atas.append(label, nilai);
+
+    const track = document.createElement('div');
+    track.className = 'gen-track';
+    const bar = document.createElement('div');
+    // Yang pegawainya tidak disebut dapat abu-abu, aturan yang sama dengan
+    // kombinasi treatment yang jenisnya belum diisi.
+    bar.className = 'gen-bar komb' + (k.nama ? '' : ' kosong');
+    bar.style.width = Math.max(2, k.n / selesai * 100) + '%';
+    track.appendChild(bar);
+
+    baris.append(atas, track);
+    baris.setAttribute('aria-label',
+      nama + ': ' + k.n + ' treatment selesai, ' + persen + '% dari yang selesai bulan ini.');
+    pasangTip(baris, '<b>' + k.n + ' selesai</b> · ' + persen + '%<br>' + nama);
+    box.appendChild(baris);
+  });
+}
+
 // --- Koreksi gender: satu-satunya tempat gender bisa diatur manual ---
 // Daftarnya dibatasi customer yang punya jadwal di bulan yang sedang dilihat,
 // supaya yang muncul cuma yang memang memengaruhi angka di atas.
@@ -4456,6 +4539,12 @@ function renderTabel(kini, lalu) {
       : [],
     'Belum ada jadwal di bulan ini.');
 
+  const peg = ringkasPegawai(kini.rows);
+  tambah('Per pegawai (yang sudah ditandai selesai)', ['Pegawai', 'Selesai', 'Porsi'],
+    peg.daftar.map((k) =>
+      [k.nama || 'Tanpa pegawai', k.n, Math.round(k.n / peg.selesai * 100) + '%']),
+    'Belum ada treatment yang ditandai selesai bulan ini.');
+
   const perHari = new Map();
   kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
   tambah('Per hari', ['Tanggal', 'Treatment'],
@@ -4497,6 +4586,7 @@ function renderAnalitik() {
   renderKpi(kini, lalu);
   renderGender(kini, lalu);
   renderKomb(kini);
+  renderPegawai(kini);
   renderHeat(kini);
   renderJam(kini);
   if (!$('tabelWrap').hidden) renderTabel(kini, lalu);
@@ -4665,6 +4755,36 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     ty += 56;
   });
   y += tinggiT + 18;
+
+  // --- Pegawai ---
+  const peg = ringkasPegawai(kini.rows);
+  const barisP = peg.selesai ? peg.daftar : [];
+  const tinggiP = 62 + (barisP.length ? barisP.length * 56 : 40) + 14;
+  vizPanel(ctx, C, L, y, W, tinggiP);
+  vizTeks(ctx, 'Pegawai', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+  let py = y + 64;
+  if (!barisP.length) {
+    vizTeks(ctx, kini.total ? 'Belum ada treatment yang ditandai selesai bulan ini.'
+      : 'Belum ada jadwal di bulan ini.',
+      L + 22, py + 18, { ukuran: 14, warna: C.muted });
+  } else barisP.forEach((k) => {
+    const persen = Math.round(k.n / peg.selesai * 100);
+    const nama = k.nama || 'Tanpa pegawai';
+    vizTeks(ctx, nama, L + 22, py + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+    const teksPersen = '(' + persen + '%)';
+    vizTeks(ctx, teksPersen, L + W - 22, py + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+    vizTeks(ctx, String(k.n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, py + 14,
+      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+    const jalur = W - 44;
+    ctx.fillStyle = C.field;
+    vizKotak(ctx, L + 22, py + 27, jalur, 11, 6);
+    ctx.fill();
+    ctx.fillStyle = k.nama ? C.accent : C.gen['?'];
+    vizKotak(ctx, L + 22, py + 27, Math.max(8, jalur * k.n / peg.selesai), 11, 6);
+    ctx.fill();
+    py += 56;
+  });
+  y += tinggiP + 18;
 
   // --- Kepadatan harian (kalender sebulan) ---
   const perHari = new Map();
