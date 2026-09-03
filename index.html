@@ -455,11 +455,17 @@
      kotak kosong membuat daftarnya terbaca seperti formulir yang harus diisi. -->
 <div class="sheet-backdrop atas" id="hpSheet" hidden>
   <div class="sheet">
-    <h2>Nomor WhatsApp</h2>
+    <h2>Nomor &amp; sapaan WhatsApp</h2>
     <div class="sheet-name" id="hpNama"></div>
     <label for="hpInput">Nomor</label>
     <input id="hpInput" type="tel" inputmode="tel" autocomplete="off"
            placeholder="mis. 0812-3456-7890">
+    <!-- Dua-duanya cuma dipakai pesan WhatsApp, dan dua-duanya paling sering
+         perlu dibetulkan tepat sebelum pesannya dikirim — jadi satu kotak. -->
+    <label for="hpSapaan">Sapaan di pembuka pesan</label>
+    <input id="hpSapaan" type="text" autocomplete="off" maxlength="40"
+           placeholder="mis. Ci Lulu">
+    <p class="sheet-contoh" id="hpContoh"></p>
     <p class="sheet-sub" id="hpKet"></p>
     <div class="sheet-actions">
       <button type="button" class="ghost" id="hpBatal">Batal</button>

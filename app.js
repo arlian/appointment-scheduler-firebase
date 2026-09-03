@@ -1430,7 +1430,7 @@ function tombolNomor(id, sendiri) {
   b.type = 'button';
   b.className = 'hp-ubah' + (nomor ? '' : ' kosong') + (sendiri ? ' sendiri' : '');
   b.textContent = nomor || 'belum ada nomor';
-  b.title = (nomor ? 'Ubah nomor ' : 'Isi nomor ') + nameOf(id);
+  b.title = (nomor ? 'Ubah nomor ' : 'Isi nomor ') + nameOf(id) + ' — sekalian sapaannya';
   b.onclick = () => bukaHp({ id, nama: nameOf(id) }, false);
   return b;
 }
@@ -2741,6 +2741,19 @@ function renderReminder() {
     const namaEl = el.querySelector('.rem-nama');
     namaEl.textContent = k.nama;
     namaEl.title = 'Lihat semua kunjungan ' + k.nama;
+    // Sapaannya ikut di belakang nama lengkap: itu kata yang akan dibaca
+    // customer di pesannya, jadi salah sapa ketahuan dari daftar ini — sebelum
+    // pesannya dikirim, bukan sesudah. Yang sama persis dengan nama lengkapnya
+    // tidak ditulis lagi: "Ibu Siti Rahma (Ibu Siti Rahma)" cuma memanjangkan
+    // baris tanpa memberi tahu apa pun.
+    const sapaan = sapaanCustomer(k.id);
+    if (sapaan && sapaan.toLowerCase() !== k.nama.toLowerCase()) {
+      const s = document.createElement('span');
+      s.className = 'rem-sapaan';
+      s.textContent = ' (' + sapaan + ')';
+      namaEl.appendChild(s);
+      namaEl.title += ' — disapa "' + sapaan + '" di pesan WhatsApp';
+    }
     // Pintu yang sama dengan nama di daftar jadwal: sebelum menghubungi orangnya,
     // yang paling sering ditanya adalah "dia biasanya berapa lama sekali datang".
     namaEl.onclick = () => { tutupReminder(); cariCustomer(k.id); };
@@ -2753,7 +2766,7 @@ function renderReminder() {
     const nomor = c && c.phone ? nomorLokal(c.phone) : '';
     hpEl.textContent = nomor || 'belum ada nomor';
     hpEl.classList.toggle('kosong', !nomor);
-    hpEl.title = nomor ? 'Ubah nomor ' + k.nama : 'Isi nomor ' + k.nama;
+    hpEl.title = (nomor ? 'Ubah nomor ' : 'Isi nomor ') + k.nama + ' — sekalian sapaannya';
     hpEl.onclick = () => bukaHp(k, false);
 
     // Nomor dan sapaan yang belum ada ditanyakan sendiri oleh mulaiKirimWa()
@@ -2832,10 +2845,13 @@ function cabutIngat(id) {
   toast('Tanda "sudah diingatkan" pada ' + nama + ' dicabut.');
 }
 
-// Kotak isian nomor. Yang dipegang cuma id customer-nya, bukan objeknya:
-// snapshot customers yang mendarat selagi kotak ini terbuka mengganti seluruh
-// isi array dengan objek baru, dan nomor yang ditulis ke objek lama tidak akan
-// pernah ikut tersimpan.
+// Kotak isian nomor sekaligus sapaan. Dua-duanya cuma dipakai pesan WhatsApp
+// dan dua-duanya paling sering perlu dibetulkan tepat sebelum pesannya dikirim,
+// jadi mengurusnya di satu kotak menghemat satu putaran buka-tutup sheet.
+//
+// Yang dipegang cuma id customer-nya, bukan objeknya: snapshot customers yang
+// mendarat selagi kotak ini terbuka mengganti seluruh isi array dengan objek
+// baru, dan yang ditulis ke objek lama tidak akan pernah ikut tersimpan.
 let hpTarget = null;
 // Dibuka dari tombol kirim, bukan dari nomornya. Bedanya menentukan apa yang
 // terjadi sesudah simpan: langsung membuka WhatsApp, atau berhenti di situ.
@@ -2847,12 +2863,25 @@ function bukaHp(k, lanjutKirim) {
   hpLanjutKirim = lanjutKirim;
   $('hpNama').textContent = k.nama;
   $('hpInput').value = nomorLokal(c && c.phone);
+  // Sama seperti kotak sapaan: yang belum pernah diisi jatuh ke nama lengkapnya,
+  // jadi menekan Simpan tanpa menyentuhnya tidak mengubah bunyi pesan.
+  $('hpSapaan').value = (c && c.sapaan) || k.nama;
+  perbaruiContohHp();
   $('hpKet').textContent = lanjutKirim
-    ? 'Nomornya disimpan dulu, lalu WhatsApp langsung terbuka dengan pesannya.'
+    ? 'Keduanya disimpan dulu, lalu WhatsApp langsung terbuka dengan pesannya.'
     : 'Kosongkan lalu simpan kalau nomornya mau dihapus.';
   $('hpSheet').hidden = false;
   $('hpInput').focus();
   $('hpInput').select();
+}
+
+// Contoh kalimat pembukanya, bentuk yang sama persis dengan kotak sapaan.
+function perbaruiContohHp() {
+  const isi = $('hpSapaan').value.trim().replace(/\s+/g, ' ');
+  $('hpContoh').textContent = isi
+    ? salamWaktu() + ', ' + isi + '.'
+    : 'Sapaannya belum diisi — akan ditanyakan lagi sebelum pesannya dikirim.';
+  $('hpContoh').classList.toggle('kosong', !isi);
 }
 
 function tutupHp() {
@@ -2876,14 +2905,20 @@ function simpanHp() {
     toast('Isi nomornya dulu supaya WhatsApp bisa dibuka.', true);
     return;
   }
+  // Dikosongkan di sini berarti "belum ditentukan", bukan ditolak seperti di
+  // kotak sapaan: yang membuka kotak ini sering cuma mau membetulkan nomor, dan
+  // sapaan yang kosong toh masih ditanyakan lagi sebelum pesannya berangkat.
+  const sapaan = $('hpSapaan').value.trim().replace(/\s+/g, ' ');
   const asli = customers.find((x) => x.id === k.id);
   if (!asli) { tutupHp(); return; }
-  const berubah = (asli.phone || '') !== d;
-  if (berubah) {
-    // Menyimpan nomor berarti menulis ulang seluruh dokumen customers, jadi ia
+  const nomorBeda = (asli.phone || '') !== d;
+  const sapaanBeda = (asli.sapaan || '') !== sapaan;
+  if (nomorBeda || sapaanBeda) {
+    // Menyimpannya berarti menulis ulang seluruh dokumen customers, jadi ia
     // lewat gerbang yang sama dengan perubahan data lainnya.
     if (!bolehUbah()) return;
     if (d) asli.phone = d; else delete asli.phone;
+    if (sapaan) asli.sapaan = sapaan; else delete asli.sapaan;
     save(KEY_CUSTOMERS, customers);
   }
   const nama = asli.name;
@@ -2894,10 +2929,19 @@ function simpanHp() {
   renderList();
   // window.open masih dihitung lanjutan dari ketukan tombol Simpan, jadi ia
   // tidak kena penghadang popup.
-  // Lewat pintu yang sama, bukan langsung kirim: sapaannya bisa saja juga
-  // belum ada, dan kotaknya menyusul di belakang kotak nomor ini.
+  //
+  // Lewat pintu yang sama, bukan langsung kirim: sapaannya bisa saja dibiarkan
+  // kosong di sini, dan kotak sapaan menyusul di belakang kotak ini.
   if (lanjut) { mulaiKirimWa(k, d); return; }
-  if (berubah) toast(d ? 'Nomor ' + nama + ' tersimpan.' : 'Nomor ' + nama + ' dihapus.');
+  // Yang disebut cuma yang benar-benar berubah — kalimat yang menyebut kedua
+  // isian padahal cuma satu yang disentuh membuat operator ragu sendiri.
+  if (nomorBeda && sapaanBeda) toast('Nomor dan sapaan ' + nama + ' tersimpan.');
+  else if (nomorBeda) toast(d ? 'Nomor ' + nama + ' tersimpan.' : 'Nomor ' + nama + ' dihapus.');
+  else if (sapaanBeda) {
+    toast(sapaan
+      ? 'Sapaan ' + nama + ' disimpan: "' + sapaan + '".'
+      : 'Sapaan ' + nama + ' dikosongkan.');
+  }
 }
 
 // ============================================================
@@ -2991,8 +3035,11 @@ $('sapaanInput').addEventListener('keydown', (e) => {
 $('hpSimpan').addEventListener('click', simpanHp);
 $('hpBatal').addEventListener('click', tutupHp);
 $('hpSheet').addEventListener('click', (e) => { if (e.target === $('hpSheet')) tutupHp(); });
-$('hpInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); simpanHp(); }
+$('hpSapaan').addEventListener('input', perbaruiContohHp);
+[$('hpInput'), $('hpSapaan')].forEach((el) => {
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); simpanHp(); }
+  });
 });
 
 function bukaReminder() {

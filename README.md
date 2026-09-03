@@ -782,11 +782,30 @@ Kosong tidak boleh disimpan — pesannya dibuka dengan itu.
 rangkaian ketukan. Nomor ditanyakan lebih dulu karena nomor yang salah
 membatalkan seluruh kiriman, sedangkan sapaan cuma menentukan bunyinya.
 
-**Mengubahnya belakangan** lewat baris ringkasan di layar riwayat customer (tap
-nama customer untuk membukanya) — di sebelah status lama/baru dan nomor
-WhatsApp-nya, tertulis `sapaan "Ci Mei"`. Di alur kirim sapaannya sudah
-ditanyakan sendiri, jadi tombol ini gunanya untuk yang terlanjur tersimpan
-salah.
+**Mengubahnya belakangan** lewat dua jalan, dua-duanya untuk yang terlanjur
+tersimpan salah:
+
+- **Kotak nomor WhatsApp** — tap nomornya di daftar reminder, dan sapaannya ada
+  di kotak yang sama persis di bawah nomor, lengkap dengan contoh kalimat
+  pembukanya. Dua-duanya cuma dipakai pesan WhatsApp dan dua-duanya paling
+  sering perlu dibetulkan tepat sebelum pesannya dikirim, jadi tidak perlu buka
+  dua kotak. Kalau kotak ini dibuka dari tombol kirim (nomornya belum ada),
+  kedua isian tersimpan sekaligus lalu WhatsApp langsung terbuka.
+- **Baris ringkasan di layar riwayat customer** (tap nama customer untuk
+  membukanya) — di sebelah status lama/baru dan nomor WhatsApp-nya, tertulis
+  `sapaan "Ci Mei"`.
+
+Di **daftar reminder**, sapaannya ikut tertulis di belakang nama lengkap —
+`Ibu Siti Rahma (Bu Siti)` — supaya salah sapa ketahuan waktu daftarnya
+dipindai, sebelum pesannya dikirim dan bukan sesudah. Yang sapaannya sama persis
+dengan nama lengkapnya tidak ditulis dua kali, dan yang belum punya sapaan
+tampil seperti biasa.
+
+Bedanya dengan kotak sapaan yang muncul sendiri: di kotak nomor, sapaan yang
+**dikosongkan** boleh disimpan — artinya "belum ditentukan", dan ia akan
+ditanyakan lagi sebelum pesannya berangkat. Yang membuka kotak itu sering cuma
+mau membetulkan nomor. Di kotak sapaan sendiri, kosong ditolak: di situ pesannya
+memang sedang menunggu isian itu.
 
 Saat impor file cadangan, sapaan dari file cuma mengisi customer yang di sini
 masih kosong — tidak pernah menimpa yang sudah ada, aturan yang sama dengan

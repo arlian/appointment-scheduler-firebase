@@ -1106,6 +1106,11 @@ button.primary:active { transform: scale(.985); }
   white-space: nowrap;
 }
 .rem-nama:hover { color: var(--accent-ink); }
+/* Sapaan di belakang nama lengkap. Sengaja lebih kalem: yang dicari mata waktu
+   memindai daftar ini tetap nama orangnya — sapaannya baru dibaca kalau
+   perhatian sudah berhenti di barisnya. Ia juga yang pertama terpotong kalau
+   barisnya sempit, dan memang itu urutan yang benar. */
+.rem-sapaan { font-weight: 400; font-size: .86em; color: var(--text-2); }
 /* Nomornya sekaligus tombol koreksi, tapi bentuknya sengaja tetap seperti
    keterangan biasa — yang harus menonjol di baris ini cuma tombol kirimnya. */
 .rem-hp {
