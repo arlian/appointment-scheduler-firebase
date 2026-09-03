@@ -158,6 +158,7 @@ WA, export/import), ditambah:
   - tombol "Lihat angka dalam tabel" untuk membaca semua angkanya tanpa
     bergantung pada warna.
 - **Konfirmasi customer baru** (lihat bagian di bawah).
+- **Sapaan pesan WhatsApp** (lihat bagian di bawah).
 - **Multi-cabang**: tiap cabang punya data sendiri (customer, jadwal,
   pegawai). Cabang bawaan: **Puri, Kemayoran, Bandung** (data lama otomatis
   masuk ke cabang pertama). Ganti cabang lewat chip 📍 di bawah judul,
@@ -740,6 +741,60 @@ yang bernilai `true` yang mengeluarkan orang dari hitungan itu.
 Saat impor file cadangan, penanda dari file cuma mengisi customer yang di sini
 **belum pernah dijawab**. Jawaban yang sudah ada tidak pernah ditimpa: file
 cadangan bisa saja lebih tua daripada koreksi yang baru saja dilakukan.
+
+## Sapaan di pesan WhatsApp
+
+Pesan reminder dibuka dengan salam menurut jam saat tombol kirim ditekan, lalu
+sapaan orangnya:
+
+```
+Selamat pagi, Ci Mei.
+
+Apakah mau kami jadwalkan untuk treatment berikutnya? ...
+```
+
+Yang menyapa **kolom `sapaan`**, bukan nama lengkapnya. Nama di aplikasi ini
+selalu ditulis lengkap dengan panggilannya — "Ibu Siti Rahma", "Ci Mei Lin" —
+dan itu memang yang dibaca penebak gender lewat daftar sapaan, jadi kolom nama
+tidak bisa ikut dipendekkan. Tapi yang wajar dipakai menyapa cuma sebagiannya,
+dan bagian mana cuma operator yang tahu: "Ci Mei" benar, "Ci Mei Lin" kaku,
+"Mei Lin" kehilangan panggilannya. Menambahkan "Kak" di depan nama juga bukan
+jalan keluar — hasilnya "Kak Ibu Siti Rahma".
+
+**Ditanyakan sekali, saat pesan pertama.** Begitu **Kirim WA** ditekan untuk
+orang yang sapaannya belum pernah diisi, yang muncul kotak isiannya dulu; sesudah
+disimpan, WhatsApp terbuka sendiri dengan pesannya. Persis perlakuan yang sudah
+berlaku untuk nomor yang belum ada — bukan pesan galat yang menyuruh operator
+mencari sendiri di mana isiannya.
+
+**Isian awalnya nama lengkapnya.** Yang belum pernah diisi tidak dibiarkan
+kosong: kotaknya sudah terisi nama lengkap orangnya — persis yang dipakai pesan
+ini sebelum ada kolom sapaan — jadi operator yang langsung menekan **Simpan**
+tidak mengubah bunyi pesannya sama sekali. Yang perlu ia lakukan cuma memangkas
+yang berlebih. Kotaknya juga menampilkan **contoh kalimat pembukanya**, ikut
+berubah tiap ketikan: yang sedang disusun teks yang dibaca customer, jadi bentuk
+jadinya tidak perlu dibayangkan.
+
+Kosong tidak boleh disimpan — pesannya dibuka dengan itu.
+
+**Kalau nomor dan sapaan dua-duanya belum ada**, kotaknya muncul berurutan
+(nomor dulu, lalu sapaan) dan WhatsApp terbuka di ujungnya, jadi tetap satu
+rangkaian ketukan. Nomor ditanyakan lebih dulu karena nomor yang salah
+membatalkan seluruh kiriman, sedangkan sapaan cuma menentukan bunyinya.
+
+**Mengubahnya belakangan** lewat baris ringkasan di layar riwayat customer (tap
+nama customer untuk membukanya) — di sebelah status lama/baru dan nomor
+WhatsApp-nya, tertulis `sapaan "Ci Mei"`. Di alur kirim sapaannya sudah
+ditanyakan sendiri, jadi tombol ini gunanya untuk yang terlanjur tersimpan
+salah.
+
+Saat impor file cadangan, sapaan dari file cuma mengisi customer yang di sini
+masih kosong — tidak pernah menimpa yang sudah ada, aturan yang sama dengan
+nomor WhatsApp.
+
+Sapaan dibatasi 40 karakter dan dirapikan saat dibaca, bukan cuma saat
+disimpan: isian yang cuma berisi spasi lolos dari pemeriksaan "sudah ada
+isinya", dan pesannya akan berangkat menyapa ruang kosong.
 
 ## Gender customer
 
