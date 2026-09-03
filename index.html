@@ -467,6 +467,26 @@
     </div>
   </div>
 </div>
+<!-- Sapaan di pembuka pesan WhatsApp. Berdiri di atas sheet reminder sama
+     seperti kotak nomor, dan muncul sendiri sebelum pesan pertama berangkat
+     ke orang yang sapaannya belum pernah diisi. -->
+<div class="sheet-backdrop atas" id="sapaanSheet" hidden>
+  <div class="sheet">
+    <h2>Sapaan di pesan WhatsApp</h2>
+    <div class="sheet-name" id="sapaanNama"></div>
+    <label for="sapaanInput">Sapaan</label>
+    <input id="sapaanInput" type="text" autocomplete="off" maxlength="40"
+           placeholder="mis. Ci Lulu">
+    <!-- Contoh kalimatnya ikut berubah tiap ketikan: yang sedang disusun ini
+         teks yang dibaca customer, jadi bentuk jadinya tidak perlu dibayangkan. -->
+    <p class="sheet-contoh" id="sapaanContoh"></p>
+    <p class="sheet-sub" id="sapaanKet"></p>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="sapaanBatal">Batal</button>
+      <button type="button" class="primary" id="sapaanSimpan">Simpan</button>
+    </div>
+  </div>
+</div>
 <div class="sheet-backdrop" id="cabangSheet" hidden>
   <div class="sheet">
     <h2>Tambah Cabang</h2>
