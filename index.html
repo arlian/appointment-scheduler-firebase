@@ -366,9 +366,12 @@
      yang selama ini cuma tercatat di buku. Ditanya dulu sebelum jadwalnya masuk. -->
 <div class="sheet-backdrop" id="newCustSheet" hidden>
   <div class="sheet">
-    <h2>Nama ini belum ada di sistem</h2>
+    <!-- Sheet ini dipakai dua kali: waktu nama baru pertama disimpan, dan waktu
+         status baru/lama customer yang sudah terdaftar diperbaiki belakangan.
+         Judul, keterangan, dan tulisan tombolnya diisi app.js sesuai keperluan. -->
+    <h2 id="newCustJudul">Nama ini belum ada di sistem</h2>
     <div class="sheet-name" id="newCustName"></div>
-    <p class="sheet-sub">Benar-benar customer baru, atau sebenarnya sudah lama
+    <p class="sheet-sub" id="newCustSub">Benar-benar customer baru, atau sebenarnya sudah lama
       datang tapi belum pernah dicatat di sini?</p>
     <div class="mirip" id="newCustMirip" hidden>
       <h3>Mirip dengan yang sudah terdaftar</h3>

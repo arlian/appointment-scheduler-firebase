@@ -381,7 +381,8 @@ button.primary:active { transform: scale(.985); }
 .appt .who .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1.0625rem; }
 .appt .who .n .nama { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tanda-baru {
-  flex: none; padding: 1.5px 7px; border-radius: 999px;
+  flex: none; padding: 1.5px 7px; border: 0; border-radius: 999px;
+  font-family: inherit; cursor: pointer;
   font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   background: var(--accent); color: #fff;
 }
@@ -426,6 +427,16 @@ button.primary:active { transform: scale(.985); }
 }
 .appt button.nama:hover { color: var(--accent-ink); text-decoration: underline; }
 .appt button.nama:active { transform: none; opacity: .6; }
+/* Tanda "Baru" juga tombol — ketukannya membuka sheet status customer. Sama
+   seperti nama, bentuk tombol dari .appt button dibatalkan lagi di sini
+   (aturan itu lebih kuat daripada .tanda-baru sendirian): yang dilihat
+   operator tetap penanda, bukan tombol ketiga di sebelah Ubah dan Hapus. */
+.appt button.tanda-baru {
+  padding: 1.5px 7px; font-size: .64rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  background: var(--accent); color: #fff;
+}
+.appt button.tanda-baru:active { transform: scale(.94); }
 
 /* ---- Panel ubah jadwal ---- */
 .sheet-backdrop {

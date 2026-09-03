@@ -702,6 +702,45 @@ tidak diberi keterangan apa-apa — tiap jadwal cukup satu baris, dan jumlah
 kunjungannya justru lebih lengkap terbaca di riwayat, sejauh tap namanya. Di
 salinan WhatsApp tandanya jadi 🆕 di ujung baris.
 
+**Memperbaikinya belakangan.** Tombol di panel konfirmasi sering tertekan
+buru-buru, dan status yang telanjur salah dulu tidak ada jalan mundurnya: yang
+telanjur "lama" tidak pernah bisa dicabut, dan yang telanjur "baru" harus
+ditunggu sampai kunjungan keduanya. Sekarang statusnya bisa diubah kapan saja,
+lewat dua jalan:
+
+- **Ketuk tanda Baru** di daftar jadwal — yang terbaca salah persis yang sedang
+  dilihat, jadi perbaikannya ada di tempat yang sama.
+- **Ketuk keterangan "customer lama" / "customer baru"** di baris ringkasan
+  riwayat (tap nama customer untuk membukanya), di sebelah nomor WhatsApp-nya.
+  Ini satu-satunya jalan untuk customer lama — mereka tidak punya tanda yang
+  bisa diketuk di daftar jadwal.
+
+Panelnya sama dengan panel konfirmasi, jadi pertanyaannya tidak pernah berbunyi
+beda di dua layar. Bedanya, di sini judulnya "Status customer", jumlah kunjungan
+yang tercatat ikut disebut, daftar "nama mirip" tidak ditampilkan (orangnya
+sudah jelas siapa), dan jawaban yang sedang berlaku ditandai **(sekarang)**.
+
+**Jawaban operator menang atas jumlah kunjungan, dua-duanya arah.** Yang dijawab
+"lama" tetap lama walau kunjungannya baru satu; yang dijawab "baru" lewat panel
+ini tetap baru walau kunjungannya lebih dari satu — orang yang langsung memesan
+beberapa sesi sekaligus di hari pertama tetap orang baru waktu ia datang.
+Karena itu `sudahLama` sekarang bisa bernilai `false`, bukan cuma `true` atau
+tidak ada sama sekali.
+
+Yang tidak pernah dijawab tetap jatuh ke jumlah kunjungan seperti sebelumnya.
+Jawaban **Customer baru** di panel konfirmasi saat nama pertama disimpan
+sengaja tidak ditulis sebagai `false`: orang yang memang baru hari ini harus
+berhenti terbaca baru begitu ia datang lagi. Yang ditulis `false` cuma koreksi
+manual — di situ operator memang sedang membantah jumlah kunjungannya.
+
+Angka **"Customer baru"** di Analitik tidak ikut berubah artinya: ia tetap
+dihitung dari kunjungan pertama yang tercatat, dan cuma penanda `sudahLama`
+yang bernilai `true` yang mengeluarkan orang dari hitungan itu.
+
+Saat impor file cadangan, penanda dari file cuma mengisi customer yang di sini
+**belum pernah dijawab**. Jawaban yang sudah ada tidak pernah ditimpa: file
+cadangan bisa saja lebih tua daripada koreksi yang baru saja dilakukan.
+
 ## Gender customer
 
 Versi awal aplikasi ini tidak punya kolom gender sama sekali. Yang menyelamatkan

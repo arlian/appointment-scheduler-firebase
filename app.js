@@ -252,11 +252,18 @@ const visitCount = (customerId, kunci) =>
 
 // "Customer lama" tidak selalu terbaca dari jumlah kunjungan: ada yang sudah
 // bertahun-tahun datang tapi baru hari ini masuk sistem. Penanda sudahLama
-// dijawab operator sendiri di sheet konfirmasi saat namanya pertama disimpan.
+// dijawab operator sendiri di sheet konfirmasi saat namanya pertama disimpan,
+// dan bisa diperbaiki kapan saja lewat bukaUbahStatus().
+//
+// Jawaban operator menang atas jumlah kunjungan, dua-duanya arah. Yang sudah
+// dijawab "lama" tetap lama walau kunjungannya baru satu; yang dijawab "baru"
+// tetap baru walau kunjungannya lebih dari satu — orang yang langsung memesan
+// beberapa sesi sekaligus di hari pertama tetap orang baru waktu ia datang.
+// Yang tidak pernah dijawab jatuh ke jumlah kunjungan seperti sebelumnya.
 const sudahLamaDatang = (customerId, totalVisits) => {
   const c = customers.find((x) => x.id === customerId);
-  return (totalVisits != null ? totalVisits : visitCount(customerId)) > 1
-    || !!(c && c.sudahLama);
+  if (c && typeof c.sudahLama === 'boolean') return c.sudahLama;
+  return (totalVisits != null ? totalVisits : visitCount(customerId)) > 1;
 };
 
 // Badge & saran nama mengikuti bulan tanggal yang sedang diisi di form;
@@ -717,6 +724,11 @@ function simpanJadwal(customer, cleanName, date, time, status) {
     // Jawaban operator di sheet konfirmasi. Tanpa penanda ini orangnya akan
     // terbaca "customer baru" di daftar jadwal sampai kunjungan keduanya,
     // padahal sebenarnya sudah lama datang — cuma belum pernah dicatat.
+    //
+    // Jawaban "baru" sengaja tidak ditulis sebagai false: orang yang memang
+    // baru hari ini harus berhenti terbaca baru begitu ia datang lagi. Yang
+    // ditulis false cuma koreksi manual dari bukaUbahStatus() — di situ
+    // operator memang sedang membantah jumlah kunjungannya.
     if (status === 'lama') customer.sudahLama = true;
     customers.push(customer);
     save(KEY_CUSTOMERS, customers);
@@ -779,6 +791,13 @@ function simpanJadwal(customer, cleanName, date, time, status) {
 // langsung ditempelkan ke customer yang sudah ada.
 // ============================================================
 let pendingJadwal = null; // {nama, date, time} yang menunggu jawaban konfirmasi
+// Sheet yang sama juga dipakai untuk memperbaiki status customer yang sudah
+// terdaftar: tombol di sheet konfirmasi sering tertekan buru-buru, dan sebelum
+// ini jawaban yang telanjur salah tidak ada jalan mundurnya sama sekali —
+// yang telanjur "lama" tidak pernah bisa dicabut, dan yang telanjur "baru"
+// harus ditunggu sampai kunjungan keduanya. Wordingnya cuma ada di satu tempat
+// supaya pertanyaannya tidak pernah berbunyi beda di dua layar.
+let pendingStatus = null; // id customer yang statusnya sedang diubah
 
 // Nama dilucuti jadi bagian intinya: huruf kecil, tanpa tanda baca, tanpa
 // sapaan — supaya "Ci Lulu" dan "Cici Lulu" terbaca sebagai orang yang sama.
@@ -836,7 +855,13 @@ function cariMirip(nama) {
 
 function bukaKonfirmasiBaru(nama, date, time) {
   pendingJadwal = { nama, date, time };
+  pendingStatus = null;
+  $('newCustJudul').textContent = 'Nama ini belum ada di sistem';
   $('newCustName').textContent = nama;
+  $('newCustSub').textContent = 'Benar-benar customer baru, atau sebenarnya '
+    + 'sudah lama datang tapi belum pernah dicatat di sini?';
+  $('newCustBaru').textContent = 'Customer baru';
+  $('newCustLama').textContent = 'Customer lama, baru dicatat';
 
   const daftar = $('newCustMiripList');
   daftar.innerHTML = '';
@@ -865,12 +890,58 @@ function bukaKonfirmasiBaru(nama, date, time) {
   $('newCustSheet').hidden = false;
 }
 
+// Status customer yang sudah terdaftar. Pertanyaannya sama, yang beda cuma
+// tidak ada jadwal yang menunggu jawaban — dan daftar "nama mirip" tidak ada
+// gunanya di sini: orangnya sudah jelas siapa.
+function bukaUbahStatus(id) {
+  const c = customers.find((x) => x.id === id);
+  if (!c) return;
+  pendingJadwal = null;
+  pendingStatus = id;
+  const n = visitCount(id);
+  const lama = sudahLamaDatang(id, n);
+  $('newCustJudul').textContent = 'Status customer';
+  $('newCustName').textContent = c.name;
+  $('newCustSub').textContent = (n
+    ? n + 'x kunjungan tercatat di sini. '
+    : 'Belum ada kunjungan tercatat di sini. ')
+    + 'Benar-benar customer baru, atau sudah lama datang sebelum masuk sistem?';
+  // Yang sedang berlaku diberi tanda: tanpa itu sheet ini terbaca seperti
+  // pertanyaan yang belum pernah dijawab, dan operator tidak tahu apa yang
+  // sebenarnya sedang ia ubah.
+  $('newCustBaru').textContent = 'Customer baru' + (lama ? '' : ' (sekarang)');
+  $('newCustLama').textContent = 'Customer lama' + (lama ? ' (sekarang)' : '');
+  $('newCustMirip').hidden = true;
+  $('newCustMiripList').innerHTML = '';
+  $('newCustSheet').hidden = false;
+}
+
 function tutupKonfirmasiBaru() {
   pendingJadwal = null;
+  pendingStatus = null;
   $('newCustSheet').hidden = true;
 }
 
+// Jawabannya ditulis apa adanya — termasuk `false` untuk "baru". Menghapus
+// penandanya tidak cukup: tanpa penanda, orang yang sudah memesan dua sesi
+// sekaligus langsung terbaca customer lama lagi, persis yang mau dikoreksi.
+function simpanStatus(id, status) {
+  const c = customers.find((x) => x.id === id);
+  tutupKonfirmasiBaru();
+  if (!c) return;
+  const lama = status === 'lama';
+  if (c.sudahLama === lama) return; // jawabannya sama, tidak ada yang perlu ditulis
+  if (!bolehUbah()) return;
+  c.sudahLama = lama;
+  save(KEY_CUSTOMERS, customers);
+  renderList();
+  toast(c.name + (lama
+    ? ' dicatat sebagai customer lama.'
+    : ' dicatat sebagai customer baru.'));
+}
+
 function jawabKonfirmasi(status) {
+  if (pendingStatus) { simpanStatus(pendingStatus, status); return; }
   const p = pendingJadwal;
   if (!p) return;
   tutupKonfirmasiBaru();
@@ -1279,16 +1350,37 @@ function renderList() {
     // <bulan>" yang dulu duduk di bawah nama sudah tidak ada: satu baris per
     // jadwal jauh lebih cepat dipindai, dan jumlah kunjungannya justru lebih
     // lengkap terbaca di riwayat — sejauh tap namanya.
+    // Tandanya sekaligus jadi jalan mencabutnya: kalau yang terbaca salah,
+    // yang salah itu justru yang sedang dilihat. <button>, bukan <span> —
+    // attachRowGestures melewati apa pun yang berupa tombol, jadi menekannya
+    // tidak ikut membuka sheet ubah jadwal.
     if (!sudahLamaDatang(r.customerId, totalVisits)) {
-      const tanda = document.createElement('span');
+      const tanda = document.createElement('button');
+      tanda.type = 'button';
       tanda.className = 'tanda-baru';
       tanda.textContent = 'Baru';
-      tanda.title = 'Customer baru';
+      tanda.title = 'Customer baru — ketuk untuk mengubah statusnya';
+      tanda.onclick = () => bukaUbahStatus(r.customerId);
       el.querySelector('.n').appendChild(tanda);
     }
     list.appendChild(el);
   });
   jadwalkanAnalitik();
+}
+
+// Status lama/baru sebagai tombol, sebentuk dengan tombol nomor di sebelahnya:
+// keterangan yang baru ketahuan bisa diketuk waktu disentuh. Di layar riwayat
+// inilah satu-satunya tempat status customer lama bisa dicabut — di daftar
+// jadwal yang bisa diketuk cuma tanda "Baru", dan customer lama tidak punya.
+function tombolStatus(id, sendiri) {
+  const lama = sudahLamaDatang(id);
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'hp-ubah' + (sendiri ? ' sendiri' : '');
+  b.textContent = lama ? 'customer lama' : 'customer baru';
+  b.title = 'Ubah status ' + nameOf(id);
+  b.onclick = () => bukaUbahStatus(id);
+  return b;
 }
 
 // Nomor customer sebagai tombol: menampilkan nomornya sekaligus jadi jalan
@@ -1326,7 +1418,8 @@ function setRingkasList(rows) {
     // Di sini tempatnya justru wajar: layar ini memang dibuka ketika yang
     // dicari satu orang tertentu. Ikut muncul walau kunjungannya belum ada satu
     // pun — customer yang baru dicatat yang paling sering perlu diisikan nomor.
-    box.appendChild(tombolNomor(custCari, !rows.length));
+    box.appendChild(tombolStatus(custCari, !rows.length));
+    box.appendChild(tombolNomor(custCari, false));
     return;
   }
   if (!rows.length) return;
@@ -2963,10 +3056,15 @@ function gabungData(isi, dariFile) {
       dftCustomers.push(existing);
       cust++; berubah = true;
     }
-    // Penanda "sudah lama datang, baru masuk sistem" ikut terbawa. Sekali
-    // seseorang diakui customer lama, tidak ada file yang bisa mencabutnya —
-    // ketiadaan penanda di file cuma berarti file itu belum tahu.
-    if (c.sudahLama && !existing.sudahLama) { existing.sudahLama = true; berubah = true; }
+    // Penanda "sudah lama datang, baru masuk sistem" ikut terbawa, tapi cuma
+    // untuk mengisi yang di sini belum pernah dijawab — ketiadaan penanda di
+    // file cuma berarti file itu belum tahu. Jawaban yang sudah ada di sini
+    // tidak pernah ditimpa: file cadangan bisa saja lebih tua daripada koreksi
+    // yang baru saja dilakukan operator.
+    if (c.sudahLama && typeof existing.sudahLama !== 'boolean') {
+      existing.sudahLama = true;
+      berubah = true;
+    }
     // Nomor WhatsApp ikut terbawa, tapi cuma untuk mengisi yang masih kosong.
     // Nomor yang sudah ada di sini lebih baru daripada isi file cadangan, dan
     // menimpanya berarti mengembalikan nomor lama yang mungkin sudah diperbaiki.
