@@ -362,6 +362,28 @@
     </div>
   </div>
 </div>
+<!-- Tandai treatment selesai sekaligus pegawai yang menangani. Dua-duanya satu
+     keputusan — "sudah dikerjakan, oleh siapa" — jadi satu kotak, bukan dua. -->
+<div class="sheet-backdrop" id="selesaiSheet" hidden>
+  <div class="sheet">
+    <h2>Treatment selesai</h2>
+    <div class="sheet-name" id="selesaiNama"></div>
+    <p class="sheet-sub" id="selesaiWaktu"></p>
+    <label id="selesaiPegLabel">Pegawai yang menangani <span class="opsional">opsional</span></label>
+    <!-- Tombolnya dibangun app.js dari daftar pegawai cabang ini -->
+    <div class="peg-pilih" role="group" aria-labelledby="selesaiPegLabel" id="selesaiPeg"></div>
+    <div class="peg-tambah">
+      <input id="selesaiPegBaru" type="text" autocomplete="off" maxlength="30"
+             placeholder="Tambah nama pegawai">
+      <button type="button" class="ghost" id="selesaiPegTambah">Tambah</button>
+    </div>
+    <button type="button" class="sheet-batal" id="selesaiBatalkan" hidden>Batalkan tanda selesai</button>
+    <div class="sheet-actions">
+      <button type="button" class="ghost" id="selesaiTutup">Batal</button>
+      <button type="button" class="primary" id="selesaiSimpan">Tandai selesai</button>
+    </div>
+  </div>
+</div>
 <!-- Nama yang belum ada di sistem belum tentu orang baru — banyak customer lama
      yang selama ini cuma tercatat di buku. Ditanya dulu sebelum jadwalnya masuk. -->
 <div class="sheet-backdrop" id="newCustSheet" hidden>

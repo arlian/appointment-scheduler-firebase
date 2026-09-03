@@ -1208,6 +1208,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('sapaanSheet').hidden) { tutupSapaan(); return; }
   if (!$('hpSheet').hidden) { tutupHp(); return; }
   if (!$('editSheet').hidden) closeEdit();
+  if (!$('selesaiSheet').hidden) tutupSelesai();
   if (!$('newCustSheet').hidden) tutupKonfirmasiBaru();
   if (!$('cabangSheet').hidden) closeCabangSheet();
   if (!$('slotSheet').hidden) tutupSlot();
@@ -1284,6 +1285,124 @@ const hapusFotoJadwal = (a) =>
   (a.photos || []).forEach((p) => deleteDoc(fotoRef(p.id)).catch(() => {}));
 
 // ============================================================
+// Tandai selesai + pegawai yang menangani
+// ------------------------------------------------------------
+// Dipasang lagi memakai field lama yang memang tidak pernah dihapus: `done`
+// dan `staff` di tiap jadwal, dan daftar nama di dokumen staff. Data yang
+// terlanjur tercatat dulu langsung terbaca lagi tanpa perlu diisi ulang.
+//
+// Foto hasil treatment tetap tidak dipasang — yang diminta cuma penanda selesai
+// dan pegawainya. Pembersih foto di atas tetap jalan untuk data lama.
+//
+// Keduanya satu keputusan ("sudah dikerjakan, oleh siapa"), jadi satu kotak.
+// Centang di baris jadwal cuma pintunya; yang menyimpan tombol di kotak ini.
+// ============================================================
+let selesaiId = null;   // id jadwal yang sedang dibuka
+let selesaiPeg = null;  // nama pegawai yang sedang terpilih, null = belum ada
+
+function bukaSelesai(apptId) {
+  const a = appointments.find((x) => x.id === apptId);
+  if (!a) return;
+  selesaiId = apptId;
+  selesaiPeg = a.staff || null;
+  $('selesaiNama').textContent = nameOf(a.customerId);
+  const jenis = rapikanTreatment(a.treatments);
+  $('selesaiWaktu').textContent = hariBulan(a.date) + ' · ' + a.time
+    + (jenis.length ? ' · ' + namaKombinasi(jenis) : '');
+  // Yang sudah selesai dibuka untuk mengganti pegawainya, bukan untuk
+  // menandainya lagi — tulisan tombolnya ikut menyesuaikan supaya tidak
+  // terbaca seperti pekerjaan yang belum dilakukan.
+  $('selesaiBatalkan').hidden = !a.done;
+  $('selesaiSimpan').textContent = a.done ? 'Simpan' : 'Tandai selesai';
+  $('selesaiPegBaru').value = '';
+  renderPilihPegawai();
+  $('selesaiSheet').hidden = false;
+}
+
+function renderPilihPegawai() {
+  const box = $('selesaiPeg');
+  box.innerHTML = '';
+  const daftar = staff.slice();
+  // Pegawai yang sudah tidak ada di daftar tapi masih tercatat di jadwal ini
+  // tetap ikut muncul — kalau tidak, pilihan yang sudah tersimpan terbaca
+  // hilang begitu kotaknya dibuka, dan menyimpan lagi diam-diam menghapusnya.
+  if (selesaiPeg && !daftar.some((n) => n.toLowerCase() === selesaiPeg.toLowerCase())) {
+    daftar.push(selesaiPeg);
+  }
+  if (!daftar.length) {
+    const p = document.createElement('p');
+    p.className = 'peg-kosong';
+    p.textContent = 'Belum ada nama pegawai di cabang ini — tambahkan di bawah.';
+    box.appendChild(p);
+    return;
+  }
+  daftar.forEach((nama) => {
+    const aktif = selesaiPeg === nama;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'peg-btn' + (aktif ? ' aktif' : '');
+    b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
+    b.textContent = nama;
+    // Ditekan lagi berarti batal memilih: satu-satunya jalan mencabut pegawai
+    // dari jadwal yang pegawainya terlanjur salah isi.
+    b.onclick = () => { selesaiPeg = aktif ? null : nama; renderPilihPegawai(); };
+    box.appendChild(b);
+  });
+}
+
+// Nama baru langsung ikut terpilih: yang mengetiknya sedang menjawab "siapa
+// yang menangani", bukan sedang mengurus daftar pegawai.
+function tambahPegawai() {
+  const nama = $('selesaiPegBaru').value.trim().replace(/\s+/g, ' ');
+  if (!nama) { $('selesaiPegBaru').focus(); return; }
+  if (!bolehUbah()) return;
+  addStaff(nama);
+  selesaiPeg = staff.find((n) => n.toLowerCase() === nama.toLowerCase()) || nama;
+  $('selesaiPegBaru').value = '';
+  renderPilihPegawai();
+}
+
+function tutupSelesai() {
+  $('selesaiSheet').hidden = true;
+  selesaiId = null;
+  selesaiPeg = null;
+}
+
+function simpanSelesai(selesai) {
+  const a = appointments.find((x) => x.id === selesaiId);
+  if (!a) { tutupSelesai(); return; }
+  if (!bolehUbah()) return;
+  if (selesai) {
+    a.done = true;
+    if (selesaiPeg) a.staff = selesaiPeg; else delete a.staff;
+  } else {
+    // Dibatalkan berarti treatment-nya belum dikerjakan, dan catatan siapa yang
+    // mengerjakan ikut kehilangan artinya.
+    delete a.done;
+    delete a.staff;
+  }
+  const nama = nameOf(a.customerId);
+  const peg = a.staff;
+  simpanBulan(new Set([kunciDari(a.date)]));
+  tutupSelesai();
+  renderList();
+  toast(selesai
+    ? 'Treatment ' + nama + ' ditandai selesai' + (peg ? ' — dikerjakan ' + peg + '.' : '.')
+    : 'Tanda selesai pada treatment ' + nama + ' dicabut.');
+}
+
+$('selesaiSimpan').addEventListener('click', () => simpanSelesai(true));
+$('selesaiBatalkan').addEventListener('click', () => simpanSelesai(false));
+$('selesaiTutup').addEventListener('click', tutupSelesai);
+$('selesaiPegTambah').addEventListener('click', tambahPegawai);
+$('selesaiPegBaru').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); tambahPegawai(); }
+});
+$('selesaiSheet').addEventListener('click', (e) => {
+  if (e.target === $('selesaiSheet')) tutupSelesai();
+});
+
+// ============================================================
 // Daftar jadwal (render)
 // ============================================================
 function renderList() {
@@ -1349,9 +1468,21 @@ function renderList() {
       '<div class="urut"></div>' +
       '<div class="when"><div class="t"></div></div>' +
       '<div class="who"><div class="n"><button type="button" class="nama"></button></div></div>' +
+      '<button type="button" class="cek">' + ikon('cek') + '</button>' +
       '<button class="edit" title="Ubah jadwal">Ubah</button>' +
       '<button class="del" title="Hapus jadwal">Hapus</button>';
     el.appendChild(main);
+    // Centang selesai. Tetap tampil di layar sempit — tombol Ubah dan Hapus di
+    // sebelahnya yang disembunyikan, karena keduanya punya gestur pengganti;
+    // menandai selesai tidak punya.
+    const cekEl = el.querySelector('.cek');
+    cekEl.classList.toggle('sudah', !!r.done);
+    cekEl.setAttribute('aria-pressed', r.done ? 'true' : 'false');
+    cekEl.title = r.done
+      ? 'Selesai' + (r.staff ? ' — dikerjakan ' + r.staff : '') + '. Ketuk untuk mengubah.'
+      : 'Tandai treatment selesai';
+    cekEl.onclick = () => bukaSelesai(r.id);
+    el.classList.toggle('selesai', !!r.done);
     el.querySelector('.edit').onclick = () => openEdit(r.id);
     el.querySelector('.del').onclick = () => confirmDelete(r);
     attachRowGestures(main, r);
@@ -1365,6 +1496,17 @@ function renderList() {
     namaEl.textContent = nameOf(r.customerId);
     namaEl.title = 'Lihat semua kunjungan ' + nameOf(r.customerId);
     namaEl.onclick = () => cariCustomer(r.customerId);
+    // Pegawai yang menangani, cuma pada yang sudah ditandai selesai. Ditulis di
+    // baris namanya, bukan di dalam centang: yang dicari waktu daftar ini
+    // dipindai adalah "siapa mengerjakan siapa", dan itu terbaca sekali lihat
+    // kalau dua-duanya berdampingan.
+    if (r.done && r.staff) {
+      const peg = document.createElement('span');
+      peg.className = 'tanda-peg';
+      peg.textContent = r.staff;
+      peg.title = 'Dikerjakan ' + r.staff;
+      el.querySelector('.n').appendChild(peg);
+    }
     // Bentuk tandanya sama persis dengan yang nanti keluar di salinan WA
     const tandaT = tandaTreatment(r.treatments);
     if (tandaT) {

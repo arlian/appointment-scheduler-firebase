@@ -656,19 +656,46 @@ Foto hasil treatment tidak ikut file JSON (tersimpan sebagai dokumen
 tersendiri di Firestore); yang terbawa adalah customer, jadwal, dan daftar
 pegawai.
 
-## Tandai selesai — sedang dimatikan
+## Tandai selesai + pegawai yang menangani
 
-Fitur centang selesai (pegawai yang menangani + foto hasil treatment) untuk
-sementara dihilangkan dari layar karena belum diperlukan: lingkaran centang di
-tiap jadwal, panel isian pegawai/foto, tanda "Selesai" di daftar, dan ✅ di
-salinan WhatsApp semuanya tidak ada lagi.
+Tiap baris jadwal punya **lingkaran centang** di sebelah kanan namanya.
+Kosong selama treatment-nya belum dikerjakan, penuh begitu ditandai.
 
-Yang hilang cuma tampilannya. Data yang terlanjur tercatat — field
-`done`/`staff`/`photos` di tiap jadwal, daftar pegawai, dan dokumen foto di
-koleksi `photos` — tetap utuh di Firestore dan tetap ikut export/import, jadi
-fiturnya bisa dipasang lagi kapan saja tanpa ada yang perlu diisi ulang. Satu
-hal yang tetap jalan diam-diam: foto ikut terhapus kalau jadwal induknya
-dihapus, supaya tidak ada foto yatim yang menumpuk tanpa bisa dijangkau.
+Ketuk centangnya, dan yang muncul satu kotak berisi dua-duanya sekaligus —
+"sudah dikerjakan" dan "oleh siapa" memang satu keputusan, jadi bukan dua kotak
+terpisah:
+
+- **Pegawai yang menangani** dipilih dari daftar pegawai cabang itu. Ditekan
+  lagi berarti batal memilih — satu-satunya jalan mencabut pegawai dari jadwal
+  yang terlanjur salah isi. Pilihannya **opsional**: treatment tetap bisa
+  ditandai selesai tanpa menyebut siapa pun.
+- **Nama pegawai baru** ditambahkan langsung dari kotak itu juga, dan yang baru
+  ditambahkan langsung ikut terpilih — yang mengetiknya sedang menjawab "siapa
+  yang menangani", bukan sedang mengurus daftar pegawai. Nama kembar (beda besar
+  kecil huruf pun) tidak pernah masuk dua kali.
+- **Batalkan tanda selesai** cuma muncul di jadwal yang sudah ditandai. Tanda
+  selesai dan catatan pegawainya dicabut bersamaan: kalau treatment-nya ternyata
+  belum dikerjakan, catatan siapa yang mengerjakan ikut kehilangan artinya.
+
+Di daftar jadwal, yang sudah selesai diredupkan sedikit (sama seperti baris
+reminder yang sudah dihubungi — pekerjaannya selesai, tapi tetap perlu terlihat)
+dan nama pegawainya tertulis di sebelah nama customer.
+
+Centangnya **tetap ada di layar sempit**, sedangkan tombol Ubah dan Hapus
+disembunyikan seperti biasa: keduanya punya gestur pengganti (tekan lama dan
+geser kiri), menandai selesai tidak punya.
+
+**Dipasang lagi memakai field lama.** Fitur ini pernah ada lalu dimatikan, dan
+datanya sengaja tidak pernah dihapus — `done` dan `staff` di tiap jadwal serta
+daftar nama di dokumen `staff` tetap utuh di Firestore dan tetap ikut
+export/import. Jadi jadwal yang dulu terlanjur ditandai langsung terbaca lagi
+tanpa ada yang perlu diisi ulang.
+
+**Foto hasil treatment tetap tidak dipasang.** Field `photos` dan koleksi
+`photos` di Firestore juga masih utuh, begitu juga pembersihnya — foto ikut
+terhapus kalau jadwal induknya dihapus, supaya tidak ada foto yatim yang
+menumpuk tanpa bisa dijangkau. Tanda ✅ di salinan WhatsApp juga belum
+dikembalikan; salinan jadwal masih sama seperti sebelumnya.
 
 ## Customer baru atau customer lama yang belum tercatat
 

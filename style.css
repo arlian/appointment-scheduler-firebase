@@ -413,6 +413,37 @@ button.primary:active { transform: scale(.985); }
 .treat-baris.kosong { color: var(--muted); }
 .treat-n { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+/* Centang selesai. Lingkaran kosong selama belum dikerjakan — bentuk yang
+   sudah menerangkan sendiri bahwa ia menunggu diisi — dan penuh begitu
+   ditandai. Ikonnya selalu ada di DOM, cuma disembunyikan, supaya perubahannya
+   tidak menggeser apa pun di baris. */
+.appt button.cek {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border-radius: 50%;
+  border: 1.75px solid var(--border-kuat); background: var(--card);
+  color: var(--text-2); font-size: 1rem;
+}
+.appt button.cek .ico { opacity: 0; transform: scale(.6); transition: opacity .14s ease, transform .14s ease; }
+.appt button.cek.sudah {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.appt button.cek.sudah .ico { opacity: 1; transform: scale(1); }
+@media (hover: hover) {
+  .appt button.cek:hover:not(.sudah) { border-color: var(--accent); color: var(--accent-ink); }
+  .appt button.cek:hover:not(.sudah) .ico { opacity: .45; transform: scale(1); }
+}
+/* Barisnya diredupkan sedikit, sama seperti baris reminder yang sudah
+   dihubungi: pekerjaannya sudah selesai, tapi ia tetap perlu terlihat. */
+.appt.selesai .when, .appt.selesai .who { opacity: .68; }
+.appt.selesai:hover .when, .appt.selesai:hover .who { opacity: 1; }
+/* Nama pegawai yang menangani. Sengaja paling kalem di antara tanda-tanda di
+   baris ini — ia catatan sesudah pekerjaannya lewat, bukan sesuatu yang masih
+   harus dikerjakan. */
+.tanda-peg {
+  flex: none; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  font-size: .66rem; font-weight: 600;
+  background: none; color: var(--muted); border: 1px dashed var(--border-kuat);
+}
 .appt button.edit { background: var(--accent-soft); color: var(--accent-ink); }
 .appt button.del { background: var(--red-soft); color: var(--red-ink); }
 .appt button:active { transform: scale(.95); }
@@ -463,6 +494,25 @@ button.primary:active { transform: scale(.985); }
 }
 .sheet-actions .ghost:active, .sheet-actions .primary:active { transform: scale(.985); }
 .empty { color: var(--text-2); font-size: .86rem; padding: 20px 0; text-align: center; }
+
+/* ---- Pilih pegawai di kotak "treatment selesai" ---- */
+.peg-pilih { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.peg-btn {
+  padding: 9px 14px; cursor: pointer; font-family: inherit;
+  font-size: .8125rem; font-weight: 600;
+  border: 1px solid var(--border-kuat); border-radius: 999px;
+  background: var(--card); color: var(--text-2);
+}
+.peg-btn.aktif { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (hover: hover) {
+  .peg-btn:hover:not(.aktif) { background: var(--field); }
+  .peg-btn.aktif:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+}
+.peg-kosong { margin: 0; font-size: .8125rem; color: var(--muted); font-style: italic; }
+/* Isian nama baru: sederet dengan tombolnya, karena keduanya satu tindakan. */
+.peg-tambah { display: flex; gap: 8px; align-items: stretch; margin-top: 10px; }
+.peg-tambah input { flex: 1; min-width: 0; margin: 0; }
+.peg-tambah .ghost { flex: none; margin-top: 0; padding-left: 16px; padding-right: 16px; }
 
 /* ---- Konfirmasi customer baru ---- */
 .sheet-sub { margin: 6px 0 0; font-size: .8125rem; color: var(--text-2); line-height: 1.45; }
@@ -877,6 +927,9 @@ button.primary:active { transform: scale(.985); }
 @media (pointer: coarse) {
   .gesture-hint { display: block; }
   .appt button.edit, .appt button.del { display: none; }
+  /* Centang tetap ada: ia satu-satunya jalan menandai selesai — Ubah dan Hapus
+     masih terjangkau lewat tekan-lama dan geser kiri. */
+  .appt button.cek { display: inline-flex; }
 }
 
 @media (prefers-reduced-motion: reduce) {
