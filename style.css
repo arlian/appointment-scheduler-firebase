@@ -466,6 +466,15 @@ button.primary:active { transform: scale(.985); }
 
 /* ---- Konfirmasi customer baru ---- */
 .sheet-sub { margin: 6px 0 0; font-size: .8125rem; color: var(--text-2); line-height: 1.45; }
+/* Contoh kalimat pembuka di kotak sapaan. Dibedakan dari keterangan biasa
+   karena ia bukan penjelasan, melainkan teks yang benar-benar akan terkirim —
+   bentuknya kutipan, bukan kalimat aplikasi. */
+.sheet-contoh {
+  margin: 10px 0 0; padding: 9px 12px; border-radius: 10px;
+  background: var(--field); border-left: 3px solid var(--accent);
+  font-size: .8125rem; line-height: 1.45; color: var(--text);
+}
+.sheet-contoh.kosong { color: var(--muted); font-style: italic; border-left-color: var(--border); }
 /* Dua pilihan setara, ditumpuk — "Customer lama, baru dicatat" tidak akan muat
    di setengah lebar layar HP, dan memendekkannya bikin artinya kabur. */
 .sheet-actions.tumpuk { grid-template-columns: 1fr; gap: 10px; margin-top: 18px; }
