@@ -684,6 +684,41 @@ terpisah:
   selesai dan catatan pegawainya dicabut bersamaan: kalau treatment-nya ternyata
   belum dikerjakan, catatan siapa yang mengerjakan ikut kehilangan artinya.
 
+**Menandai beberapa sekaligus.** Satu pegawai biasanya mengerjakan beberapa
+orang di hari yang sama, dan membuka kotak yang sama berulang-ulang untuk
+jawaban yang sama cuma memperlambat. Tombol **Pilih beberapa** di atas daftar
+menyalakan mode pilih:
+
+- centangnya berhenti berarti "sudah selesai" dan berganti berarti "sedang
+  dipilih" — yang sudah selesai tetap kelihatan lewat lingkaran bertinta muda,
+  barisnya yang redup, dan nama pegawainya;
+- **ketukan di mana pun di barisnya** ikut memilih, bukan cuma di lingkaran
+  kecilnya. Tombol Ubah, Hapus, dan nama dimatikan selama mode ini, dan gestur
+  geser-kiri tidak dipasang — geser yang tidak sengaja saat menyapu daftar
+  jangan sampai menghapus jadwal;
+- **Tandai selesai** membuka kotak yang sama, cuma sekali, dan jawabannya
+  berlaku untuk semuanya. Pegawai yang sudah sama di seluruh pilihan langsung
+  ikut terpilih; kalau campur, tidak ada yang dipilihkan — menebak salah satunya
+  berarti diam-diam menimpa yang lain;
+- **Cabut tanda selesai** tidak lewat kotak pegawai sama sekali: yang dicabut
+  justru catatan pegawainya, jadi tidak ada yang perlu ditanyakan. Sekali tekan,
+  langsung dikerjakan. Tombolnya mati selama tidak ada satu pun pilihan yang
+  bertanda selesai, dan yang dicabut cuma yang memang bertanda — pilihan yang
+  bercampur dengan jadwal biasa tidak apa-apa, dan yang dihitung di kalimat
+  hasilnya cuma yang benar-benar berubah;
+- **Pilih semua per hari**, bukan satu tombol untuk seluruh daftar. Tombolnya
+  duduk di judul hari, jadi cakupannya tidak perlu dijelaskan — yang tersapu
+  jelas jadwal di bawah judul itu saja, dan daftar yang sedang menampilkan
+  sebulan tidak bisa ikut tersapu sekaligus. Ditekan lagi (tulisannya berubah
+  jadi **Kosongkan**) mengosongkan hari itu saja, tanpa mengganggu hari lain
+  yang sudah terpilih.
+
+Tanggal yang terpilih boleh jatuh di bulan yang berbeda-beda: tiap bulan yang
+tersentuh ikut ditulis ulang. Selesai menyimpan, modenya ikut mati — membiarkan
+mode menyala dengan centang yang masih tertinggal cuma menunggu salah tekan.
+Esc juga mematikannya, tapi paling belakang: kalau ada kotak yang sedang
+terbuka, kotak itu dulu yang ditutup.
+
 Di **Analitik** ada kartu **Pegawai**: berapa yang diselesaikan tiap pegawai
 bulan itu, ikut di tabel angka dan ikut di gambar "Salin sebagai Gambar".
 

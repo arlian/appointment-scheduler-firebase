@@ -240,6 +240,18 @@
       </div>
       <p class="list-total" id="listTotal" aria-live="polite"></p>
       <p class="gesture-hint">Geser kiri untuk hapus · tekan lama untuk ubah jadwal</p>
+      <!-- Menandai selesai satu per satu berarti membuka kotak yang sama
+           berulang-ulang padahal jawabannya sama. Di mode ini centangnya
+           mengumpulkan dulu, pegawainya ditanyakan sekali di ujung. -->
+      <div class="pilih-bar">
+        <button type="button" class="pilih-btn" id="pilihMulai">Pilih beberapa</button>
+        <span class="pilih-jml" id="pilihJml" hidden></span>
+        <span class="pilih-aksi" id="pilihAksi" hidden>
+          <button type="button" class="pilih-btn" id="pilihCabut">Cabut tanda selesai</button>
+          <button type="button" class="pilih-btn utama" id="pilihSelesai">Tandai selesai</button>
+          <button type="button" class="pilih-btn" id="pilihKeluar">Keluar</button>
+        </span>
+      </div>
       <!-- Pindah hari, hanya saat yang tampil memang satu tanggal. Tanggal yang
            dituju ditulis di tombolnya, jadi tidak mengulang judul tanggal yang
            sudah tercetak tepat di bawahnya. -->

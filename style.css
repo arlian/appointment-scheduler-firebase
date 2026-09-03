@@ -326,6 +326,49 @@ button.primary:active { transform: scale(.985); }
 .hp-ubah.sendiri::before { content: none; }
 .hp-ubah:hover { color: var(--accent-ink); text-decoration: underline; }
 .hp-ubah.kosong { color: var(--muted); font-style: italic; font-weight: 400; }
+/* ---- Pilih beberapa jadwal sekaligus ---- */
+.pilih-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.pilih-aksi { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.pilih-aksi[hidden] { display: none; }
+.pilih-btn {
+  padding: 6px 12px; font-family: inherit; font-size: .76rem; font-weight: 700;
+  color: var(--text-2); background: var(--card); border: 1px solid var(--border);
+  border-radius: 999px; cursor: pointer;
+}
+.pilih-btn:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--border-kuat); }
+.pilih-btn:active:not(:disabled) { transform: scale(.97); }
+.pilih-btn:disabled { opacity: .45; cursor: default; }
+.pilih-btn.utama { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pilih-btn.utama:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; }
+.pilih-jml { font-size: .78rem; font-weight: 700; color: var(--accent-ink); }
+.pilih-jml[hidden] { display: none; }
+.pilih-jml.kosong { color: var(--muted); font-weight: 600; font-style: italic; }
+/* Di mode pilih, ketukan mana pun di baris berarti memilih — tombol di dalamnya
+   dimatikan supaya tidak ada yang tidak sengaja membuka riwayat atau menghapus
+   jadwal waktu tangan sedang menyapu daftar. */
+.mode-pilih .appt button.nama,
+.mode-pilih .appt button.edit,
+.mode-pilih .appt button.del,
+.mode-pilih .appt .tanda-baru { pointer-events: none; }
+.mode-pilih .appt button.edit, .mode-pilih .appt button.del { opacity: .4; }
+.mode-pilih .appt-main { cursor: pointer; }
+/* Di mode pilih centangnya menunjukkan pilihan, jadi yang sudah selesai
+   kehilangan tandanya. Ia diberi ganti: lingkaran bertinta muda — cukup untuk
+   membedakannya dari yang belum dikerjakan, tanpa tertukar dengan yang sedang
+   dipilih (lingkaran penuh). */
+.mode-pilih .appt.selesai button.cek:not(.sudah) {
+  background: var(--accent-soft); border-color: var(--accent);
+}
+.mode-pilih .appt.selesai button.cek:not(.sudah) .ico { opacity: .5; transform: scale(1); }
+/* Tintnya dilebarkan lewat box-shadow: baris ini tidak punya padding kiri-kanan
+   sendiri, dan warna yang berhenti persis di ujung teks terbaca seperti sisa
+   render, bukan seperti baris yang sedang terpilih. */
+.appt.dipilih .appt-main {
+  background: var(--accent-soft); border-radius: 3px;
+  box-shadow: 0 0 0 7px var(--accent-soft);
+}
+.appt.dipilih .when, .appt.dipilih .who { opacity: 1; }
+
 /* Pindah hari: duduk tepat di atas daftar, satu tombol di tiap ujung supaya
    arah gesernya sejalan dengan letak tombolnya */
 .hari-bar { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
@@ -349,6 +392,22 @@ button.primary:active { transform: scale(.985); }
   margin-left: auto; letter-spacing: 0; text-transform: none;
   font-weight: 600; font-variant-numeric: tabular-nums;
 }
+/* "Pilih semua" di judul hari, cuma ada selama mode pilih menyala. Bentuknya
+   mengikuti judulnya — kecil dan kalem: ia jalan pintas, bukan tombol utama. */
+.hari-pilih {
+  margin-left: 10px; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: .64rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent-soft); border: 0;
+}
+.day-jml + .hari-pilih { margin-left: 10px; }
+/* Tanpa jumlah jadwal di sebelahnya (mode riwayat), ia sendiri yang menempel
+   ke ujung kanan. Judul harinya teks telanjang, bukan elemen, jadi tombolnya
+   memang anak elemen pertama waktu ia sendirian. */
+.day-head > .hari-pilih:first-child { margin-left: auto; }
+.hari-pilih:hover { background: var(--accent); color: #fff; }
+.hari-pilih:active { transform: scale(.96); }
+
 .appt { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
 .appt:last-child { border-bottom: 0; }
 .appt-main {

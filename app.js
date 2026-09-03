@@ -1235,6 +1235,9 @@ document.addEventListener('keydown', (e) => {
   if (!$('cabangSheet').hidden) closeCabangSheet();
   if (!$('slotSheet').hidden) tutupSlot();
   if (!$('reminderSheet').hidden) tutupReminder();
+  // Paling belakang: mode pilih bukan lapisan di atas layar, jadi ia baru
+  // dimatikan kalau memang tidak ada kotak apa pun yang sedang terbuka.
+  else if (modePilih) setModePilih(false);
 });
 
 $('editSave').addEventListener('click', () => {
@@ -1319,13 +1322,101 @@ const hapusFotoJadwal = (a) =>
 // Keduanya satu keputusan ("sudah dikerjakan, oleh siapa"), jadi satu kotak.
 // Centang di baris jadwal cuma pintunya; yang menyimpan tombol di kotak ini.
 // ============================================================
-let selesaiId = null;   // id jadwal yang sedang dibuka
-let selesaiPeg = null;  // nama pegawai yang sedang terpilih, null = belum ada
+let selesaiId = null;     // id jadwal yang sedang dibuka, kalau cuma satu
+let selesaiBanyak = null; // array id, kalau yang dibuka hasil pilih beberapa
+let selesaiPeg = null;    // nama pegawai yang sedang terpilih, null = belum ada
+
+// Mode pilih beberapa. Menandai selesai satu per satu berarti membuka kotak
+// yang sama berulang-ulang padahal jawabannya sama — satu pegawai biasanya
+// mengerjakan beberapa orang di hari yang sama. Di mode ini centangnya
+// mengumpulkan dulu, dan pegawainya ditanyakan sekali di ujung.
+let modePilih = false;
+const dipilih = new Set();
+
+function setModePilih(nyala) {
+  modePilih = nyala;
+  dipilih.clear();
+  perbaruiPilihBar();
+  renderList();
+}
+
+function togglePilih(id) {
+  if (dipilih.has(id)) dipilih.delete(id); else dipilih.add(id);
+  perbaruiPilihBar();
+  renderList();
+}
+
+function perbaruiPilihBar() {
+  const n = dipilih.size;
+  $('pilihMulai').hidden = modePilih;
+  $('pilihAksi').hidden = !modePilih;
+  $('pilihJml').hidden = !modePilih;
+  $('pilihJml').textContent = n ? n + ' dipilih' : 'Ketuk centangnya';
+  $('pilihJml').classList.toggle('kosong', !n);
+  // Tombolnya tetap terlihat walau belum ada yang dipilih — tombol yang hilang
+  // timbul tiap kali centang ditekan membuat barisnya bergoyang sendiri.
+  $('pilihSelesai').disabled = !n;
+  // Mencabut cuma masuk akal kalau ada yang memang sudah ditandai. Tombolnya
+  // tetap terlihat walau mati, supaya letak tombol di sebelahnya tidak berpindah
+  // tiap kali pilihannya berubah.
+  $('pilihCabut').disabled = !adaSelesaiDipilih();
+}
+
+const adaSelesaiDipilih = () =>
+  [...dipilih].some((id) => {
+    const a = appointments.find((x) => x.id === id);
+    return a && a.done === true;
+  });
+
+$('pilihMulai').addEventListener('click', () => setModePilih(true));
+$('pilihKeluar').addEventListener('click', () => setModePilih(false));
+$('pilihSelesai').addEventListener('click', () => {
+  if (dipilih.size) bukaSelesaiBanyak([...dipilih]);
+});
+// Mencabut tidak lewat kotak pegawai sama sekali: yang dicabut justru catatan
+// pegawainya, jadi tidak ada yang perlu ditanyakan. Sekali tekan, langsung
+// dikerjakan — sama seperti mencabut tanda "sudah diingatkan" di daftar
+// reminder, dan sama-sama bisa dipasang lagi kalau ternyata salah tekan.
+$('pilihCabut').addEventListener('click', () => {
+  if (!dipilih.size) return;
+  selesaiId = null;
+  selesaiBanyak = [...dipilih];
+  selesaiPeg = null;
+  simpanSelesai(false);
+});
+
+// Beberapa jadwal sekaligus. Pertanyaannya sama persis, jadi kotaknya juga
+// sama — yang berbeda cuma yang tertulis di kepalanya dan berapa jadwal yang
+// nanti ikut tersentuh waktu disimpan.
+function bukaSelesaiBanyak(ids) {
+  const rows = ids.map((id) => appointments.find((a) => a.id === id)).filter(Boolean);
+  if (!rows.length) return;
+  selesaiId = null;
+  selesaiBanyak = rows.map((a) => a.id);
+  // Pegawai yang sudah sama di seluruh pilihan langsung ikut terpilih; kalau
+  // campur, tidak ada yang dipilihkan — menebak salah satunya berarti diam-diam
+  // menimpa yang lain waktu disimpan.
+  const pegSama = rows.every((a) => (a.staff || '') === (rows[0].staff || ''))
+    ? (rows[0].staff || '') : '';
+  selesaiPeg = pegSama || null;
+  $('selesaiNama').textContent = rows.length + ' treatment dipilih';
+  // Namanya disebut sampai tiga, sisanya dihitung — daftar dua puluh nama di
+  // kepala kotak justru tidak terbaca lagi.
+  const nama = [...new Set(rows.map((a) => nameOf(a.customerId)))];
+  $('selesaiWaktu').textContent = nama.slice(0, 3).join(', ')
+    + (nama.length > 3 ? ', dan ' + (nama.length - 3) + ' lainnya' : '');
+  $('selesaiBatalkan').hidden = !rows.some((a) => a.done);
+  $('selesaiSimpan').textContent = 'Tandai selesai';
+  $('selesaiPegBaru').value = '';
+  renderPilihPegawai();
+  $('selesaiSheet').hidden = false;
+}
 
 function bukaSelesai(apptId) {
   const a = appointments.find((x) => x.id === apptId);
   if (!a) return;
   selesaiId = apptId;
+  selesaiBanyak = null;
   selesaiPeg = a.staff || null;
   $('selesaiNama').textContent = nameOf(a.customerId);
   const jenis = rapikanTreatment(a.treatments);
@@ -1387,30 +1478,56 @@ function tambahPegawai() {
 function tutupSelesai() {
   $('selesaiSheet').hidden = true;
   selesaiId = null;
+  selesaiBanyak = null;
   selesaiPeg = null;
 }
 
 function simpanSelesai(selesai) {
-  const a = appointments.find((x) => x.id === selesaiId);
-  if (!a) { tutupSelesai(); return; }
+  const ids = selesaiBanyak || (selesaiId ? [selesaiId] : []);
+  const rows = ids.map((id) => appointments.find((a) => a.id === id)).filter(Boolean);
+  // Semuanya bisa saja sudah dihapus perangkat lain selagi kotak ini terbuka.
+  if (!rows.length) { tutupSelesai(); return; }
   if (!bolehUbah()) return;
-  if (selesai) {
-    a.done = true;
-    if (selesaiPeg) a.staff = selesaiPeg; else delete a.staff;
-  } else {
-    // Dibatalkan berarti treatment-nya belum dikerjakan, dan catatan siapa yang
-    // mengerjakan ikut kehilangan artinya.
-    delete a.done;
-    delete a.staff;
+  const peg = selesaiPeg;
+  // Tanggalnya bisa jatuh di bulan yang berbeda-beda — tiap bulan yang tersentuh
+  // harus ikut ditulis ulang, kalau tidak sebagian perubahannya tidak tersimpan.
+  const bulan = new Set();
+  // Yang benar-benar berubah dihitung sendiri: waktu mencabut, pilihan biasanya
+  // bercampur dengan jadwal yang memang belum pernah ditandai, dan menyebut
+  // seluruh jumlah pilihan membuat kalimatnya berbohong.
+  let ubah = 0;
+  let namaUbah = '';
+  rows.forEach((a) => {
+    if (selesai) {
+      a.done = true;
+      if (peg) a.staff = peg; else delete a.staff;
+    } else {
+      if (a.done !== true) return;
+      // Dibatalkan berarti treatment-nya belum dikerjakan, dan catatan siapa
+      // yang mengerjakan ikut kehilangan artinya.
+      delete a.done;
+      delete a.staff;
+    }
+    if (!ubah) namaUbah = nameOf(a.customerId);
+    ubah++;
+    bulan.add(kunciDari(a.date));
+  });
+  // Tidak ada satu pun yang perlu dicabut: tidak ada yang ditulis ke server,
+  // dan tidak ada kabar palsu bahwa sesuatu sudah dikerjakan.
+  if (!ubah) {
+    tutupSelesai();
+    toast('Tidak ada yang bertanda selesai di pilihan ini.', true);
+    return;
   }
-  const nama = nameOf(a.customerId);
-  const peg = a.staff;
-  simpanBulan(new Set([kunciDari(a.date)]));
+  simpanBulan(bulan);
   tutupSelesai();
-  renderList();
+  // Pilihannya sudah dikerjakan, jadi modenya ikut selesai — membiarkannya
+  // menyala dengan centang yang masih tertinggal cuma menunggu salah tekan.
+  if (modePilih) setModePilih(false); else renderList();
+  const sebut = ubah > 1 ? ubah + ' treatment' : 'Treatment ' + namaUbah;
   toast(selesai
-    ? 'Treatment ' + nama + ' ditandai selesai' + (peg ? ' — dikerjakan ' + peg + '.' : '.')
-    : 'Tanda selesai pada treatment ' + nama + ' dicabut.');
+    ? sebut + ' ditandai selesai' + (peg ? ' — dikerjakan ' + peg + '.' : '.')
+    : 'Tanda selesai pada ' + (ubah > 1 ? sebut : namaUbah) + ' dicabut.');
 }
 
 $('selesaiSimpan').addEventListener('click', () => simpanSelesai(true));
@@ -1430,7 +1547,17 @@ $('selesaiSheet').addEventListener('click', (e) => {
 function renderList() {
   const list = $('list');
   list.innerHTML = '';
+  list.classList.toggle('mode-pilih', modePilih);
   const rows = filteredRows();
+  // Jadwal yang sudah dihapus — di sini atau di perangkat lain — tidak boleh
+  // tertinggal di dalam pilihan: hitungannya jadi menyebut baris yang tidak
+  // ada, dan tombol "Kosongkan" tidak pernah terbaca penuh.
+  if (modePilih && dipilih.size) {
+    const ada = new Set(appointments.map((a) => a.id));
+    let hilang = false;
+    dipilih.forEach((id) => { if (!ada.has(id)) { dipilih.delete(id); hilang = true; } });
+    if (hilang) perbaruiPilihBar();
+  }
   setRingkasList(rows);
   setRingkasTreat(rows);
   if (!rows.length) {
@@ -1465,6 +1592,25 @@ function renderList() {
         jml.textContent = perHari.get(r.date) + ' jadwal';
         h.appendChild(jml);
       }
+      // "Pilih semua" duduk di judul hari, bukan di baris tombol atas: dengan
+      // begitu cakupannya tidak perlu dijelaskan — yang tersapu jelas jadwal
+      // yang ada di bawah judul itu saja. Satu tombol untuk seluruh daftar
+      // terlalu jauh akibatnya kalau daftarnya sedang menampilkan sebulan.
+      if (modePilih) {
+        const idHari = rows.filter((x) => x.date === r.date).map((x) => x.id);
+        const penuh = idHari.every((id) => dipilih.has(id));
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hari-pilih';
+        b.textContent = penuh ? 'Kosongkan' : 'Pilih semua';
+        b.title = (penuh ? 'Kosongkan pilihan ' : 'Pilih semua jadwal ') + hariBulan(r.date);
+        b.onclick = () => {
+          idHari.forEach((id) => { if (penuh) dipilih.delete(id); else dipilih.add(id); });
+          perbaruiPilihBar();
+          renderList();
+        };
+        h.appendChild(b);
+      }
       list.appendChild(h);
       lastDate = r.date;
       // Nomornya tidak diulang dari 1 di mode riwayat: di situ ia justru jadi
@@ -1498,16 +1644,34 @@ function renderList() {
     // sebelahnya yang disembunyikan, karena keduanya punya gestur pengganti;
     // menandai selesai tidak punya.
     const cekEl = el.querySelector('.cek');
-    cekEl.classList.toggle('sudah', !!r.done);
-    cekEl.setAttribute('aria-pressed', r.done ? 'true' : 'false');
-    cekEl.title = r.done
-      ? 'Selesai' + (r.staff ? ' — dikerjakan ' + r.staff : '') + '. Ketuk untuk mengubah.'
-      : 'Tandai treatment selesai';
-    cekEl.onclick = () => bukaSelesai(r.id);
+    // Di mode pilih, centangnya berhenti menunjukkan "sudah selesai" dan
+    // berganti menunjukkan "sedang dipilih". Keadaan selesai tidak ikut hilang
+    // dari layar: barisnya tetap redup dan nama pegawainya tetap tertulis.
+    const tandai = modePilih ? dipilih.has(r.id) : !!r.done;
+    cekEl.classList.toggle('sudah', tandai);
+    cekEl.setAttribute('aria-pressed', tandai ? 'true' : 'false');
+    cekEl.title = modePilih
+      ? (tandai ? 'Batal pilih' : 'Pilih jadwal ini' + (r.done ? ' (sudah selesai)' : ''))
+      : r.done
+        ? 'Selesai' + (r.staff ? ' — dikerjakan ' + r.staff : '') + '. Ketuk untuk mengubah.'
+        : 'Tandai treatment selesai';
+    cekEl.onclick = (e) => {
+      // Ketukan di centang tidak boleh ikut terbaca sebagai ketukan di baris —
+      // di mode pilih keduanya menyalakan hal yang sama dan pilihannya batal
+      // lagi seketika.
+      e.stopPropagation();
+      if (modePilih) togglePilih(r.id); else bukaSelesai(r.id);
+    };
     el.classList.toggle('selesai', !!r.done);
+    el.classList.toggle('dipilih', modePilih && dipilih.has(r.id));
     el.querySelector('.edit').onclick = () => openEdit(r.id);
     el.querySelector('.del').onclick = () => confirmDelete(r);
-    attachRowGestures(main, r);
+    // Di mode pilih, seluruh barisnya jadi sasaran ketuk — mengharuskan
+    // lingkaran kecil yang tepat sasaran padahal yang sedang dikerjakan
+    // belasan baris cuma memperlambat. Gesturnya tidak dipasang: geser kiri
+    // yang tidak sengaja saat memilih akan menghapus jadwal.
+    if (modePilih) main.onclick = () => togglePilih(r.id);
+    else attachRowGestures(main, r);
     const noUrut = el.querySelector('.urut');
     noUrut.textContent = String(urut);
     noUrut.setAttribute('aria-label', filterMode === 'cust'
