@@ -478,10 +478,11 @@ function ringkasTreatment(rows) {
 // Yang belum ditandai selesai sama sekali tidak ikut: pertanyaannya "siapa
 // mengerjakan berapa", dan jadwal yang belum dikerjakan belum punya jawabannya.
 //
-// Yang selesai tapi pegawainya tidak disebut tetap dihitung, sebagai barisnya
-// sendiri paling bawah — kalau dibuang, jumlah seluruh baris tidak lagi sama
-// dengan jumlah yang selesai, dan angka yang tidak menjumlah membuat orang
-// mencari-cari selisihnya.
+// Pegawai sekarang wajib diisi waktu menandai selesai, tapi data lama — dan
+// yang namanya dihapus dari daftar — masih bisa kosong. Yang seperti itu tetap
+// dihitung, sebagai barisnya sendiri paling bawah: kalau dibuang, jumlah
+// seluruh baris tidak lagi sama dengan jumlah yang selesai, dan angka yang
+// tidak menjumlah membuat orang mencari-cari selisihnya.
 function ringkasPegawai(rows) {
   const selesai = rows.filter((a) => a.done === true);
   const peta = new Map();
@@ -1321,6 +1322,11 @@ const hapusFotoJadwal = (a) =>
 //
 // Keduanya satu keputusan ("sudah dikerjakan, oleh siapa"), jadi satu kotak.
 // Centang di baris jadwal cuma pintunya; yang menyimpan tombol di kotak ini.
+//
+// Pegawainya wajib diisi: setengah jawaban ("sudah dikerjakan, entah oleh
+// siapa") tidak bisa dilengkapi belakangan — beberapa hari kemudian tidak ada
+// lagi yang ingat, dan rekap per pegawai di analitik ikut kehilangan angkanya.
+// Yang dicabut tidak menanyakan apa-apa, jadi tidak ikut aturan ini.
 // ============================================================
 let selesaiId = null;     // id jadwal yang sedang dibuka, kalau cuma satu
 let selesaiBanyak = null; // array id, kalau yang dibuka hasil pilih beberapa
@@ -1432,9 +1438,17 @@ function bukaSelesai(apptId) {
   $('selesaiSheet').hidden = false;
 }
 
+// Tombol simpannya mati selama belum ada pegawai yang terpilih. Dimatikan,
+// bukan disembunyikan: tombol yang timbul-hilang tiap kali nama ditekan
+// membuat kotaknya bergoyang sendiri. Yang mencabut tidak ikut dimatikan.
+function perbaruiSimpanSelesai() {
+  $('selesaiSimpan').disabled = !selesaiPeg;
+}
+
 function renderPilihPegawai() {
   const box = $('selesaiPeg');
   box.innerHTML = '';
+  perbaruiSimpanSelesai();
   const daftar = staff.slice();
   // Pegawai yang sudah tidak ada di daftar tapi masih tercatat di jadwal ini
   // tetap ikut muncul — kalau tidak, pilihan yang sudah tersimpan terbaca
@@ -1489,6 +1503,12 @@ function simpanSelesai(selesai) {
   if (!rows.length) { tutupSelesai(); return; }
   if (!bolehUbah()) return;
   const peg = selesaiPeg;
+  // Tombolnya sudah mati kalau pegawainya belum dipilih; ini penjaga terakhir
+  // supaya jalan lain ke sini tidak menyelipkan tanda selesai tanpa nama.
+  if (selesai && !peg) {
+    toast('Pilih dulu pegawai yang menangani.', true);
+    return;
+  }
   // Tanggalnya bisa jatuh di bulan yang berbeda-beda — tiap bulan yang tersentuh
   // harus ikut ditulis ulang, kalau tidak sebagian perubahannya tidak tersimpan.
   const bulan = new Set();
