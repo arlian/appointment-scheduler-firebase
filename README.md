@@ -149,9 +149,9 @@ WA, export/import), ditambah:
     per pegawai yang menangani. Pembaginya jumlah yang **selesai**, bukan seluruh
     treatment bulan itu: kalau dibagi seluruhnya, bulan yang baru separuh
     ditandai membuat semua pegawai terbaca berkinerja setengah, padahal yang
-    belum ditandai belum tentu belum dikerjakan. Yang selesai tapi pegawainya
-    tidak disebut tetap dihitung sebagai barisnya sendiri (abu-abu, paling
-    bawah) supaya jumlah seluruh barisnya tetap sama dengan jumlah yang selesai;
+    belum ditandai belum tentu belum dikerjakan. Pegawai sekarang wajib diisi
+    waktu menandai selesai, tapi data lama masih bisa kosong — yang seperti itu
+    tetap dihitung sebagai barisnya sendiri (abu-abu, paling bawah) supaya jumlah seluruh barisnya tetap sama dengan jumlah yang selesai;
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
     dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
     HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
@@ -674,8 +674,13 @@ terpisah:
 
 - **Pegawai yang menangani** dipilih dari daftar pegawai cabang itu. Ditekan
   lagi berarti batal memilih — satu-satunya jalan mencabut pegawai dari jadwal
-  yang terlanjur salah isi. Pilihannya **opsional**: treatment tetap bisa
-  ditandai selesai tanpa menyebut siapa pun.
+  yang terlanjur salah isi. Pilihannya **wajib**: selama belum ada nama yang
+  terpilih, tombol **Tandai selesai** mati (mati, bukan hilang — letaknya tidak
+  berpindah, jadi jelas tombol itu yang sedang ditunggu). Alasannya setengah
+  jawaban tidak bisa dilengkapi belakangan: beberapa hari kemudian tidak ada
+  lagi yang ingat siapa yang menangani, dan rekap per pegawai di analitik ikut
+  kehilangan angkanya. Jadwal lama yang terlanjur ditandai tanpa nama tetap
+  terbaca seperti sebelumnya; yang dibuka lagi baru diminta melengkapi.
 - **Nama pegawai baru** ditambahkan langsung dari kotak itu juga, dan yang baru
   ditambahkan langsung ikut terpilih — yang mengetiknya sedang menjawab "siapa
   yang menangani", bukan sedang mengurus daftar pegawai. Nama kembar (beda besar
