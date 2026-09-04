@@ -281,8 +281,11 @@ button.primary {
   border-radius: 12px; cursor: pointer; box-shadow: var(--shadow-accent);
   transition: background .15s;
 }
-button.primary:hover { background: var(--accent-deep); }
-button.primary:active { transform: scale(.985); }
+button.primary:hover:not(:disabled) { background: var(--accent-deep); }
+button.primary:active:not(:disabled) { transform: scale(.985); }
+/* Mati, bukan hilang: yang belum lengkap isiannya tetap melihat tombolnya di
+   tempat yang sama, jadi jelas tombol itu yang sedang ditunggu. */
+button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 
 /* ---- Autocomplete ---- */
 .name-box { position: relative; }
@@ -858,12 +861,16 @@ button.primary:active { transform: scale(.985); }
 .treat-field { margin-top: 14px; margin-bottom: 20px; }
 .treat-field > label:first-child { margin-top: 0; }
 /* Ditempel di labelnya, bukan ditulis di keterangan bawah: yang perlu tahu
-   ini boleh dilewat adalah orang yang sedang membaca judul fieldnya. */
-.opsional {
+   field ini boleh dilewat atau tidak adalah orang yang sedang membaca
+   judulnya. */
+.opsional, .wajib {
   margin-left: 6px; padding: 2px 7px; border-radius: 999px;
   background: var(--field); color: var(--muted);
   font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
 }
+/* Kebalikannya, jadi bentuknya sama dan cuma warnanya yang berbeda — dibaca
+   sekilas sebagai penanda yang sejenis, bukan sebagai peringatan baru. */
+.wajib { background: var(--accent-soft); color: var(--accent-ink); }
 .treat-seg { display: flex; gap: 8px; }
 .treat-btn {
   position: relative;
