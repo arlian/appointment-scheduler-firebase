@@ -244,6 +244,13 @@ Tambahan lebih dari satu disambung "&", bukan dirangkai plus sendiri-sendiri:
 `+Exo +Muka` terbaca seperti dua tanda yang kebetulan berdempetan, sedangkan
 `+Exo & Muka` jelas satu tanda berisi dua hal.
 
+Bedanya cuma di letak: di salinan WhatsApp tandanya menempel di belakang nama,
+sedangkan **di daftar jadwal ia turun ke barisnya sendiri di bawah nama** —
+berbaris dengan nama pegawai yang mengerjakan dan tanda "Baru". Ketiganya
+pernah berjejer di belakang nama, dan pada baris yang kena ketiganya sekaligus
+nama panjang tinggal beberapa huruf sebelum terpotong. Baris keterangan itu
+hilang sendiri kalau memang tidak ada satu pun yang perlu ditulis.
+
 Di bawah daftar jadwal ada rekap **jumlah tiap kombinasi** dari jadwal yang
 sedang tampil
 (mis. `Rambut + Exo : 3`), diurutkan dari kombinasi terbanyak. Jadwal yang
@@ -729,7 +736,7 @@ bulan itu, ikut di tabel angka dan ikut di gambar "Salin sebagai Gambar".
 
 Di daftar jadwal, yang sudah selesai diredupkan sedikit (sama seperti baris
 reminder yang sudah dihubungi — pekerjaannya selesai, tapi tetap perlu terlihat)
-dan nama pegawainya tertulis di sebelah nama customer.
+dan nama pegawainya tertulis di baris keterangan di bawah nama customer.
 
 Centangnya **tetap ada di layar sempit**, sedangkan tombol Ubah dan Hapus
 disembunyikan seperti biasa: keduanya punya gestur pengganti (tekan lama dan
