@@ -1655,7 +1655,8 @@ function renderList() {
     main.innerHTML =
       '<div class="urut"></div>' +
       '<div class="when"><div class="t"></div></div>' +
-      '<div class="who"><div class="n"><button type="button" class="nama"></button></div></div>' +
+      '<div class="who"><div class="n"><button type="button" class="nama"></button></div>' +
+        '<div class="tanda"></div></div>' +
       '<button type="button" class="cek">' + ikon('cek') + '</button>' +
       '<button class="edit" title="Ubah jadwal">Ubah</button>' +
       '<button class="del" title="Hapus jadwal">Hapus</button>';
@@ -1702,17 +1703,12 @@ function renderList() {
     namaEl.textContent = nameOf(r.customerId);
     namaEl.title = 'Lihat semua kunjungan ' + nameOf(r.customerId);
     namaEl.onclick = () => cariCustomer(r.customerId);
-    // Pegawai yang menangani, cuma pada yang sudah ditandai selesai. Ditulis di
-    // baris namanya, bukan di dalam centang: yang dicari waktu daftar ini
-    // dipindai adalah "siapa mengerjakan siapa", dan itu terbaca sekali lihat
-    // kalau dua-duanya berdampingan.
-    if (r.done && r.staff) {
-      const peg = document.createElement('span');
-      peg.className = 'tanda-peg';
-      peg.textContent = r.staff;
-      peg.title = 'Dikerjakan ' + r.staff;
-      el.querySelector('.n').appendChild(peg);
-    }
+    // Tanda-tandanya turun ke barisnya sendiri di bawah nama, tidak lagi
+    // berjejer di belakangnya: pada baris yang lengkap — treatment, pegawai,
+    // dan "Baru" sekaligus — nama panjang tinggal tersisa beberapa huruf
+    // sebelum terpotong. Dipisah begini namanya selalu utuh, dan tanda-tanda
+    // itu terbaca sebagai keterangan jadwalnya, bukan bagian dari namanya.
+    const tandaEl = el.querySelector('.tanda');
     // Bentuk tandanya sama persis dengan yang nanti keluar di salinan WA
     const tandaT = tandaTreatment(r.treatments);
     if (tandaT) {
@@ -1720,12 +1716,23 @@ function renderList() {
       chip.className = 'tanda-treat';
       chip.textContent = tandaT;
       chip.title = 'Jenis treatment: ' + namaKombinasi(rapikanTreatment(r.treatments));
-      el.querySelector('.n').appendChild(chip);
+      tandaEl.appendChild(chip);
+    }
+    // Pegawai yang menangani, cuma pada yang sudah ditandai selesai. Ditulis di
+    // barisnya, bukan di dalam centang: yang dicari waktu daftar ini dipindai
+    // adalah "siapa mengerjakan siapa", dan itu terbaca sekali lihat kalau
+    // dua-duanya masih dalam satu baris jadwal.
+    if (r.done && r.staff) {
+      const peg = document.createElement('span');
+      peg.className = 'tanda-peg';
+      peg.textContent = r.staff;
+      peg.title = 'Dikerjakan ' + r.staff;
+      tandaEl.appendChild(peg);
     }
     // Cuma customer baru yang diberi tanda. Keterangan "customer lama · Nx
-    // <bulan>" yang dulu duduk di bawah nama sudah tidak ada: satu baris per
-    // jadwal jauh lebih cepat dipindai, dan jumlah kunjungannya justru lebih
-    // lengkap terbaca di riwayat — sejauh tap namanya.
+    // <bulan>" yang dulu duduk di sini sudah tidak ada — kalimat sepanjang itu
+    // di tiap baris memperlambat pemindaian, dan jumlah kunjungannya justru
+    // lebih lengkap terbaca di riwayat, sejauh tap namanya.
     // Tandanya sekaligus jadi jalan mencabutnya: kalau yang terbaca salah,
     // yang salah itu justru yang sedang dilihat. <button>, bukan <span> —
     // attachRowGestures melewati apa pun yang berupa tombol, jadi menekannya
@@ -1737,7 +1744,7 @@ function renderList() {
       tanda.textContent = 'Baru';
       tanda.title = 'Customer baru — ketuk untuk mengubah statusnya';
       tanda.onclick = () => bukaUbahStatus(r.customerId);
-      el.querySelector('.n').appendChild(tanda);
+      tandaEl.appendChild(tanda);
     }
     list.appendChild(el);
   });
