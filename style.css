@@ -438,13 +438,19 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   font-variant-numeric: tabular-nums; letter-spacing: -.01em;
 }
 .appt .who { flex: 1; min-width: 0; }
-/* Nama boleh terpotong kalau kepanjangan, tandanya jangan — makanya baris ini
-   flex: yang menyusut cuma namanya, tanda "Baru" tetap utuh di sebelahnya. */
 /* 16px, turun dari 17px: nama tetap yang paling menonjol di barisnya, tapi
-   jaraknya ke jam (14px) dan ke tanda-tanda di sebelahnya tidak lagi selebar
+   jaraknya ke jam (14px) dan ke keterangan di bawahnya tidak lagi selebar
    dulu — barisnya jadi lebih tenang waktu daftarnya panjang. */
-.appt .who .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1rem; }
+.appt .who .n { display: flex; align-items: center; font-weight: 600; font-size: 1rem; }
 .appt .who .n .nama { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Baris keterangan di bawah nama: jenis treatment, pegawai yang mengerjakan,
+   dan tanda "Baru". Dulu ketiganya berjejer di belakang nama dan nama panjang
+   yang kena ketiganya sekaligus tinggal beberapa huruf sebelum terpotong.
+   Boleh melipat ke baris berikutnya — lebih baik barisnya bertambah tinggi
+   daripada ada tanda yang hilang terdorong keluar. Kosong berarti tidak ada
+   keterangannya sama sekali: baris itu ikut hilang, tidak menyisakan jarak. */
+.appt .who .tanda { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 3px; }
+.appt .who .tanda:empty { display: none; }
 .tanda-baru {
   flex: none; padding: 1.5px 7px; border: 0; border-radius: 999px;
   font-family: inherit; cursor: pointer;
