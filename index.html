@@ -425,7 +425,9 @@
   </div>
 </div>
 <!-- Slot kosong: jam yang masih ada pegawai luang, dihitung dari perkiraan
-     durasi tiap treatment. Isinya ikut filter tanggal yang sedang dipilih. -->
+     durasi tiap treatment. Rentang harinya diatur di dalam sheet ini sendiri —
+     bawaannya seminggu ke depan — dan masih bisa dikembalikan ke filter tanggal
+     yang sedang dipilih di daftar jadwal. -->
 <div class="sheet-backdrop" id="slotSheet" hidden>
   <div class="sheet sheet-lebar">
     <h2>Slot Kosong</h2>
@@ -445,6 +447,31 @@
            dua setelan yang sama-sama menentukan bentuk satu hari. -->
       <div id="slotJamBox" class="slot-jam-minggu"></div>
       <span class="slot-atur-ket">Bawaannya 10:00–17:00, tersimpan sendiri-sendiri tiap cabang. Hari yang jumlah pegawainya nol tetap tutup, berapa pun jamnya.</span>
+    </div>
+    <!-- Rentang hari yang dicari. Berdiri sendiri, tidak lagi selalu ikut
+         filter halaman: yang ditanya customer hampir selalu "kapan ada kosong
+         minggu ini", sementara filternya hampir selalu tertinggal di Hari Ini —
+         dan melebarkannya cuma untuk melihat slot berarti memindahkan daftar
+         jadwal di belakang sheet ini juga. -->
+    <div class="slot-rentang">
+      <label id="slotRentangLabel">Hari yang dicari</label>
+      <div class="treat-seg" role="group" aria-labelledby="slotRentangLabel" id="slotRentang">
+        <button type="button" class="treat-btn" data-r="depan" aria-pressed="false">
+          <svg class="treat-cek" aria-hidden="true"><use href="#i-cek"/></svg>Ke depan
+        </button>
+        <button type="button" class="treat-btn" data-r="filter" aria-pressed="false">
+          <svg class="treat-cek" aria-hidden="true"><use href="#i-cek"/></svg>Ikut filter halaman
+        </button>
+      </div>
+      <!-- Kotak angkanya sebaris dengan keterangannya supaya terbaca sebagai
+           satu kalimat, "7 hari ke depan" — bukan angka yang berdiri sendiri.
+           Isinya dibangun app.js lewat buatStepper(), sama dengan kotak jumlah
+           pegawai di atas. -->
+      <div class="rentang-hari">
+        <span id="slotHariBox"></span>
+        <span class="rentang-hari-ket">hari ke depan, dihitung dari hari ini</span>
+      </div>
+      <div class="treat-hint" id="slotRentangHint"></div>
     </div>
     <!-- Pemilihnya sengaja sama persis dengan yang di form isi jadwal: yang
          dipikirkan operator "rambut sama muka", bukan mencari baris

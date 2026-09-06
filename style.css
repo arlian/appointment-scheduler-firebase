@@ -1018,7 +1018,7 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
    tiap hari punya beberapa baris rentang jam sendiri. */
 .sheet-lebar { max-width: 560px; max-height: 86vh; overflow-y: auto; }
 .slot-sub { font-size: .78rem; color: var(--muted); margin: 0 0 14px; }
-.slot-atur label, .slot-jenis label, .slot-atur-judul {
+.slot-atur label, .slot-jenis label, .slot-rentang label, .slot-atur-judul {
   display: block; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 4px;
 }
 /* Kotak angka dengan tombol − dan +. Dibuat besar dengan sengaja: di iPhone
@@ -1062,6 +1062,15 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   content: ''; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px;
 }
 .slot-jenis { margin-top: 14px; }
+/* Rentang hari yang dicari. Kotak angkanya berdiri sebaris dengan keterangannya
+   supaya terbaca sebagai satu kalimat — "7 hari ke depan" — bukan sebagai angka
+   lepas yang harus ditebak satuannya. Barisnya boleh melipat: di layar 320px
+   kotak 44px plus kalimatnya tidak muat berdampingan. */
+.slot-rentang { margin-top: 14px; }
+.rentang-hari {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 8px;
+}
+.rentang-hari-ket { font-size: .8125rem; color: var(--text-2); }
 .slot-atur-ket { display: block; font-size: .72rem; color: var(--muted); margin-top: 5px; line-height: 1.45; }
 /* Tujuh kotak angka Senin..Minggu. Grid, bukan flex: jumlah kolomnya menyesuaikan
    lebar layar sendiri — ketujuhnya sebaris di sheet yang lebar, tiga-tiga di HP —
