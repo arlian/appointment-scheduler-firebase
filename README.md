@@ -444,12 +444,38 @@ melewatkan apa pun dan tetap berperilaku seperti semula.
 
 ### Hari mana yang diperiksa
 
-Mengikuti **filter tanggal yang sedang dipilih**, dan sengaja dihitung dari
-filternya — bukan dari jadwal yang tampil. Hari yang kosong melompong justru
-yang paling perlu muncul di sini, dan hari seperti itu tidak akan pernah lahir
-dari daftar jadwal. Filter yang tidak menunjuk hari tertentu ("Semua", atau
-rentang tanggal yang belum diisi lengkap) memakai tanggal yang memang ada
-jadwalnya, dibatasi 31 hari sekali jalan.
+Sheet-nya punya **rentang harinya sendiri**, disetel di baris *Hari yang dicari*
+tepat di atas pemilih jenis:
+
+- **Ke depan** — bawaannya, **7 hari dihitung dari hari ini** alias seminggu ke
+  depan. Angkanya diputar sendiri di kotak sebelahnya, 1 sampai 31 hari; memutar
+  angkanya sekaligus mengembalikan modenya ke sini, jadi angka yang baru diubah
+  tidak pernah diam-diam tidak berlaku. Keterangan di bawahnya menyebut tanggal
+  hari terakhir yang diperiksa, bukan mengulang angkanya — yang perlu dipastikan
+  sebelum menawarkan jam adalah sampai kapan daftarnya berlaku.
+- **Ikut filter halaman** — memakai filter tanggal di Daftar Jadwal, seperti
+  perilaku lama. Dipakai kalau pencariannya memang berangkat dari tanggal yang
+  sudah dipilih di sana.
+
+Rentangnya dulu selalu ikut filter halaman, dan itu jawaban yang salah untuk
+pertanyaan yang paling sering dibawa ke sheet ini: filternya hampir selalu
+tertinggal di **Hari Ini**, jadi "kapan ada kosong?" dijawab satu hari saja —
+sementara melebarkannya cuma untuk melihat slot berarti memindahkan daftar
+jadwal di belakang sheet juga.
+
+Pilihannya **tidak disetel ulang tiap sheet dibuka**, berbeda dari centang jenis
+di atasnya: angka dan tanggal ujungnya tertulis apa adanya di layar — tidak ada
+yang diam-diam berubah — dan yang baru saja mencari dua minggu ke depan hampir
+selalu mencari itu lagi di pertanyaan berikutnya. Hilang waktu halaman dimuat
+ulang, kembali ke seminggu.
+
+Hari-harinya dihitung dari rentang itu, **bukan dari jadwal yang tampil**. Hari
+yang kosong melompong justru yang paling perlu muncul di sini, dan hari seperti
+itu tidak akan pernah lahir dari daftar jadwal. Dalam mode *Ikut filter halaman*,
+filter yang tidak menunjuk hari tertentu ("Semua", atau rentang tanggal yang
+belum diisi lengkap) memakai tanggal yang memang ada jadwalnya. Berapa pun
+modenya, sekali jalan dibatasi 31 hari (`MAKS_HARI_SLOT`), dan hari yang sudah
+lewat dibuang lebih dulu — jumlahnya disebut di baris ringkasan.
 
 Jumlah pegawai yang menyita dihitung dari **seluruh jadwal hari itu**, termasuk
 yang sedang disaring keluar layar oleh mode riwayat satu customer.
