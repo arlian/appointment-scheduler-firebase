@@ -2088,6 +2088,41 @@ function tanggalFilter() {
   return adaJadwalnya(); // 'all'
 }
 
+// Rentang hari yang dicari slotnya. Dulu selalu sama dengan filter di daftar
+// jadwal, dan itu jawaban yang salah untuk pertanyaan yang paling sering
+// dibawa ke sheet ini: filternya hampir selalu tertinggal di Hari Ini, jadi
+// "kapan ada kosong?" dijawab satu hari saja — sementara melebarkannya berarti
+// memindahkan daftar jadwal di belakang sheet cuma untuk melihat slot.
+//
+// Bawaannya seminggu ke depan karena itu yang biasa ditawarkan lewat WhatsApp;
+// angkanya bisa diputar sampai MAKS_HARI_SLOT untuk yang mencari lebih jauh.
+// Mode 'filter' tetap disediakan buat pencarian yang memang berangkat dari
+// tanggal tertentu — tanggal itu sudah dipilih di filter halaman, dan
+// mengetiknya lagi di sini cuma pekerjaan dua kali.
+const HARI_CARI_BAWAAN = 7;
+let modeCari = 'depan'; // 'depan' | 'filter'
+let hariCari = HARI_CARI_BAWAAN;
+
+// Sebutan tiap mode filter halaman, dipakai keterangan di bawah pemilih rentang:
+// yang perlu diketahui operator bukan kode modenya, melainkan tombol mana yang
+// sedang menyala di baris filter.
+const LABEL_FILTER = {
+  today: 'Hari Ini', pastweek: 'Seminggu ke Belakang', nextweek: 'Seminggu ke Depan',
+  day: 'tanggal yang dipilih', week: 'Minggu Ini', all: 'Semua',
+  date: 'rentang tanggal', cust: 'riwayat satu customer',
+};
+
+// Tanggal yang benar-benar dicari slotnya — ini yang dipakai daftar di layar
+// maupun salinan WhatsApp, jadi keduanya tidak mungkin memeriksa hari yang
+// berbeda. Hari yang sudah lewat tidak disaring di sini: renderSlot() yang
+// membuangnya, sekalian menghitung berapa yang dilewati.
+function tanggalCari() {
+  if (modeCari === 'filter') return tanggalFilter();
+  const out = [];
+  for (let i = 0; i < Math.min(hariCari, MAKS_HARI_SLOT); i++) out.push(hariGeser(i));
+  return out;
+}
+
 // Kotak angka dengan tombol − dan +. Di iPhone <input type="number"> tidak
 // punya panah sama sekali, dan memanggil papan ketik angka cuma untuk mengubah
 // 2 jadi 3 jauh lebih repot daripada satu ketukan. Kotaknya tetap bisa diketik
@@ -2633,9 +2668,9 @@ function renderSlot() {
   const box = $('slotHasil');
   box.innerHTML = '';
   tanggalSlot = []; dilewatiSlot = 0;
-  const semuaTanggal = tanggalFilter();
+  const semuaTanggal = tanggalCari();
   if (!semuaTanggal.length) {
-    box.innerHTML = '<div class="empty">Pilih dulu filter tanggalnya — mode ini tidak menunjuk hari tertentu.</div>';
+    box.innerHTML = '<div class="empty">Filter halaman tidak menunjuk hari tertentu — pilih tanggalnya, atau pakai rentang hari ke depan di atas.</div>';
     $('slotRingkas').textContent = '';
     return;
   }
@@ -2656,7 +2691,7 @@ function renderSlot() {
 
 function buildSlotWaText() {
   const hariIni = today();
-  const tanggal = tanggalFilter().filter((t) => t >= hariIni);
+  const tanggal = tanggalCari().filter((t) => t >= hariIni);
   if (!tanggal.length) return null;
   const cabang = cabangList.find((c) => c.id === cabangId);
   const judulCabang = cabangList.length > 1 && cabang ? ' ' + cabang.name.toUpperCase() : '';
