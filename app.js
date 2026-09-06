@@ -2668,6 +2668,10 @@ function renderSlot() {
   const box = $('slotHasil');
   box.innerHTML = '';
   tanggalSlot = []; dilewatiSlot = 0;
+  // Keterangan rentangnya ikut digambar ulang di sini, bukan cuma waktu
+  // tombolnya ditekan: mode 'filter' menumpang filter halaman, dan filter itu
+  // bisa berpindah selagi sheet ini terbuka.
+  gambarRentangCari();
   const semuaTanggal = tanggalCari();
   if (!semuaTanggal.length) {
     box.innerHTML = '<div class="empty">Filter halaman tidak menunjuk hari tertentu — pilih tanggalnya, atau pakai rentang hari ke depan di atas.</div>';
@@ -2722,6 +2726,48 @@ const treatSlot = pasangTreatSeg('slotTreat', 'slotTreatHint', {
 });
 treatSlot.set(treatCari);
 
+// Tombolnya sama bentuknya dengan pemilih jenis di atasnya, tapi sekali pilih:
+// dua mode ini saling meniadakan — yang satu rentang milik sheet ini sendiri,
+// yang satu menumpang filter halaman.
+function gambarRentangCari() {
+  [...$('slotRentang').children].forEach((b) => {
+    const aktif = b.dataset.r === modeCari;
+    b.classList.toggle('aktif', aktif);
+    b.setAttribute('aria-pressed', aktif ? 'true' : 'false');
+  });
+  // Keterangannya menyebut hari terakhir yang diperiksa, bukan mengulang
+  // angkanya: yang perlu dipastikan operator sebelum menawarkan jam adalah
+  // sampai tanggal berapa daftar di bawah ini berlaku.
+  $('slotRentangHint').textContent = modeCari === 'filter'
+    ? 'Ikut filter di daftar jadwal — sekarang ' + (LABEL_FILTER[filterMode] || filterMode)
+      + '. Hari yang sudah lewat tetap dilewati.'
+    : hariCari === 1
+      ? 'Cuma hari ini.'
+      : 'Hari ini sampai ' + hariPendek(hariGeser(hariCari - 1))
+        + (hariCari === HARI_CARI_BAWAAN ? ' — seminggu ke depan.' : '.');
+}
+
+$('slotRentang').addEventListener('click', (e) => {
+  const b = e.target.closest('.treat-btn');
+  if (!b || b.dataset.r === modeCari) return;
+  modeCari = b.dataset.r;
+  renderSlot(); // menggambar ulang keterangannya sekalian
+});
+
+$('slotHariBox').appendChild(buatStepper({
+  id: 'slotHariInput', nilai: hariCari, min: 1, max: MAKS_HARI_SLOT,
+  aria: 'Berapa hari ke depan yang dicari',
+  onUbah: (n) => {
+    hariCari = n;
+    // Memutar angkanya berarti memang mau rentang sendiri. Tanpa baris ini,
+    // angka yang baru diubah diam-diam tidak mengubah apa pun selama modenya
+    // masih menumpang filter halaman.
+    modeCari = 'depan';
+    renderSlot();
+  },
+}));
+gambarRentangCari();
+
 function bukaSlot() {
   if (!dataSiap[KEY_APPOINTMENTS]) {
     toast('Jadwal masih dimuat — tunggu sebentar lalu ulangi.', true);
@@ -2737,6 +2783,10 @@ function bukaSlot() {
   // jawabannya tanpa ada yang menyadari.
   treatCari = TREAT_BAWAAN.slice();
   treatSlot.set(treatCari);
+  // Rentang harinya sengaja tidak ikut dikembalikan ke bawaan: tidak seperti
+  // centang jenis yang diam-diam mengubah jawaban, angka dan tanggal ujungnya
+  // tertulis apa adanya di sheet ini — dan operator yang baru saja mencari dua
+  // minggu ke depan hampir selalu mencari itu lagi di pertanyaan berikutnya.
   $('slotSheet').hidden = false;
   renderSlot();
 }
