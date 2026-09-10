@@ -2960,7 +2960,7 @@ const REM_SLOT_HARI = 7;
 // 12 karakter URL, sedangkan judul hari cuma tujuh buah per pesan sementara
 // baris jam bisa dua puluh delapan. Penanda yang paling sering muncul yang
 // paling mahal, jadi baris jam tetap tanda hubung biasa.
-const REM_EMOJI = true;
+const REM_EMOJI = false;
 const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
 const TANDA_JAM = '- ';
 
