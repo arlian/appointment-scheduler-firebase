@@ -429,12 +429,23 @@ const KISI_SLOT = 30;
 // daftar yang isinya sama persis tapi bentuknya beda cuma membuat yang
 // membacanya bertanya-tanya apa bedanya.
 //
-// Empat sebaris karena hari yang lowong sejak pagi punya belasan jam mulai, dan
-// belasan baris per hari membuat pesannya berubah jadi dinding jam.
-const JAM_SEBARIS = 4;
-// Pemisahnya koma, dipilih karena paling gampang dibaca — deretan jam yang
-// dipisah titik tengah terbaca seperti satu blok, sedangkan koma memberi tiap
-// jam ujungnya sendiri.
+// Satu jam sebaris. Yang dibaca customer daftar pilihan, dan daftar yang tiap
+// barisnya satu pilihan paling gampang ditunjuk — "yang jam 14:30" — sementara
+// empat jam sebaris membuat matanya mencari dulu di dalam barisnya, lalu
+// menghitung ke mana jarinya menekan.
+//
+// Ongkosnya panjang pesan: hari yang lowong sejak pagi jadi dua puluh delapan
+// baris, dan seminggu penuh di cabang yang buka 08:00-22:00 lewat dua ratus
+// baris. Kalau itu terasa terlalu jauh digulir, angka ini yang dikembalikan ke
+// 4 — dan bentuknya kembali seperti semula di kedua teks sekaligus.
+const JAM_SEBARIS = 1;
+// Pemisah antarjam di dalam satu baris. Selama JAM_SEBARIS masih 1 ia tidak
+// pernah terpakai — satu jam sebaris tidak punya yang dipisah — tapi tetap
+// dipegang di sini supaya mengembalikan JAM_SEBARIS ke 4 cukup satu angka.
+//
+// Komanya dipilih karena paling gampang dibaca — deretan jam yang dipisah titik
+// tengah terbaca seperti satu blok, sedangkan koma memberi tiap jam ujungnya
+// sendiri.
 //
 // Ongkos URL-nya kebetulan yang paling murah juga, dan itu perlu diingat kalau
 // bentuk ini nanti diubah: pesan reminder berangkat lewat wa.me, dan di situ
@@ -3039,17 +3050,20 @@ function slotTawaran(k) {
 // 8192. Masih jauh di bawah kemampuan semua browser yang dipakai sekarang
 // (Chrome ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
 //
-// Diukur dengan bentuk sekarang, tujuh hari sekaligus, rambut 30 menit: jam
-// kerja bawaan 10:00–17:00 berhenti di 1.874, buka sampai 21:00 di 2.616, dan
-// buka 08:00–22:00 — empat belas jam sehari — di 3.169.
+// Diukur dengan bentuk sekarang — satu jam sebaris, tujuh hari sekaligus,
+// rambut 30 menit: jam kerja bawaan 10:00–17:00 berhenti di 1.944, buka sampai
+// 21:00 di 2.728, dan buka 08:00–22:00 — empat belas jam sehari — di 3.316.
+// Waktu masih empat sebaris ketiganya 1.874, 2.616, dan 3.169: satu jam sebaris
+// menukar pemisah ", " yang 6 karakter URL dengan ganti baris yang 3, tapi
+// menambah "- " di tiap jam.
 //
-// Penanda "(2)" menambah 6 karakter URL, tapi cuma di jam yang pegawainya lebih
-// dari satu luang — dan yang paling berat justru cabang yang paling lowong: dua
-// pegawai yang sama-sama kosong seharian berarti seluruh jamnya bertanda.
-// Diukur di keadaan itu, ketiga angka di atas jadi sekitar 2.460, 3.540, dan
-// 4.345. Yang terakhir sudah lewat 4096 — itu yang menaikkan batasnya, bukan
-// perkiraan. Pegawai ketiga tidak menambah apa-apa lagi: panjangnya sama, cuma
-// angkanya yang berubah.
+// Penanda "(2)" menambah 6 karakter URL lagi, tapi cuma di jam yang pegawainya
+// lebih dari satu luang — dan yang paling berat justru cabang yang paling
+// lowong: dua pegawai yang sama-sama kosong seharian berarti seluruh jamnya
+// bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar 2.530,
+// 3.650, dan 4.490. Yang terakhir sudah lewat 4096 — itu yang menaikkan
+// batasnya, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa lagi:
+// panjangnya sama, cuma angkanya yang berubah.
 //
 // Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
 // koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka

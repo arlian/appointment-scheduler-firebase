@@ -485,19 +485,22 @@ yang sedang disaring keluar layar oleh mode riwayat satu customer.
 ### Salin slot ke WhatsApp
 
 Tombol **Salin untuk WA** di dalam sheet-nya. Isinya sengaja **cuma jam
-mulainya**, empat sebaris:
+mulainya**, satu jam sebaris:
 
 ```
 *SLOT KOSONG PURI* 🕒
 
 📅 *Selasa, 1 September 2026*
-16:15, 16:30
+16:15
+16:30
 
 📅 *Rabu, 2 September 2026*
-10:00, 10:30, 11:00 (2), 11:30 (2)
-12:00 (2), 12:30, 13:00, 13:30
-14:00, 14:30, 15:00, 15:30
-16:00, 16:30
+10:00
+10:30
+11:00 (2)
+11:30 (2)
+12:00 (2)
+12:30
 ```
 
 **Angka dalam kurung = berapa pegawai yang sama-sama luang di jam itu**, jadi
@@ -517,20 +520,26 @@ reminder sekaligus.
 
 Yang tetap tidak ikut: nama pegawainya, dan sisa jadwal hari itu. Yang dikirim
 ke customer adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya
-di sana. Empat sebaris karena hari yang lowong sejak pagi menghasilkan belasan
-pilihan, dan belasan baris membuat pesannya perlu digulir jauh cuma untuk
-sampai ke hari berikutnya.
+di sana.
 
-Bentuknya — empat sebaris, dipisah koma — dipegang `JAM_SEBARIS` dan
-`PISAH_JAM` di [app.js](app.js), dan **pesan reminder memakai keduanya juga**.
-Komanya dipilih karena paling gampang dibaca: deretan jam yang dipisah titik
-tengah terbaca seperti satu blok, sedangkan koma memberi tiap jam ujungnya
-sendiri.
+**Satu jam sebaris**, dipegang `JAM_SEBARIS` di [app.js](app.js) — dan **pesan
+reminder memakai angka yang sama**. Daftar yang tiap barisnya satu pilihan
+paling gampang ditunjuk ("yang jam 14:30"); empat jam sebaris membuat matanya
+mencari dulu di dalam barisnya. Ongkosnya panjang: hari yang lowong sejak pagi
+jadi dua puluh delapan baris, dan seminggu penuh di cabang yang buka 08:00–22:00
+lewat dua ratus baris — kalau itu terasa terlalu jauh digulir, `JAM_SEBARIS`
+dikembalikan ke 4 dan kedua teks berubah sekaligus.
 
-Yang perlu diingat kalau bentuknya nanti diubah: pesan reminder berangkat lewat
+`PISAH_JAM` masih ada tapi tidak terpakai selama satu jam sebaris: ia pemisah
+antarjam **di dalam** satu baris. Komanya dipilih karena paling gampang dibaca
+— deretan jam yang dipisah titik tengah terbaca seperti satu blok, sedangkan
+koma memberi tiap jam ujungnya sendiri.
+
+Yang perlu diingat kalau bentuknya nanti diubah — misalnya `JAM_SEBARIS`
+dikembalikan ke 4, dan pemisahnya terpakai lagi: pesan reminder berangkat lewat
 URL `wa.me`, dan di situ spasi pengapit berharga. Titiknya sendiri gratis — `·`
 jadi 6 karakter URL, sama persis dengan `, ` — tapi tiap spasi menambah 6 lagi.
-Diukur di seminggu penuh dengan jam kerja bawaan:
+Diukur di seminggu penuh dengan jam kerja bawaan, waktu masih empat sebaris:
 
 | Pemisah | Panjang URL |
 |---|---|
@@ -540,17 +549,18 @@ Diukur di seminggu penuh dengan jam kerja bawaan:
 | `  ·  ` dua spasi | 2.714 |
 
 `BATAS_URL` sekarang **8.192**, naik dari 4.096 (dan sebelumnya 2.048). Dengan
-tujuh hari sekaligus dan rambut 30 menit: jam kerja bawaan berhenti di 1.874,
-cabang yang buka sampai 21:00 di 2.616, dan cabang yang buka 08:00–22:00 di
-3.169.
+satu jam sebaris, tujuh hari sekaligus, dan rambut 30 menit: jam kerja bawaan
+berhenti di 1.944, cabang yang buka sampai 21:00 di 2.728, dan cabang yang buka
+08:00–22:00 di 3.316. Satu jam sebaris menukar pemisah `, ` yang 6 karakter URL
+dengan ganti baris yang 3, tapi menambah `- ` di tiap jam — selisihnya kecil.
 
-Penanda `(2)` menambah 6 karakter URL, tapi cuma di jam yang pegawainya lebih
-dari satu luang — dan yang paling berat justru cabang yang paling lowong: dua
-pegawai yang sama-sama kosong seharian berarti seluruh jamnya bertanda. Diukur
-di keadaan itu, ketiga angka di atas jadi sekitar **2.460, 3.540, dan 4.345**.
-Yang terakhir sudah lewat 4.096 dan kehilangan hari terjauhnya — itu yang
-menaikkan batasnya, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa lagi:
-panjangnya sama, cuma angkanya yang berubah.
+Penanda `(2)` menambah 6 karakter URL lagi, tapi cuma di jam yang pegawainya
+lebih dari satu luang — dan yang paling berat justru cabang yang paling lowong:
+dua pegawai yang sama-sama kosong seharian berarti seluruh jamnya bertanda.
+Diukur di keadaan itu, ketiga angka di atas jadi sekitar **2.530, 3.650, dan
+4.490**. Yang terakhir sudah lewat 4.096 dan kehilangan hari terjauhnya — itu
+yang menaikkan batasnya, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa
+lagi: panjangnya sama, cuma angkanya yang berubah.
 
 Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi koma:
 yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka sampai
