@@ -466,16 +466,15 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 
 // Satu jam mulai jadi teks, dipakai salinan Slot Kosong maupun pesan reminder.
 //
-// Jam yang dua pegawainya sama-sama luang muat dua orang sekaligus, dan itu
-// ikut ditulis: "14:00 - 2 slot". Tanpa penanda ini jam seperti itu terbaca
-// sebagai satu tempat saja — yang menawarkan tidak tahu ia masih bisa
-// menjanjikan jam yang sama ke orang kedua, dan customer yang datang berdua
-// tidak tahu jam itu muat keduanya.
+// Jam yang tinggal satu pegawainya luang ditulis "14:00 - 1 slot". Yang
+// ditandai kelangkaannya, bukan kelapangannya: jam yang tinggal satu tempat
+// perlu dijawab hari ini juga, sedangkan jam yang masih muat dua orang tidak
+// menuntut apa-apa dari yang membacanya. Jadi yang dua ke atas dibiarkan polos
+// — kalau semuanya bertanda, yang benar-benar tinggal satu berhenti menonjol.
 //
-// Artinya sama dengan tanda ×2 di chip layar, tapi ditulis lengkap dengan
-// satuannya: satu jam sebaris memberi ruang untuk itu, dan "2 slot" tidak punya
-// bacaan lain — angka telanjang dalam kurung masih bisa terbaca sebagai dua
-// jam, dua sesi, atau catatan kaki.
+// Satuannya ikut ditulis: satu jam sebaris memberi ruang untuk itu, dan "1
+// slot" tidak punya bacaan lain — angka telanjang dalam kurung masih bisa
+// terbaca sebagai satu jam, satu sesi, atau catatan kaki.
 //
 // Dipisah tanda hubung, bukan dikurung: kurung membungkus keterangannya jadi
 // satu benda yang gampang dilewati mata, sedangkan tanda hubung membiarkannya
@@ -483,9 +482,13 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 // ia sudah jadi bulatan daftar di depan tiap jam, dan dua titik dalam satu
 // baris membuat yang di depan berhenti terbaca sebagai penanda daftar.
 //
-// Yang cuma satu pegawai tidak diberi "1 slot". Itu keadaan biasa, dan
-// menandainya semua justru membuat yang dua berhenti menonjol.
-const jamTawaran = (j) => keJam(j.m) + (j.peg > 1 ? ' - ' + j.peg + ' slot' : '');
+// Angkanya tetap diambil dari j.peg, bukan ditulis mati "1 slot": kalau suatu
+// hari aturannya berubah lagi, yang perlu diubah cuma syaratnya.
+//
+// Ongkosnya perlu diingat di cabang yang pegawainya cuma satu — di sana tidak
+// ada jam yang luang berdua, jadi seluruh jamnya bertanda dan pesannya jadi
+// yang paling panjang. Angkanya ada di BATAS_URL.
+const jamTawaran = (j) => keJam(j.m) + (j.peg === 1 ? ' - ' + j.peg + ' slot' : '');
 
 // Bulatan daftar di depan tiap jam, dipakai salinan Slot Kosong maupun pesan
 // reminder. Titik tengah, bukan tanda hubung: yang di bawah judul hari itu
@@ -3073,19 +3076,20 @@ function slotTawaran(k) {
 // sehari — di 4.296. Waktu jamnya masih empat sebaris dan berbulatan tanda
 // hubung, ketiganya 1.874, 2.616, dan 3.169.
 //
-// Penanda "- 2 slot" menambah 15 karakter URL lagi, tapi cuma di jam yang
-// pegawainya lebih dari satu luang — dan yang paling berat justru cabang yang
-// paling lowong: dua pegawai yang sama-sama kosong seharian berarti seluruh
-// jamnya bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar
-// 3.900, 5.810, dan 7.235. Yang terakhir sudah lewat 4096 — itu yang menaikkan
-// batasnya ke 8192, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa
-// lagi: panjangnya sama, cuma angkanya yang berubah.
+// Penanda "- 1 slot" menambah 15 karakter URL lagi, tapi cuma di jam yang
+// tinggal satu pegawainya luang — dan yang paling berat cabang yang pegawainya
+// memang cuma satu: di sana tidak pernah ada jam yang luang berdua, jadi
+// seluruh jamnya bertanda. Diukur di keadaan itu, ketiga angka di atas jadi
+// sekitar 3.900, 5.810, dan 7.235. Yang terakhir sudah lewat 4096 — itu yang
+// menaikkan batasnya ke 8192, bukan perkiraan. Cabang yang pegawainya dua ke
+// atas justru yang paling pendek: jamnya polos selama masih ada dua yang
+// luang.
 //
 // Sisanya tinggal sekitar 950, dan itu yang perlu diingat kalau suatu hari ada
-// cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
-// berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan
-// hari terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan —
-// yang menaikkannya nanti keadaan, bukan jaga-jaga.
+// cabang berpegawai satu yang buka lebih panjang: 07:00–23:00 berhenti tepat di
+// 8.190, dan yang lebih panjang dari itu mulai kehilangan hari terjauhnya.
+// Belum ada cabang sepanjang itu, jadi batasnya dibiarkan — yang menaikkannya
+// nanti keadaan, bukan jaga-jaga.
 //
 // Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
 // koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka

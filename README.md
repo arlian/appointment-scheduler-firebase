@@ -310,8 +310,9 @@ Aturannya:
   saja dan yang kedua tidak pernah ditawarkan ke siapa pun. Angkanya dihitung
   dari sisa **paling sedikit** di sepanjang treatment itu, bukan di titik
   mulainya saja: mulai 10:30 selama sejam sementara satu pegawai sudah terisi
-  dari jam 11:00 berarti cuma satu yang benar-benar bebas. Tanda yang sama ikut
-  ke WhatsApp, di sana ditulis `- 2 slot` — lihat [Salin slot ke
+  dari jam 11:00 berarti cuma satu yang benar-benar bebas. Angka yang sama ikut
+  ke WhatsApp, tapi penandanya dibalik di sana: yang ditulis justru jam yang
+  tinggal satu tempat, `- 1 slot` — lihat [Salin slot ke
   WhatsApp](#salin-slot-ke-whatsapp).
 - Mengganti jenis treatment langsung menghitung ulang seluruh daftarnya —
   durasinya berubah, jadi jam mulai yang muat ikut berubah.
@@ -497,23 +498,22 @@ mulainya**, satu jam sebaris:
 📅 *Rabu, 2 September 2026*
 · 10:00
 · 10:30
-· 11:00 - 2 slot
-· 11:30 - 2 slot
-· 12:00 - 2 slot
-· 12:30
+· 11:00
+· 11:30
+· 12:00 - 1 slot
+· 12:30 - 1 slot
 ```
 
-**`- 2 slot` = dua pegawai sama-sama luang di jam itu**, jadi jam seperti itu
-muat dua orang sekaligus. Tanpa penanda ini ia terbaca sebagai satu tempat saja:
-yang menawarkan tidak tahu jam yang sama masih bisa dijanjikan ke orang kedua,
-dan customer yang datang berdua tidak tahu keduanya muat di jam yang sama. Jam
-yang cuma satu pegawainya tidak diberi `1 slot` — itu keadaan biasa, dan
-menandainya semua justru membuat yang dua berhenti menonjol.
+**`- 1 slot` = jam itu tinggal satu tempat**, karena cuma satu pegawai yang
+luang di sepanjang treatmentnya. Yang ditandai kelangkaannya, bukan
+kelapangannya: jam yang tinggal satu perlu dijawab hari ini juga, sedangkan jam
+yang masih muat dua orang tidak menuntut apa-apa dari yang membacanya. Karena
+itu **jam yang dua ke atas dibiarkan polos** — kalau semuanya bertanda, yang
+benar-benar tinggal satu berhenti menonjol.
 
-Artinya sama dengan tanda `×2` di chip layar, tapi ditulis lengkap dengan
-satuannya: satu jam sebaris memberi ruang untuk itu, dan "2 slot" tidak punya
-bacaan lain — angka telanjang dalam kurung masih bisa terbaca sebagai dua jam,
-dua sesi, atau catatan kaki. Dipisah **tanda hubung, bukan dikurung**: kurung
+Satuannya ikut ditulis: satu jam sebaris memberi ruang untuk itu, dan "1 slot"
+tidak punya bacaan lain — angka telanjang dalam kurung masih bisa terbaca
+sebagai satu jam, satu sesi, atau catatan kaki. Dipisah **tanda hubung, bukan dikurung**: kurung
 membungkus keterangannya jadi satu benda yang gampang dilewati mata, sedangkan
 tanda hubung membiarkannya menempel apa adanya di belakang jamnya.
 
@@ -565,19 +565,19 @@ menit: jam kerja bawaan berhenti di 2.434, cabang yang buka sampai 21:00 di
 3.498, dan cabang yang buka 08:00–22:00 di 4.296. Waktu jamnya masih empat
 sebaris dan berbulatan tanda hubung, ketiganya 1.874, 2.616, dan 3.169.
 
-Penanda `- 2 slot` menambah 15 karakter URL lagi, tapi cuma di jam yang
-pegawainya lebih dari satu luang — dan yang paling berat justru cabang yang
-paling lowong: dua pegawai yang sama-sama kosong seharian berarti seluruh jamnya
+Penanda `- 1 slot` menambah 15 karakter URL lagi, tapi cuma di jam yang tinggal
+satu pegawainya luang — dan yang paling berat cabang yang pegawainya memang cuma
+satu: di sana tidak pernah ada jam yang luang berdua, jadi seluruh jamnya
 bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar **3.900,
 5.810, dan 7.235**. Yang terakhir sudah lewat 4.096 dan kehilangan hari
-terjauhnya — itu yang menaikkan batasnya, bukan perkiraan. Pegawai ketiga tidak
-menambah apa-apa lagi: panjangnya sama, cuma angkanya yang berubah.
+terjauhnya — itu yang menaikkan batasnya, bukan perkiraan. Cabang berpegawai dua
+ke atas justru yang paling pendek: jamnya polos selama masih ada dua yang luang.
 
 Sisanya tinggal sekitar **950**, dan itu yang perlu diingat kalau suatu hari ada
-cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
-berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan hari
-terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan — yang
-menaikkannya nanti keadaan, bukan jaga-jaga.
+cabang berpegawai satu yang buka lebih panjang: 07:00–23:00 berhenti tepat di
+8.190, dan yang lebih panjang dari itu mulai kehilangan hari terjauhnya. Belum
+ada cabang sepanjang itu, jadi batasnya dibiarkan — yang menaikkannya nanti
+keadaan, bukan jaga-jaga.
 
 Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi koma:
 yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka sampai
