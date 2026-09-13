@@ -467,20 +467,37 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 // Satu jam mulai jadi teks, dipakai salinan Slot Kosong maupun pesan reminder.
 //
 // Jam yang dua pegawainya sama-sama luang muat dua orang sekaligus, dan itu
-// ikut ditulis: "14:00 (2)". Tanpa penanda ini jam seperti itu terbaca sebagai
-// satu tempat saja — yang menawarkan tidak tahu ia masih bisa menjanjikan jam
-// yang sama ke orang kedua, dan customer yang datang berdua tidak tahu jam itu
-// muat keduanya.
+// ikut ditulis: "14:00 - 2 slot". Tanpa penanda ini jam seperti itu terbaca
+// sebagai satu tempat saja — yang menawarkan tidak tahu ia masih bisa
+// menjanjikan jam yang sama ke orang kedua, dan customer yang datang berdua
+// tidak tahu jam itu muat keduanya.
 //
-// Artinya sama dengan tanda ×2 di chip layar, tapi di sini cuma angkanya:
-// deretan jam yang tiap tandanya membawa huruf berubah jadi ramai, dan yang
-// dicari mata di antara belasan jam itu angkanya. Satuannya sengaja tidak
-// ditulis, di tiap jam maupun sekali di ujung pesan — jam yang bertanda cuma
-// sedikit, dan yang membacanya bertanya "jam berapa" bukan "berapa orang".
+// Artinya sama dengan tanda ×2 di chip layar, tapi ditulis lengkap dengan
+// satuannya: satu jam sebaris memberi ruang untuk itu, dan "2 slot" tidak punya
+// bacaan lain — angka telanjang dalam kurung masih bisa terbaca sebagai dua
+// jam, dua sesi, atau catatan kaki.
 //
-// Yang cuma satu pegawai tidak diberi "(1)". Itu keadaan biasa, dan menandainya
-// semua justru membuat yang dua berhenti menonjol.
-const jamTawaran = (j) => keJam(j.m) + (j.peg > 1 ? ' (' + j.peg + ')' : '');
+// Dipisah tanda hubung, bukan dikurung: kurung membungkus keterangannya jadi
+// satu benda yang gampang dilewati mata, sedangkan tanda hubung membiarkannya
+// menempel apa adanya di belakang jamnya. Titik tengah tidak dipakai di sini —
+// ia sudah jadi bulatan daftar di depan tiap jam, dan dua titik dalam satu
+// baris membuat yang di depan berhenti terbaca sebagai penanda daftar.
+//
+// Yang cuma satu pegawai tidak diberi "1 slot". Itu keadaan biasa, dan
+// menandainya semua justru membuat yang dua berhenti menonjol.
+const jamTawaran = (j) => keJam(j.m) + (j.peg > 1 ? ' - ' + j.peg + ' slot' : '');
+
+// Bulatan daftar di depan tiap jam, dipakai salinan Slot Kosong maupun pesan
+// reminder. Titik tengah, bukan tanda hubung: yang di bawah judul hari itu
+// daftar pilihan, dan bulatan membacanya sebagai daftar sementara tanda hubung
+// terbaca seperti rentang atau potongan kalimat.
+//
+// '·' aman lewat wa.me — ia ada di Windows-1252, tidak seperti emoji yang
+// jatuh jadi tanda tanya (lihat REM_EMOJI) — tapi tidak gratis: 9 karakter URL
+// per baris, dari 4 waktu masih tanda hubung. Ia muncul di tiap jam, jadi ini
+// penanda yang paling sering muncul di seluruh pesan; angkanya ada di
+// BATAS_URL.
+const TANDA_JAM = '· ';
 const labelDurasi = (m) => {
   const j = Math.floor(m / 60), sisa = m % 60;
   if (!j) return sisa + ' menit';
@@ -2739,7 +2756,7 @@ function buildSlotWaText() {
     lines.push('', '📅 *' + hariBulan(tgl) + '*');
     // Bentuknya sama persis dengan pesan reminder — lihat JAM_SEBARIS.
     for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
-      lines.push(jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
+      lines.push(TANDA_JAM + jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
     }
   });
   return ada ? lines.join('\n') : null;
@@ -2988,10 +3005,10 @@ const REM_SLOT_HARI = 7;
 // Cuma judul hari yang dapat emoji, dan itu bukan soal selera: satu emoji jadi
 // 12 karakter URL, sedangkan judul hari cuma tujuh buah per pesan sementara
 // baris jam bisa dua puluh delapan. Penanda yang paling sering muncul yang
-// paling mahal, jadi baris jam tetap tanda hubung biasa.
+// paling mahal — itu sebabnya bulatan daftar di TANDA_JAM berhenti di titik
+// tengah yang 9 karakter URL, bukan ikut jadi emoji.
 const REM_EMOJI = false;
 const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
-const TANDA_JAM = '- ';
 
 // Tawaran jadwal untuk satu customer, memakai mesin slot yang sama dengan sheet
 // "Slot Kosong" — jadi jam yang ditawarkan ke customer tidak mungkin beda
@@ -3050,20 +3067,25 @@ function slotTawaran(k) {
 // 8192. Masih jauh di bawah kemampuan semua browser yang dipakai sekarang
 // (Chrome ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
 //
-// Diukur dengan bentuk sekarang — satu jam sebaris, tujuh hari sekaligus,
-// rambut 30 menit: jam kerja bawaan 10:00–17:00 berhenti di 1.944, buka sampai
-// 21:00 di 2.728, dan buka 08:00–22:00 — empat belas jam sehari — di 3.316.
-// Waktu masih empat sebaris ketiganya 1.874, 2.616, dan 3.169: satu jam sebaris
-// menukar pemisah ", " yang 6 karakter URL dengan ganti baris yang 3, tapi
-// menambah "- " di tiap jam.
+// Diukur dengan bentuk sekarang — satu jam sebaris, berbulatan titik tengah,
+// tujuh hari sekaligus, rambut 30 menit: jam kerja bawaan 10:00–17:00 berhenti
+// di 2.434, buka sampai 21:00 di 3.498, dan buka 08:00–22:00 — empat belas jam
+// sehari — di 4.296. Waktu jamnya masih empat sebaris dan berbulatan tanda
+// hubung, ketiganya 1.874, 2.616, dan 3.169.
 //
-// Penanda "(2)" menambah 6 karakter URL lagi, tapi cuma di jam yang pegawainya
-// lebih dari satu luang — dan yang paling berat justru cabang yang paling
-// lowong: dua pegawai yang sama-sama kosong seharian berarti seluruh jamnya
-// bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar 2.530,
-// 3.650, dan 4.490. Yang terakhir sudah lewat 4096 — itu yang menaikkan
-// batasnya, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa lagi:
-// panjangnya sama, cuma angkanya yang berubah.
+// Penanda "- 2 slot" menambah 15 karakter URL lagi, tapi cuma di jam yang
+// pegawainya lebih dari satu luang — dan yang paling berat justru cabang yang
+// paling lowong: dua pegawai yang sama-sama kosong seharian berarti seluruh
+// jamnya bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar
+// 3.900, 5.810, dan 7.235. Yang terakhir sudah lewat 4096 — itu yang menaikkan
+// batasnya ke 8192, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa
+// lagi: panjangnya sama, cuma angkanya yang berubah.
+//
+// Sisanya tinggal sekitar 950, dan itu yang perlu diingat kalau suatu hari ada
+// cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
+// berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan
+// hari terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan —
+// yang menaikkannya nanti keadaan, bukan jaga-jaga.
 //
 // Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
 // koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
