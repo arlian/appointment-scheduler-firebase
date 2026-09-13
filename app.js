@@ -3034,14 +3034,22 @@ function slotTawaran(k) {
 //
 // Angkanya 2048 selama pesannya masih pendek — batas lama Internet Explorer,
 // dipakai karena tidak ada ruginya waktu itu. Ia mulai memotong hari begitu
-// seluruh jam ikut ditulis dan pemisahnya diberi spasi, jadi dinaikkan ke 4096:
-// masih jauh di bawah kemampuan semua browser yang dipakai sekarang (Chrome
-// ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
+// seluruh jam ikut ditulis dan pemisahnya diberi spasi, jadi dinaikkan ke 4096;
+// penanda jumlah orang dari jamTawaran() membuatnya kurang lagi, jadi sekarang
+// 8192. Masih jauh di bawah kemampuan semua browser yang dipakai sekarang
+// (Chrome ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
 //
 // Diukur dengan bentuk sekarang, tujuh hari sekaligus, rambut 30 menit: jam
 // kerja bawaan 10:00–17:00 berhenti di 1.874, buka sampai 21:00 di 2.616, dan
-// buka 08:00–22:00 — empat belas jam sehari — di 3.169. Ketiganya terkirim utuh
-// dan masih bersisa, jadi tidak ada cabang yang kehilangan hari terjauhnya.
+// buka 08:00–22:00 — empat belas jam sehari — di 3.169.
+//
+// Penanda "(2)" menambah 6 karakter URL, tapi cuma di jam yang pegawainya lebih
+// dari satu luang — dan yang paling berat justru cabang yang paling lowong: dua
+// pegawai yang sama-sama kosong seharian berarti seluruh jamnya bertanda.
+// Diukur di keadaan itu, ketiga angka di atas jadi sekitar 2.460, 3.540, dan
+// 4.345. Yang terakhir sudah lewat 4096 — itu yang menaikkan batasnya, bukan
+// perkiraan. Pegawai ketiga tidak menambah apa-apa lagi: panjangnya sama, cuma
+// angkanya yang berubah.
 //
 // Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
 // koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
@@ -3051,7 +3059,7 @@ function slotTawaran(k) {
 // Yang belum bisa diukur dari sini cuma satu: apakah jalur wa.me sendiri
 // memotong di suatu tempat. Kalau suatu hari ada pesan yang sampai dalam
 // keadaan terpenggal, angka inilah yang pertama diturunkan.
-const BATAS_URL = 4096;
+const BATAS_URL = 8192;
 
 // Panjang URL seandainya pesannya jadi dikirim. Nomor tujuannya belum tentu
 // diketahui waktu pesannya disusun, jadi yang dihitung nomor terpanjang yang

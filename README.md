@@ -539,12 +539,22 @@ Diukur di seminggu penuh dengan jam kerja bawaan:
 | ` · ` satu spasi | 2.294 |
 | `  ·  ` dua spasi | 2.714 |
 
-`BATAS_URL` sekarang **4.096**, naik dari 2.048. Dengan tujuh hari sekaligus dan
-rambut 30 menit: jam kerja bawaan berhenti di 1.874, cabang yang buka sampai
-21:00 di 2.616, dan cabang yang buka 08:00–22:00 di 3.169 — ketiganya terkirim
-utuh. Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi
-koma: yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
-sampai malam sudah lewat batas itu dan kehilangan dua hari.
+`BATAS_URL` sekarang **8.192**, naik dari 4.096 (dan sebelumnya 2.048). Dengan
+tujuh hari sekaligus dan rambut 30 menit: jam kerja bawaan berhenti di 1.874,
+cabang yang buka sampai 21:00 di 2.616, dan cabang yang buka 08:00–22:00 di
+3.169.
+
+Penanda `(2)` menambah 6 karakter URL, tapi cuma di jam yang pegawainya lebih
+dari satu luang — dan yang paling berat justru cabang yang paling lowong: dua
+pegawai yang sama-sama kosong seharian berarti seluruh jamnya bertanda. Diukur
+di keadaan itu, ketiga angka di atas jadi sekitar **2.460, 3.540, dan 4.345**.
+Yang terakhir sudah lewat 4.096 dan kehilangan hari terjauhnya — itu yang
+menaikkan batasnya, bukan perkiraan. Pegawai ketiga tidak menambah apa-apa lagi:
+panjangnya sama, cuma angkanya yang berubah.
+
+Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi koma:
+yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka sampai
+malam sudah lewat batas itu dan kehilangan dua hari.
 
 Yang tidak bisa diukur dari sini: apakah jalur `wa.me` sendiri memotong di suatu
 tempat. Kalau suatu saat ada pesan yang sampai dalam keadaan terpenggal, angka
