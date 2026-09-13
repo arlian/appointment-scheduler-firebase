@@ -452,6 +452,24 @@ const menitSekarang = () => {
   return Math.ceil((d.getHours() * 60 + d.getMinutes()) / 15) * 15;
 };
 const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+// Satu jam mulai jadi teks, dipakai salinan Slot Kosong maupun pesan reminder.
+//
+// Jam yang dua pegawainya sama-sama luang muat dua orang sekaligus, dan itu
+// ikut ditulis: "14:00 (2)". Tanpa penanda ini jam seperti itu terbaca sebagai
+// satu tempat saja — yang menawarkan tidak tahu ia masih bisa menjanjikan jam
+// yang sama ke orang kedua, dan customer yang datang berdua tidak tahu jam itu
+// muat keduanya.
+//
+// Artinya sama dengan tanda ×2 di chip layar, tapi di sini cuma angkanya:
+// deretan jam yang tiap tandanya membawa huruf berubah jadi ramai, dan yang
+// dicari mata di antara belasan jam itu angkanya. Satuannya sengaja tidak
+// ditulis, di tiap jam maupun sekali di ujung pesan — jam yang bertanda cuma
+// sedikit, dan yang membacanya bertanya "jam berapa" bukan "berapa orang".
+//
+// Yang cuma satu pegawai tidak diberi "(1)". Itu keadaan biasa, dan menandainya
+// semua justru membuat yang dua berhenti menonjol.
+const jamTawaran = (j) => keJam(j.m) + (j.peg > 1 ? ' (' + j.peg + ')' : '');
 const labelDurasi = (m) => {
   const j = Math.floor(m / 60), sisa = m % 60;
   if (!j) return sisa + ' menit';
@@ -2710,7 +2728,7 @@ function buildSlotWaText() {
     lines.push('', '📅 *' + hariBulan(tgl) + '*');
     // Bentuknya sama persis dengan pesan reminder — lihat JAM_SEBARIS.
     for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
-      lines.push(jam.slice(i, i + JAM_SEBARIS).map((j) => keJam(j.m)).join(PISAH_JAM));
+      lines.push(jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
     }
   });
   return ada ? lines.join('\n') : null;
@@ -2982,12 +3000,12 @@ const TANDA_JAM = '- ';
 // hari yang sudah terlanjur ditulis.
 //
 // Hasilnya satu blok teks per hari: judul harinya, lalu jam-jamnya menurut
-// JAM_SEBARIS dan PISAH_JAM — bentuk yang sama persis dengan salinan Slot
-// Kosong, karena yang dilihat operator di layar dan yang dibaca customer di
-// WhatsApp tidak boleh cuma mirip. Bukan satu baris panjang berisi seluruh jam
-// hari itu: deret yang menyambung sampai membungkus tiga kali justru paling
-// susah dibaca di layar HP, dan mata yang mencari satu jam tertentu kehilangan
-// tempatnya.
+// JAM_SEBARIS, PISAH_JAM, dan jamTawaran() — bentuk yang sama persis dengan
+// salinan Slot Kosong, karena yang dilihat operator di layar dan yang dibaca
+// customer di WhatsApp tidak boleh cuma mirip. Bukan satu baris panjang berisi
+// seluruh jam hari itu: deret yang menyambung sampai membungkus tiga kali
+// justru paling susah dibaca di layar HP, dan mata yang mencari satu jam
+// tertentu kehilangan tempatnya.
 function slotTawaran(k) {
   const hariIni = today();
   const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
@@ -3003,7 +3021,7 @@ function slotTawaran(k) {
     // ditebalkan, jamnya turun di bawahnya.
     const baris = [];
     for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
-      baris.push(TANDA_JAM + jam.slice(i, i + JAM_SEBARIS).map((j) => keJam(j.m)).join(PISAH_JAM));
+      baris.push(TANDA_JAM + jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
     }
     blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(baris).join('\n'));
   }

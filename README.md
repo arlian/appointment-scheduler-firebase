@@ -310,7 +310,9 @@ Aturannya:
   saja dan yang kedua tidak pernah ditawarkan ke siapa pun. Angkanya dihitung
   dari sisa **paling sedikit** di sepanjang treatment itu, bukan di titik
   mulainya saja: mulai 10:30 selama sejam sementara satu pegawai sudah terisi
-  dari jam 11:00 berarti cuma satu yang benar-benar bebas.
+  dari jam 11:00 berarti cuma satu yang benar-benar bebas. Tanda yang sama ikut
+  ke WhatsApp, di sana ditulis `(2)` — lihat [Salin slot ke
+  WhatsApp](#salin-slot-ke-whatsapp).
 - Mengganti jenis treatment langsung menghitung ulang seluruh daftarnya —
   durasinya berubah, jadi jam mulai yang muat ikut berubah.
 
@@ -492,17 +494,32 @@ mulainya**, empat sebaris:
 16:15, 16:30
 
 📅 *Rabu, 2 September 2026*
-10:00, 10:30, 11:00, 11:30
-12:00, 12:30, 13:00, 13:30
+10:00, 10:30, 11:00 (2), 11:30 (2)
+12:00 (2), 12:30, 13:00, 13:30
 14:00, 14:30, 15:00, 15:30
 16:00, 16:30
 ```
 
-Tidak ada jumlah pegawai luang, tidak ada tanda `×2`. Yang dikirim ke customer
-adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya di sana.
-Empat sebaris karena hari yang lowong sejak pagi menghasilkan belasan pilihan,
-dan belasan baris membuat pesannya perlu digulir jauh cuma untuk sampai ke hari
-berikutnya.
+**Angka dalam kurung = berapa pegawai yang sama-sama luang di jam itu**, jadi
+jam seperti itu muat dua orang sekaligus. Tanpa penanda ini ia terbaca sebagai
+satu tempat saja: yang menawarkan tidak tahu jam yang sama masih bisa
+dijanjikan ke orang kedua, dan customer yang datang berdua tidak tahu keduanya
+muat di jam yang sama. Jam yang cuma satu pegawainya tidak diberi `(1)` — itu
+keadaan biasa, dan menandainya semua justru membuat yang dua berhenti menonjol.
+
+Artinya sama dengan tanda `×2` di chip layar, tapi di sini cuma angkanya:
+deretan jam yang tiap tandanya membawa huruf berubah jadi ramai, dan yang dicari
+mata di antara belasan jam itu angkanya. Satuannya sengaja tidak ditulis, di
+tiap jam maupun sekali di ujung pesan — jam yang bertanda cuma sedikit, dan yang
+membacanya bertanya "jam berapa" bukan "berapa orang". Bentuknya dipegang
+`jamTawaran()` di [app.js](app.js) — satu fungsi untuk salinan ini dan pesan
+reminder sekaligus.
+
+Yang tetap tidak ikut: nama pegawainya, dan sisa jadwal hari itu. Yang dikirim
+ke customer adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya
+di sana. Empat sebaris karena hari yang lowong sejak pagi menghasilkan belasan
+pilihan, dan belasan baris membuat pesannya perlu digulir jauh cuma untuk
+sampai ke hari berikutnya.
 
 Bentuknya — empat sebaris, dipisah koma — dipegang `JAM_SEBARIS` dan
 `PISAH_JAM` di [app.js](app.js), dan **pesan reminder memakai keduanya juga**.
