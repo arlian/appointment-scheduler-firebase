@@ -511,6 +511,13 @@ yang masih muat dua orang tidak menuntut apa-apa dari yang membacanya. Karena
 itu **jam yang dua ke atas dibiarkan polos** — kalau semuanya bertanda, yang
 benar-benar tinggal satu berhenti menonjol.
 
+Dengan alasan yang sama, **hari yang pegawainya memang cuma satu tidak diberi
+tanda sama sekali**. Di hari seperti itu tidak ada jam yang bisa lebih lapang
+dari satu, jadi "1 slot" bukan kabar apa-apa — ia cuma mengulang jumlah pegawai
+hari itu di tiap baris. Yang diperiksa `pegawaiUntuk(tgl)`, jadi hari yang
+kebetulan cuma kebagian satu pegawai pun ikut polos, bukan cuma cabang yang
+pegawainya satu.
+
 Satuannya ikut ditulis: satu jam sebaris memberi ruang untuk itu, dan "1 slot"
 tidak punya bacaan lain — angka telanjang dalam kurung masih bisa terbaca
 sebagai satu jam, satu sesi, atau catatan kaki. Dipisah **tanda hubung, bukan dikurung**: kurung
@@ -566,18 +573,21 @@ menit: jam kerja bawaan berhenti di 2.434, cabang yang buka sampai 21:00 di
 sebaris dan berbulatan tanda hubung, ketiganya 1.874, 2.616, dan 3.169.
 
 Penanda `- 1 slot` menambah 15 karakter URL lagi, tapi cuma di jam yang tinggal
-satu pegawainya luang — dan yang paling berat cabang yang pegawainya memang cuma
-satu: di sana tidak pernah ada jam yang luang berdua, jadi seluruh jamnya
-bertanda. Diukur di keadaan itu, ketiga angka di atas jadi sekitar **3.900,
-5.810, dan 7.235**. Yang terakhir sudah lewat 4.096 dan kehilangan hari
-terjauhnya — itu yang menaikkan batasnya, bukan perkiraan. Cabang berpegawai dua
-ke atas justru yang paling pendek: jamnya polos selama masih ada dua yang luang.
+satu pegawainya luang **di hari yang pegawainya lebih dari satu**. Yang paling
+berat karena itu hari berpegawai dua yang satu pegawainya terisi penuh: seluruh
+jam sisanya tinggal satu tempat, jadi seluruhnya bertanda. Diukur di keadaan
+itu, ketiga angka di atas jadi sekitar **3.900, 5.810, dan 7.235**. Yang
+terakhir sudah lewat 4.096 dan kehilangan hari terjauhnya — itu yang menaikkan
+batasnya, bukan perkiraan.
+
+Cabang berpegawai satu justru yang paling pendek sekarang: tidak ada satu pun
+jamnya yang bertanda, jadi ia berhenti di angka polos di atas.
 
 Sisanya tinggal sekitar **950**, dan itu yang perlu diingat kalau suatu hari ada
-cabang berpegawai satu yang buka lebih panjang: 07:00–23:00 berhenti tepat di
-8.190, dan yang lebih panjang dari itu mulai kehilangan hari terjauhnya. Belum
-ada cabang sepanjang itu, jadi batasnya dibiarkan — yang menaikkannya nanti
-keadaan, bukan jaga-jaga.
+cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
+berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan hari
+terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan — yang
+menaikkannya nanti keadaan, bukan jaga-jaga.
 
 Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi koma:
 yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka sampai
