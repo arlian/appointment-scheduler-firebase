@@ -1700,6 +1700,9 @@ function renderList() {
         : 'Ketik nama customer untuk melihat seluruh riwayat kunjungannya.')
       : 'Belum ada jadwal. Tambahkan lewat form di samping.';
     list.innerHTML = '<div class="empty">' + msg + '</div>';
+    // Ikut dipanggil di jalur ini juga: tanpa itu panel analitik cabang yang
+    // jadwalnya memang nol tidak pernah keluar dari keadaan memuat.
+    jadwalkanAnalitik();
     return;
   }
   // Jumlah per tanggal dihitung sekali di depan supaya bisa dicetak di judul hari
@@ -5005,6 +5008,17 @@ $('tabelToggle').addEventListener('click', () => {
 });
 
 function renderAnalitik() {
+  // Tiap kartu di panel ini dihitung dari `appointments` dan `customers`.
+  // Selama keduanya belum sampai, angkanya semua nol — dan nol di layar
+  // analitik tidak terbaca sebagai "belum dimuat", melainkan sebagai
+  // "bulan ini memang sepi". Kartunya diredupkan sampai angkanya benar.
+  const memuat = !semuaDataSiap();
+  $('panelAnalitik').classList.toggle('memuat', memuat);
+  $('analitikMemuat').hidden = !memuat;
+  $('analitikMemuatTeks').textContent = gagalMuat
+    ? 'Data cabang gagal dimuat — periksa sambungan, lalu muat ulang halaman.'
+    : 'Memuat data cabang…';
+
   const kunci = kunciBulan(bln.y, bln.m);
   $('bulanLabel').textContent = new Date(bln.y, bln.m, 1)
     .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });

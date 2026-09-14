@@ -297,6 +297,14 @@
       </button>
     </div>
 
+    <!-- Berdiri di atas kartu-kartu yang diredupkan selama data cabang ini
+         belum lengkap. Tanpa ini seluruh analitik terbaca sebagai nol — bukan
+         "belum sampai", melainkan "bulan ini memang sepi". -->
+    <div class="memuat-nota" id="analitikMemuat" role="status" hidden>
+      <span class="spinner spinner-kecil" aria-hidden="true"></span>
+      <span id="analitikMemuatTeks">Memuat data cabang…</span>
+    </div>
+
     <div class="kpi-row" id="kpiRow"></div>
 
     <section class="card">

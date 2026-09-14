@@ -617,6 +617,12 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   flex: none; width: 13px; height: 13px; border-width: 2px;
 }
 
+/* Analitik tidak bisa diberi rangka sebentuk isinya — kartunya terlalu
+   beragam — jadi yang dilakukan sebaliknya: angka nol yang belum bisa
+   dipertanggungjawabkan diredupkan, dan notanya berdiri di atas. */
+#panelAnalitik.memuat .kpi-row,
+#panelAnalitik.memuat .card { opacity: .4; pointer-events: none; }
+
 /* ---- Pilih pegawai di kotak "treatment selesai" ---- */
 .peg-pilih { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .peg-btn {
