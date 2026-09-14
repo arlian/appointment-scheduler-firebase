@@ -590,6 +590,33 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
    berubah tinggi waktu nama cabang yang asli menggantikannya. */
 .skel-chip { display: inline-block; height: 30px; border-radius: 999px; }
 
+/* Sebaris dengan .day-head: tinggi dan jaraknya disamakan supaya judul hari
+   yang asli mendarat tepat di tempat rangkanya berdiri. */
+.skel-head { width: 132px; height: 9px; margin: 18px 0 10px; }
+.skel-head:first-child { margin-top: 0; }
+
+/* Ukurannya menirukan .appt-main — nomor antrian, jam, lalu nama dan tanda. */
+.skel-row {
+  display: flex; align-items: center; gap: 11px; padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.skel-row:last-child { border-bottom: 0; }
+.skel-urut { flex: none; width: 17px; height: 11px; }
+.skel-jam { flex: none; width: 42px; height: 15px; }
+.skel-who { flex: 1; min-width: 0; }
+.skel-nama { height: 13px; }
+.skel-tanda { height: 9px; margin-top: 7px; }
+
+/* Kalimatnya tetap ada di bawah rangka: rangka saja bisa terbaca sebagai
+   layar yang macet, dan pembaca layar tidak melihat kotak abu sama sekali. */
+.memuat-nota {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  color: var(--text-2); font-size: .82rem; padding: 16px 0 4px;
+}
+.spinner-kecil {
+  flex: none; width: 13px; height: 13px; border-width: 2px;
+}
+
 /* ---- Pilih pegawai di kotak "treatment selesai" ---- */
 .peg-pilih { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .peg-btn {

@@ -94,7 +94,12 @@ let tersambung = false;
 // dari koleksi bulanan dan bukan lagi dari satu dokumen seperti dua yang lain.
 const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI, KEY_JAM];
 let dataSiap = {};
-const resetDataSiap = () => { dataSiap = {}; };
+// Rangka "sedang memuat" tidak boleh berkedip selamanya waktu yang sebenarnya
+// terjadi adalah pembacaan yang gagal — itu menyuruh operator menunggu sesuatu
+// yang tidak akan datang. Penandanya dipasang dari error handler listener dan
+// dilepas tiap kali listener-nya dipasang ulang.
+let gagalMuat = false;
+const resetDataSiap = () => { dataSiap = {}; gagalMuat = false; };
 const semuaDataSiap = () => !!cabangId && KEYS_DATA.every((k) => dataSiap[k]);
 
 // Daftar cabang punya jendela yang sama: `cabangList` masih [] sampai snapshot
@@ -1616,10 +1621,61 @@ $('selesaiSheet').addEventListener('click', (e) => {
 // ============================================================
 // Daftar jadwal (render)
 // ============================================================
+// Rangka abu sebentuk daftar jadwal, dipakai selama snapshot pertama cabang
+// ini belum lengkap. Jumlah barisnya tetap — ia tidak menebak berapa jadwal
+// yang akan datang, cuma mengisi tinggi layar supaya isinya tidak muncul dari
+// ruang kosong. Dibangun sebagai string sekali kirim karena tidak ada satu pun
+// bagian di dalamnya yang bisa diketuk.
+const RANGKA_HARI = 2;
+const RANGKA_BARIS = 4;
+function rangkaDaftar() {
+  const baris = '<div class="skel-row">'
+    + '<span class="skel skel-urut"></span>'
+    + '<span class="skel skel-jam"></span>'
+    + '<span class="skel-who">'
+    +   '<span class="skel skel-nama" style="display:block;width:%W%%"></span>'
+    +   '<span class="skel skel-tanda" style="display:block;width:%T%%"></span>'
+    + '</span>'
+    + '</div>';
+  // Lebarnya sengaja tidak seragam: deretan kotak yang persis sama panjang
+  // terbaca sebagai gambar yang macet, bukan sebagai nama-nama yang beragam.
+  const lebarNama = [58, 44, 67, 51];
+  const lebarTanda = [32, 25, 39, 29];
+  let html = '';
+  for (let h = 0; h < RANGKA_HARI; h++) {
+    html += '<div class="skel skel-head"></div>';
+    for (let i = 0; i < RANGKA_BARIS; i++) {
+      html += baris
+        .replace('%W%', lebarNama[i % lebarNama.length])
+        .replace('%T%', lebarTanda[i % lebarTanda.length]);
+    }
+  }
+  return html
+    + '<div class="memuat-nota" role="status">'
+    +   '<span class="spinner spinner-kecil" aria-hidden="true"></span>'
+    +   '<span>Memuat data cabang…</span>'
+    + '</div>';
+}
+
 function renderList() {
   const list = $('list');
   list.innerHTML = '';
   list.classList.toggle('mode-pilih', modePilih);
+  // Sebelum snapshot pertama tiap dokumen mendarat, `appointments` masih array
+  // kosong bawaan — bukan cabang yang memang belum punya jadwal. Kalau jalur di
+  // bawah diteruskan, layarnya berbunyi "Belum ada jadwal" untuk cabang yang
+  // isinya ratusan baris, dan operator yang percaya kalimat itu akan mulai
+  // mencatat ulang. Rangkanya menahan kesimpulan itu sampai datanya sampai.
+  if (!semuaDataSiap()) {
+    $('listTotal').textContent = '';
+    $('treatRingkas').hidden = true;
+    $('treatRingkas').innerHTML = '';
+    list.innerHTML = gagalMuat
+      ? '<div class="empty">Data cabang ini gagal dimuat — periksa sambungan, lalu muat ulang halaman.</div>'
+      : rangkaDaftar();
+    jadwalkanAnalitik();
+    return;
+  }
   const rows = filteredRows();
   // Jadwal yang sudah dihapus — di sini atau di perangkat lain — tidak boleh
   // tertinggal di dalam pilihan: hitungannya jadi menyebut baris yang tidak
@@ -3988,6 +4044,7 @@ function mulaiSync() {
   cabangSiap = false;
   resetDataSiap();
   rangkaCabangBar();
+  renderList();
   // Nama klinik berdiri di tingkat akun, sejajar dengan daftar cabang — bukan
   // di dalam cabang — jadi ia tidak ikut dilepas-pasang tiap pindah cabang.
   //
@@ -4083,8 +4140,10 @@ function mulaiSyncData() {
       // Gagal baca berarti isi di layar tidak bisa dipertanggungjawabkan lagi;
       // gerbangnya ditutup balik supaya tidak ada yang tertulis menimpanya.
       dataSiap[key] = false;
+      gagalMuat = true;
       setSambung(false);
       toast('Gagal memuat data: ' + e.message, true);
+      renderList();
     }
   );
   // Jadwal datang dari koleksi bulanan, jadi listener-nya satu koleksi — bukan
@@ -4105,8 +4164,10 @@ function mulaiSyncData() {
     (e) => {
       if (cabangId !== cabangDipasang) return;
       dataSiap[KEY_APPOINTMENTS] = false;
+      gagalMuat = true;
       setSambung(false);
       toast('Gagal memuat jadwal: ' + e.message, true);
+      renderList();
     }
   );
   stopData = [
