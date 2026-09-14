@@ -3987,6 +3987,7 @@ function mulaiSync() {
   setSambung(false); // dianggap belum tersambung sampai server yang bilang lain
   cabangSiap = false;
   resetDataSiap();
+  rangkaCabangBar();
   // Nama klinik berdiri di tingkat akun, sejajar dengan daftar cabang — bukan
   // di dalam cabang — jadi ia tidak ikut dilepas-pasang tiap pindah cabang.
   //
@@ -4051,6 +4052,9 @@ function mulaiSync() {
       // bisa dipertanggungjawabkan lagi; gerbang tulisnya ditutup balik.
       cabangSiap = false;
       setSambung(false);
+      // Rangkanya dilepas: daftar cabang yang gagal dibaca tidak akan datang
+      // dengan sendirinya, jadi chip abu yang berkedip terus cuma menyesatkan.
+      $('cabangBar').innerHTML = '';
       toast('Gagal memuat daftar cabang: ' + e.message, true);
     }
   );
@@ -4164,6 +4168,20 @@ async function buatCabangDefault() {
 // ============================================================
 // Pilih & tambah cabang
 // ============================================================
+// Selama dokumen branches belum datang, `cabangList` masih kosong dan barnya
+// cuma berisi tombol "+ Cabang" — layar yang terbaca sebagai akun tanpa cabang
+// sama sekali. Chip abu ini menempati tempatnya sampai nama aslinya sampai.
+function rangkaCabangBar() {
+  const bar = $('cabangBar');
+  bar.innerHTML = '';
+  [74, 96, 82].forEach((w) => {
+    const c = document.createElement('span');
+    c.className = 'skel skel-chip';
+    c.style.width = w + 'px';
+    bar.appendChild(c);
+  });
+}
+
 function renderCabangBar() {
   const bar = $('cabangBar');
   bar.innerHTML = '';

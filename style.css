@@ -566,6 +566,30 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 .sheet-actions .ghost:active, .sheet-actions .primary:active { transform: scale(.985); }
 .empty { color: var(--text-2); font-size: .86rem; padding: 20px 0; text-align: center; }
 
+/* ---- Keadaan memuat ─────────────────────────────────────────────────────
+   Snapshot pertama Firestore tidak datang seketika, dan sampai ia mendarat
+   `cabangList`/`appointments` masih kosong bawaan. Yang tergambar di layar
+   selama jeda itu bukan "belum ada data" — kalimat yang salah dan bikin
+   panik — melainkan data yang belum sampai. Rangka abu di bawah ini yang
+   mengatakannya, dengan bentuk yang sama persis dengan isi aslinya supaya
+   layarnya tidak melompat waktu isi yang sebenarnya menggantikannya.
+
+   Animasinya sendiri tidak perlu diurus untuk prefers-reduced-motion: aturan
+   bintang di blok itu sudah membekukannya, dan kotak abu yang diam tetap
+   terbaca sebagai "sedang dimuat". */
+@keyframes kilau { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.skel {
+  background: linear-gradient(90deg, var(--border) 25%, var(--border-kuat) 44%, var(--border) 63%);
+  background-size: 200% 100%;
+  animation: kilau 1.4s linear infinite;
+  border-radius: 5px;
+}
+
+/* Setinggi .chip (7px padding + baris teks .8125rem) supaya barisnya tidak
+   berubah tinggi waktu nama cabang yang asli menggantikannya. */
+.skel-chip { display: inline-block; height: 30px; border-radius: 999px; }
+
 /* ---- Pilih pegawai di kotak "treatment selesai" ---- */
 .peg-pilih { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .peg-btn {
