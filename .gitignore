@@ -2,3 +2,6 @@
 data-import.json
 jadwal-treatment-*.json
 data.db
+
+# Cache lokal Firebase CLI — dibuat ulang tiap deploy, bukan konfigurasi
+.firebase/
