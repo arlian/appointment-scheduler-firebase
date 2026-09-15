@@ -5061,6 +5061,8 @@ function warnaViz() {
     bg: w('--bg'), card: w('--card'), border: w('--border'), field: w('--field'),
     text: w('--text'), text2: w('--text-2'), muted: w('--muted'),
     accent: w('--accent'), naik: w('--naik'), turun: w('--turun'),
+    // Dipakai chip jam yang tinggal satu pegawai di gambar Slot Kosong.
+    accentSoft: w('--accent-soft'), accentRing: w('--accent-ring'), accentInk: w('--accent-ink'),
     h: [w('--h0'), w('--h1'), w('--h2'), w('--h3'), w('--h4')],
     gen: { P: w('--gen-p'), L: w('--gen-l'), '?': w('--gen-x') },
   };
@@ -5359,15 +5361,17 @@ function buatBlobAnalitik() {
   });
 }
 
-$('salinViz').addEventListener('click', () => {
-  const btn = $('salinViz');
+// Jalur menyerahkan gambar ke operator, dipakai dua tombol: ringkasan analitik
+// dan daftar slot kosong. Ketiga cadangannya berurutan dari yang paling dekat
+// dengan "tinggal paste" ke yang paling jauh — clipboard, share sheet, lalu
+// unduh — karena keduanya sama-sama berakhir di tempel ke WhatsApp.
+function salinGambar(btn, namaFile, buatBlob, pesanSukses) {
   if (btn.disabled) return;
   btn.disabled = true;
-  const namaFile = 'analitik-' + kunciBulan(bln.y, bln.m) + '.png';
   // Blob-nya sengaja tidak di-await dulu: Safari mencabut "izin dari ketukan
   // user" begitu ada await sebelum clipboard.write, jadi janjinya yang
   // diserahkan ke ClipboardItem, bukan hasilnya.
-  const janjiBlob = buatBlobAnalitik();
+  const janjiBlob = buatBlob();
   janjiBlob.catch(() => {}); // ditangani di bawah — ini cuma peredam unhandled rejection
 
   const cadangan = async () => {
@@ -5391,7 +5395,7 @@ $('salinViz').addEventListener('click', () => {
     try {
       if (!navigator.clipboard || !window.ClipboardItem) throw new Error('tanpa clipboard gambar');
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': janjiBlob })]);
-      toast('Gambar analitik tersalin — tinggal paste.');
+      toast(pesanSukses);
     } catch {
       try { await cadangan(); }
       catch (e) { toast('Gagal membuat gambar: ' + e.message, true); }
@@ -5399,6 +5403,141 @@ $('salinViz').addEventListener('click', () => {
       btn.disabled = false;
     }
   })();
+}
+
+$('salinViz').addEventListener('click', () => salinGambar(
+  $('salinViz'),
+  'analitik-' + kunciBulan(bln.y, bln.m) + '.png',
+  buatBlobAnalitik,
+  'Gambar analitik tersalin — tinggal paste.'));
+
+// ============================================================
+// Salin slot kosong sebagai gambar
+// ------------------------------------------------------------
+// Menumpang perkakas canvas yang sama dengan salinan analitik — sebabnya juga
+// sama: tanpa build, harus jalan offline, dan angkanya sudah ada di tangan.
+//
+// Bedanya dengan salinan teks: yang dikirim ke customer lewat WhatsApp itu
+// daftar jam yang panjang, dan di layar HP daftar teks sepanjang itu terbaca
+// seperti dinding. Sebagai gambar tiap jam jadi kotak yang bisa dihitung
+// sekali lihat. Salinan teks tetap ada dan tetap yang utama — ia bisa dibalas,
+// bisa dicari, dan tidak mati kalau gambarnya gagal terkirim.
+//
+// Isinya sengaja dijaga sama persis dengan buildSlotWaText(): hari yang penuh
+// tidak ditulis, dan tanda "1 slot" tunduk pada aturan yang sama. Dua salinan
+// yang menyebut jam berbeda untuk pertanyaan yang sama jauh lebih buruk
+// daripada tidak punya salinan gambar sama sekali.
+// ============================================================
+const SLOT_VIZ_KOLOM = 4;
+const SLOT_VIZ_CHIP_H = 54;
+const SLOT_VIZ_SELA = 12;
+
+function dataSlotViz() {
+  const hariIni = today();
+  const hari = [];
+  let total = 0;
+  tanggalCari().filter((t) => t >= hariIni).forEach((tgl) => {
+    const jam = jamMulaiHari(tgl, hariIni);
+    if (!jam.length) return; // hari penuh tidak ditulis — sama seperti salinan teks
+    total += jam.length;
+    hari.push({ tgl, jam, tandai: pegawaiUntuk(tgl) > 1 });
+  });
+  return { hari, total };
+}
+
+// Pola dua giliran yang sama dengan lukisAnalitik(): sekali di canvas buangan
+// untuk tahu tingginya, sekali lagi di canvas yang sudah pas.
+function lukisSlot(ctx, data, tinggiTotal) {
+  const C = warnaViz();
+  const L = VIZ_PAD, W = VIZ_W - VIZ_PAD * 2;
+  if (tinggiTotal) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, VIZ_W, tinggiTotal);
+  }
+
+  // --- Kepala ---
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  ctx.letterSpacing = '2.5px'; // diabaikan browser lama — cuma soal rapi
+  vizTeks(ctx, 'SLOT KOSONG', L, 56, { ukuran: 12.5, tebal: 700, warna: C.accent });
+  ctx.letterSpacing = '0px';
+  // Yang dicari orangnya jenis treatment, bukan tanggal — jadi itu yang jadi
+  // judul, dan tanggalnya muncul sebagai kepala tiap blok di bawah.
+  vizTeks(ctx, namaCari(), L, 100, { ukuran: 33, tebal: 700, warna: C.text });
+  const ket = [labelDurasi(durasiCari())];
+  if (cabangList.length > 1 && cabang) ket.unshift(cabang.name);
+  vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
+  let y = 156;
+
+  const chipW = (W - 40 - SLOT_VIZ_SELA * (SLOT_VIZ_KOLOM - 1)) / SLOT_VIZ_KOLOM;
+
+  data.hari.forEach((h) => {
+    const baris = Math.ceil(h.jam.length / SLOT_VIZ_KOLOM);
+    const tinggi = 20 + 26 + baris * SLOT_VIZ_CHIP_H + (baris - 1) * SLOT_VIZ_SELA + 20;
+    if (tinggiTotal) {
+      vizPanel(ctx, C, L, y, W, tinggi);
+      vizTeks(ctx, hariBulan(h.tgl), L + 20, y + 34, { ukuran: 15.5, tebal: 700, warna: C.text });
+      vizTeks(ctx, h.jam.length + ' jam', L + W - 20, y + 34,
+        { ukuran: 12.5, tebal: 600, warna: C.muted, rata: 'right' });
+
+      h.jam.forEach((j, i) => {
+        const kol = i % SLOT_VIZ_KOLOM, brs = Math.floor(i / SLOT_VIZ_KOLOM);
+        const x = L + 20 + kol * (chipW + SLOT_VIZ_SELA);
+        const cy = y + 46 + brs * (SLOT_VIZ_CHIP_H + SLOT_VIZ_SELA);
+        // Jam yang tinggal satu pegawai dibedakan warnanya, bukan cuma diberi
+        // tulisan tambahan: gambar ini dilihat sekilas, dan warna aksen terbaca
+        // lebih dulu daripada baris kecil di bawah angkanya. Warna netral tidak
+        // cukup — --field dan --bg terlalu berdekatan untuk jadi penanda.
+        const sisaSatu = h.tandai && j.peg === 1;
+        ctx.fillStyle = sisaSatu ? C.accentSoft : C.bg;
+        ctx.strokeStyle = sisaSatu ? C.accentRing : C.border;
+        ctx.lineWidth = 1;
+        vizKotak(ctx, x, cy, chipW, SLOT_VIZ_CHIP_H, 13);
+        ctx.fill();
+        ctx.stroke();
+        vizTeks(ctx, keJam(j.m), x + chipW / 2, cy + (sisaSatu ? 25 : 34),
+          { ukuran: 18, tebal: 700, warna: sisaSatu ? C.accentInk : C.text, rata: 'center' });
+        if (sisaSatu) {
+          vizTeks(ctx, 'sisa 1 slot', x + chipW / 2, cy + 42,
+            { ukuran: 11, tebal: 600, warna: C.accentInk, rata: 'center' });
+        }
+      });
+    }
+    y += tinggi + 14;
+  });
+
+  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), VIZ_W / 2, y + 20,
+    { ukuran: 11.5, warna: C.muted, rata: 'center' });
+  return y + 42;
+}
+
+function buatBlobSlot(data) {
+  const tinggi = Math.round(lukisSlot(
+    document.createElement('canvas').getContext('2d'), data));
+  const c = document.createElement('canvas');
+  c.width = VIZ_W * VIZ_SKALA;
+  c.height = tinggi * VIZ_SKALA;
+  const ctx = c.getContext('2d');
+  ctx.scale(VIZ_SKALA, VIZ_SKALA);
+  lukisSlot(ctx, data, tinggi);
+  return new Promise((resolve, reject) => {
+    c.toBlob((b) => b ? resolve(b) : reject(new Error('canvas gagal jadi gambar')), 'image/png');
+  });
+}
+
+$('salinSlotViz').addEventListener('click', () => {
+  // Datanya dihitung sebelum salinGambar() dipanggil supaya keadaan "tidak ada
+  // yang bisa disalin" berhenti di sini — tombolnya tidak perlu sempat mati
+  // lalu hidup lagi cuma untuk memunculkan toast.
+  const data = dataSlotViz();
+  if (!data.total) {
+    toast('Tidak ada jam yang muat untuk ' + namaCari() + ' — tidak ada yang bisa disalin.', true);
+    return;
+  }
+  salinGambar(
+    $('salinSlotViz'),
+    'slot-kosong-' + today() + '.png',
+    () => buatBlobSlot(data),
+    'Gambar slot kosong tersalin — tinggal paste.');
 });
 
 // ============================================================
