@@ -613,6 +613,13 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   display: flex; align-items: center; justify-content: center; gap: 9px;
   color: var(--text-2); font-size: .82rem; padding: 16px 0 4px;
 }
+/* display: flex di atas datang dari stylesheet penulis, dan aturan penulis
+   mana pun mengalahkan [hidden] bawaan browser — jadi tanpa baris ini atribut
+   hidden tidak berbuat apa-apa dan notanya berputar selamanya walau datanya
+   sudah mendarat. Belasan elemen lain di berkas ini berpasangan begitu karena
+   sebab yang sama persis. */
+.memuat-nota[hidden] { display: none; }
+
 .spinner-kecil {
   flex: none; width: 13px; height: 13px; border-width: 2px;
 }
