@@ -777,6 +777,12 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 .kpi-delta.naik { color: var(--naik); }
 .kpi-delta.turun { color: var(--turun); }
 .kpi-delta.datar { color: var(--muted); }
+/* Pembagi rata-rata harian — sengaja lebih kecil dan redup dari baris
+   pembanding di atasnya: ia keterangan cara hitung, bukan angka yang dibaca */
+.kpi-ket {
+  font-size: .66rem; color: var(--muted); opacity: .85; margin-top: 5px;
+  padding-top: 5px; border-top: 1px solid var(--border); line-height: 1.35;
+}
 
 /* Heatmap kepadatan harian */
 .heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -864,6 +870,9 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   font-variant-numeric: tabular-nums; color: var(--text);
 }
 .gen-persen { font-weight: 600; font-size: .72rem; color: var(--muted); margin-left: 5px; }
+/* Angka penyusun di bawah batang pegawai — keterangan cara hitung, bukan angka
+   yang dibaca duluan, jadi ia yang paling redup di barisnya */
+.peg-kaki { font-size: .68rem; color: var(--muted); margin-top: 5px; line-height: 1.35; }
 .gen-delta {
   flex: none; min-width: 42px; text-align: right;
   font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums;
@@ -900,6 +909,10 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 .gen-seg-btn .ico { font-size: 1.05rem; stroke-width: 1.9; }
 .gen-seg-btn[data-g="P"] .ico { color: var(--gen-p); }
 .gen-seg-btn[data-g="L"] .ico { color: var(--gen-l); }
+/* Tanpa data-g: segmen netral, dipakai toggle mode di kartu Pegawai. Dua
+   tombol gender di bawah tetap memakai warnanya sendiri — aturannya membawa
+   [data-g] jadi specificity-nya lebih tinggi, bukan karena urutan. */
+.gen-seg-btn.aktif { background: var(--accent); color: #fff; }
 .gen-seg-btn.aktif[data-g="P"] { background: var(--gen-p); color: #fff; }
 .gen-seg-btn.aktif[data-g="L"] { background: var(--gen-l); color: #fff; }
 .gen-seg-btn.aktif .ico { color: #fff; }
