@@ -320,8 +320,12 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>Pegawai</h2></div>
-      <p class="card-sub">Jumlah treatment yang sudah ditandai selesai bulan ini, per pegawai yang menangani.</p>
+      <div class="card-head">
+        <h2>Pegawai</h2>
+        <!-- Dua cara baca daftar yang sama; tombolnya di kepala kartu supaya
+             kelihatan sebelum angkanya dibaca, bukan sesudah terlanjur salah baca -->
+        <div class="gen-seg" id="pegawaiMode" role="group" aria-label="Cara menghitung pegawai"></div>
+      </div>
       <div class="chart" id="chartPegawai"></div>
     </section>
 
