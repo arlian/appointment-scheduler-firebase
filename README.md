@@ -134,11 +134,24 @@ WA, export/import), ditambah:
   secara struktur, bukan cuma dijaga gerbang.
 - **Tab Analitik** — ringkasan sebulan untuk cabang yang sedang dibuka, bisa
   digeser ke bulan mana pun lewat panah di atas:
-  - tiga angka utama (total treatment, customer dilayani, dan customer baru)
-    lengkap dengan selisih terhadap bulan sebelumnya. "Customer baru" dihitung
-    dari kunjungan pertama yang tercatat, bukan dari tanda **Baru** di daftar
-    jadwal — tanda itu memakai jumlah kunjungan sampai hari ini, jadi angka
-    bulan lalu akan menyusut sendiri tiap kali dibuka;
+  - empat angka utama (total treatment, customer dilayani, customer baru, dan
+    rata-rata treatment per hari) lengkap dengan selisih terhadap bulan
+    sebelumnya. "Customer baru" dihitung dari kunjungan pertama yang tercatat,
+    bukan dari tanda **Baru** di daftar jadwal — tanda itu memakai jumlah
+    kunjungan sampai hari ini, jadi angka bulan lalu akan menyusut sendiri tiap
+    kali dibuka;
+  - **rata-rata per hari** memakai pembagi **hari aktif** — jumlah tanggal yang
+    benar-benar ada treatment-nya, bukan jumlah tanggal di bulan itu. Jumlah
+    hari kerja tiap bulan tidak sama: ada bulan 30 hari ada yang 31, belum lagi
+    libur dan tanggal merah yang jatuhnya beda-beda. Dibagi jumlah tanggal,
+    bulan yang banyak liburnya selalu terbaca lebih sepi padahal hari bukanya
+    memang lebih sedikit. Bulan yang sedang berjalan ikut adil dengan sendirinya:
+    tanggal yang belum datang belum punya jadwal, jadi belum ikut jadi pembagi.
+    Pembaginya dicetak di kartunya sendiri ("280 treatment ÷ 31 hari aktif")
+    supaya angkanya bisa diperiksa ulang tanpa hover — di HP tidak ada hover.
+    Selisihnya dibulatkan dulu ke satu desimal baru diadu dengan nol, supaya
+    kartunya tidak pernah bilang "naik" sambil memajang angka yang sama persis
+    dengan bulan lalu;
   - **kombinasi treatment** — porsi tiap kombinasi dari seluruh treatment bulan
     itu, lengkap dengan persennya, dibaca dengan bentuk yang sama seperti
     komposisi gender. Jadwal yang jenisnya belum diisi ikut terhitung sebagai
@@ -152,6 +165,31 @@ WA, export/import), ditambah:
     belum ditandai belum tentu belum dikerjakan. Pegawai sekarang wajib diisi
     waktu menandai selesai, tapi data lama masih bisa kosong — yang seperti itu
     tetap dihitung sebagai barisnya sendiri (abu-abu, paling bawah) supaya jumlah seluruh barisnya tetap sama dengan jumlah yang selesai;
+  - kartu pegawai punya **dua cara baca**, digeser lewat tombol di kepala kartu:
+    - **Jumlah** — berapa beban yang ditangani sebulan itu (tampilan lama);
+    - **Per hari** — berapa treatment selesai yang dikerjakan **tiap hari masuk**.
+      Ini ukuran yang dipakai kalau mau membandingkan orang: jumlah hari masuk
+      tiap pegawai beda-beda (libur, cuti, shift), jadi yang masuknya 21 hari
+      tidak adil diadu telanjang dengan yang masuk 9 hari. Dihitung per orang
+      dari tanggal yang benar-benar ada treatment selesai atas namanya — itu
+      satu-satunya jejak kehadiran yang dipunya aplikasi ini (tidak ada absensi),
+      dan menebak jadwal masuk dari hal lain cuma melahirkan angka yang
+      kelihatan pasti padahal karangan.
+    Peringkat barisnya ikut mode yang dipilih — kartu ini dibaca dari atas, jadi
+    yang teratas harus teratas menurut ukuran yang sedang dipakai. Di mode
+    **Per hari** sengaja tidak ada persen: menjumlahkan rata-rata orang per orang
+    tidak menghasilkan angka yang berarti ("45% dari 9,4 treatment/hari gabungan"
+    bukan kalimat yang punya arti), jadi batangnya diukur terhadap rata-rata
+    tertinggi dan dibaca sebagai perbandingan antar-baris. Dua-duanya mencetak
+    angka penyusunnya di bawah batang ("99 selesai ÷ 9 hari masuk") — di HP tidak
+    ada hover, dan justru pembagi itulah yang bikin angkanya bisa dipercaya.
+    Kartunya sengaja tanpa paragraf keterangan: baris kaki itu sudah menerangkan
+    pembaginya tepat di tempat angkanya dibaca, sedangkan paragraf di atas daftar
+    terlewat begitu matanya sudah turun ke baris-barisnya.
+    Tabel angka di bawah memuat kedua ukuran sekaligus, tidak ikut mode kartu:
+    yang membuka tabel memang sedang mau membandingkan sendiri. Gambar yang
+    disalin mengikuti mode yang sedang dilihat — ia dikirim sebagai "yang barusan
+    saya lihat", jadi tidak boleh diam-diam memakai ukuran lain;
   - **kalender kepadatan** ala grafik kontribusi GitHub — tiap kotak satu hari,
     dengan jumlah treatment tercetak langsung di dalamnya (jadi tetap kebaca di
     HP, yang tidak punya hover) dan warna makin pekat makin ramai; tap satu
