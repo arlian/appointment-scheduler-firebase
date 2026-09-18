@@ -545,13 +545,37 @@ function ringkasPegawai(rows) {
   const peta = new Map();
   selesai.forEach((a) => {
     const nama = (a.staff || '').trim();
-    peta.set(nama, (peta.get(nama) || 0) + 1);
+    let p = peta.get(nama);
+    if (!p) peta.set(nama, p = { nama, n: 0, tgl: new Set() });
+    p.n++;
+    // Hari kerja pegawai dihitung per orang, bukan dari kalender cabang:
+    // yang masuk 21 hari tidak adil diadu telanjang dengan yang masuk 9 hari,
+    // dan jumlah hari masuk tiap orang beda-beda — libur, cuti, shift.
+    // Dihitung dari tanggal yang benar-benar ada treatment selesai atas
+    // namanya, karena itu satu-satunya jejak kehadiran yang dipunya aplikasi
+    // ini: tidak ada absensi, dan menebak jadwal masuk dari hal lain cuma
+    // akan melahirkan angka yang kelihatan pasti padahal karangan.
+    p.tgl.add(a.date);
   });
-  const daftar = [...peta.entries()]
-    .map(([nama, n]) => ({ nama, n }))
+  const daftar = [...peta.values()]
+    .map((p) => ({ nama: p.nama, n: p.n, hari: p.tgl.size, rata: p.n / p.tgl.size }))
     .sort((a, b) => Number(!a.nama) - Number(!b.nama) || b.n - a.n
       || a.nama.localeCompare(b.nama, 'id'));
   return { selesai: selesai.length, daftar };
+}
+
+// Dua cara baca daftar pegawai yang sama. "jumlah" menjawab berapa beban yang
+// ditangani sebulan itu; "rata" menjawab berapa yang dikerjakan tiap hari
+// masuk — dan cuma yang kedua yang boleh dipakai membandingkan orang.
+// Urutannya ikut ganti: kartu ini dibaca dari atas, jadi yang teratas harus
+// yang teratas menurut ukuran yang sedang dipilih.
+function urutPegawai(daftar, mode) {
+  return [...daftar].sort((a, b) =>
+    // Yang pegawainya tidak disebut tetap paling bawah di dua-duanya: itu
+    // bukan orang, jadi ia tidak ikut diperingkat.
+    Number(!a.nama) - Number(!b.nama)
+    || (mode === 'rata' ? b.rata - a.rata : b.n - a.n)
+    || a.nama.localeCompare(b.nama, 'id'));
 }
 
 // ============================================================
@@ -4442,11 +4466,21 @@ function ringkasBulan(kunci) {
     custG[g].add(a.customerId);
   });
   const pelanggan = new Set(rows.map((a) => a.customerId));
+  // Pembagi rata-rata harian: hari yang benar-benar ada treatment, bukan
+  // seluruh tanggal di bulan itu. Jumlah hari kerja tiap bulan tidak sama —
+  // ada bulan 30 hari, ada yang 31, belum lagi libur dan tanggal merah yang
+  // jatuhnya beda-beda. Dibagi jumlah tanggal, bulan yang banyak liburnya
+  // selalu terbaca lebih sepi padahal hari bukanya memang lebih sedikit.
+  // Bulan yang sedang berjalan juga ikut adil: tanggal yang belum datang
+  // belum punya jadwal, jadi belum ikut jadi pembagi.
+  const hariAktif = new Set(rows.map((a) => a.date)).size;
   return {
     rows,
     total: rows.length,
     jumlahCustomer: pelanggan.size,
     customerBaru: [...pelanggan].filter(baruDiBulan(kunci)).length,
+    hariAktif,
+    rataHari: hariAktif ? rows.length / hariAktif : 0,
     treatmentG,
     custG,
   };
@@ -4473,6 +4507,13 @@ function baruDiBulan(kunci) {
 }
 
 // --- Deretan angka utama ---
+// Satu angka desimal saja: rata-rata harian gunanya buat dibandingkan
+// antarbulan, dan "4,3" sudah cukup buat itu — "4,29" cuma bikin kartunya
+// ramai tanpa mengubah kesimpulan siapa pun.
+const angkaRata = (n) =>
+  n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const angkaKpi = (n, desimal) => desimal ? angkaRata(n) : String(n);
+
 function renderKpi(kini, lalu) {
   const box = $('kpiRow');
   box.innerHTML = '';
@@ -4480,7 +4521,12 @@ function renderKpi(kini, lalu) {
     ['Total treatment', kini.total, lalu.total],
     ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
     ['Customer baru', kini.customerBaru, lalu.customerBaru],
-  ].forEach(([label, nilai, sebelum]) => {
+    // Rata-rata per hari aktif — alasan pembaginya ada di ringkasBulan()
+    ['Rata-rata per hari', kini.rataHari, lalu.rataHari, true,
+      kini.hariAktif
+        ? kini.total + ' treatment ÷ ' + kini.hariAktif + ' hari aktif'
+        : 'Belum ada hari yang terisi bulan ini'],
+  ].forEach(([label, nilai, sebelum, desimal, ket]) => {
     const kartu = document.createElement('div');
     kartu.className = 'kpi';
     const l = document.createElement('div');
@@ -4488,15 +4534,28 @@ function renderKpi(kini, lalu) {
     l.textContent = label;
     const v = document.createElement('div');
     v.className = 'kpi-val';
-    v.textContent = String(nilai);
+    v.textContent = angkaKpi(nilai, desimal);
     const beda = nilai - sebelum;
+    // Selisih desimal dibulatkan dulu baru diadu dengan nol: 4,25 vs 4,21 memang
+    // beda, tapi dua-duanya tercetak "4,3" — tanpa pembulatan ini kartunya
+    // bilang "naik" sambil memajang angka yang sama persis dengan bulan lalu.
+    const bedaTampil = desimal ? Math.round(beda * 10) / 10 : beda;
     const d = document.createElement('div');
     // Arah dibaca dari panah + angka, bukan dari warnanya saja
-    d.className = 'kpi-delta ' + (beda > 0 ? 'naik' : beda < 0 ? 'turun' : 'datar');
-    d.textContent = beda === 0
+    d.className = 'kpi-delta ' + (bedaTampil > 0 ? 'naik' : bedaTampil < 0 ? 'turun' : 'datar');
+    d.textContent = bedaTampil === 0
       ? 'sama seperti bulan lalu'
-      : (beda > 0 ? '▲ +' : '▼ −') + Math.abs(beda) + ' vs bulan lalu';
+      : (bedaTampil > 0 ? '▲ +' : '▼ −')
+        + angkaKpi(Math.abs(bedaTampil), desimal) + ' vs bulan lalu';
     kartu.append(l, v, d);
+    // Pembaginya ditulis di kartu, bukan disembunyikan di tooltip: angka ini
+    // satu-satunya yang bukan hitungan langsung, dan di HP tidak ada hover.
+    if (ket) {
+      const k = document.createElement('div');
+      k.className = 'kpi-ket';
+      k.textContent = ket;
+      kartu.appendChild(k);
+    }
     box.appendChild(kartu);
   });
 }
@@ -4647,7 +4706,35 @@ function renderKomb(kini) {
 // selesai, bukan seluruh treatment bulan itu. Kalau dibagi seluruh treatment,
 // bulan yang baru separuh ditandai membuat semua pegawai terbaca berkinerja
 // setengah, padahal yang belum ditandai belum tentu belum dikerjakan.
+// Pilihan cara baca kartu pegawai, dipakai bareng tampilan layar dan gambar
+// yang disalin — gambarnya menggambarkan yang sedang dilihat, bukan mode lain.
+// Kartunya tidak diberi paragraf keterangan: tiap baris sudah membawa angka
+// penyusunnya sendiri di bawah batang ("99 selesai ÷ 9 hari masuk"), dan itu
+// menerangkan pembaginya di tempat angkanya dibaca, bukan di paragraf yang
+// terlewat begitu matanya sudah turun ke daftar.
+let pegawaiMode = 'jumlah';
+const PEGAWAI_MODE = [['jumlah', 'Jumlah'], ['rata', 'Per hari']];
+
+function renderPegawaiMode() {
+  const box = $('pegawaiMode');
+  box.innerHTML = '';
+  PEGAWAI_MODE.forEach(([mode, label]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gen-seg-btn' + (pegawaiMode === mode ? ' aktif' : '');
+    b.textContent = label;
+    b.setAttribute('aria-pressed', pegawaiMode === mode ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      if (pegawaiMode === mode) return;
+      pegawaiMode = mode;
+      renderAnalitik();
+    });
+    box.appendChild(b);
+  });
+}
+
 function renderPegawai(kini) {
+  renderPegawaiMode();
   const box = $('chartPegawai');
   box.innerHTML = '';
   if (!kini.rows.length) {
@@ -4659,7 +4746,14 @@ function renderPegawai(kini) {
     box.innerHTML = '<div class="empty">Belum ada treatment yang ditandai selesai bulan ini.</div>';
     return;
   }
-  daftar.forEach((k) => {
+  const perHari = pegawaiMode === 'rata';
+  // Di mode "per hari" batangnya diukur terhadap rata-rata tertinggi, bukan
+  // terhadap jumlah semua rata-rata. Menjumlahkan rata-rata orang per orang
+  // tidak menghasilkan apa pun yang berarti — "45% dari 9,4 treatment/hari
+  // gabungan" bukan kalimat yang punya arti — jadi di mode ini tidak ada
+  // persen sama sekali, dan batangnya dibaca sebagai perbandingan antar-baris.
+  const maksRata = Math.max(...daftar.map((k) => k.rata));
+  urutPegawai(daftar, pegawaiMode).forEach((k) => {
     const persen = Math.round(k.n / selesai * 100);
     const nama = k.nama || 'Tanpa pegawai';
 
@@ -4675,10 +4769,13 @@ function renderPegawai(kini) {
 
     const nilai = document.createElement('div');
     nilai.className = 'gen-val';
-    nilai.textContent = String(k.n);
+    nilai.textContent = perHari ? angkaRata(k.rata) : String(k.n);
     const pct = document.createElement('span');
     pct.className = 'gen-persen';
-    pct.textContent = persen + '%';
+    // Satuannya ikut dicetak di mode "per hari": tanpa "/hari" angka 4,3 di
+    // sebelah nama orang terbaca seperti jumlah, dan itu justru salah baca
+    // yang bikin kartu ini dibuat.
+    pct.textContent = perHari ? '/hari' : persen + '%';
     nilai.appendChild(pct);
 
     const atas = document.createElement('div');
@@ -4691,13 +4788,30 @@ function renderPegawai(kini) {
     // Yang pegawainya tidak disebut dapat abu-abu, aturan yang sama dengan
     // kombinasi treatment yang jenisnya belum diisi.
     bar.className = 'gen-bar komb' + (k.nama ? '' : ' kosong');
-    bar.style.width = Math.max(2, k.n / selesai * 100) + '%';
+    bar.style.width = Math.max(2, perHari
+      ? k.rata / maksRata * 100
+      : k.n / selesai * 100) + '%';
     track.appendChild(bar);
 
-    baris.append(atas, track);
-    baris.setAttribute('aria-label',
-      nama + ': ' + k.n + ' treatment selesai, ' + persen + '% dari yang selesai bulan ini.');
-    pasangTip(baris, '<b>' + k.n + ' selesai</b> · ' + persen + '%<br>' + nama);
+    // Angka penyusunnya ditulis di bawah batang, bukan cuma di tooltip: di HP
+    // tidak ada hover, dan justru pembagi inilah yang bikin angkanya bisa
+    // dipercaya. Dua mode saling menunjukkan angka yang tidak sedang dipajang.
+    const kaki = document.createElement('div');
+    kaki.className = 'peg-kaki';
+    kaki.textContent = perHari
+      ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
+      : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari';
+
+    baris.append(atas, track, kaki);
+    baris.setAttribute('aria-label', perHari
+      ? nama + ': rata-rata ' + angkaRata(k.rata) + ' treatment selesai per hari masuk, dari '
+        + k.n + ' selesai selama ' + k.hari + ' hari masuk.'
+      : nama + ': ' + k.n + ' treatment selesai, ' + persen + '% dari yang selesai bulan ini, '
+        + 'selama ' + k.hari + ' hari masuk.');
+    pasangTip(baris, perHari
+      ? '<b>' + angkaRata(k.rata) + ' per hari</b><br>' + k.n + ' selesai ÷ ' + k.hari
+        + ' hari masuk<br>' + nama
+      : '<b>' + k.n + ' selesai</b> · ' + persen + '%<br>' + k.hari + ' hari masuk<br>' + nama);
     box.appendChild(baris);
   });
 }
@@ -4960,7 +5074,25 @@ function renderTabel(kini, lalu) {
     box.appendChild(tabel);
   };
 
-  const bedaTeks = (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n);
+  const bedaTeks = (n, desimal) => {
+    const b = desimal ? Math.round(n * 10) / 10 : n;
+    return (b > 0 ? '+' : b < 0 ? '−' : '±') + angkaKpi(Math.abs(b), desimal);
+  };
+
+  // Padanan angka untuk deretan KPI di paling atas. Rata-rata harian ikut
+  // membawa pembaginya sebagai baris sendiri — tanpa "hari aktif" terpampang,
+  // angka rata-ratanya tidak bisa diperiksa ulang oleh yang membaca tabel.
+  tambah('Ringkasan bulan', ['Angka', 'Bulan ini', 'Bulan lalu', 'Selisih'],
+    [
+      ['Total treatment', kini.total, lalu.total, false],
+      ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer, false],
+      ['Customer baru', kini.customerBaru, lalu.customerBaru, false],
+      ['Hari aktif', kini.hariAktif, lalu.hariAktif, false],
+      ['Rata-rata per hari', kini.rataHari, lalu.rataHari, true],
+    ].map(([label, a, b, desimal]) =>
+      [label, angkaKpi(a, desimal), angkaKpi(b, desimal), bedaTeks(a - b, desimal)]),
+    'Belum ada jadwal di bulan ini.');
+
   tambah('Per gender', ['Gender', 'Treatment', 'Customer', 'vs bulan lalu'],
     URUT_G.filter((g) => g !== '?' || kini.treatmentG[g])
       .map((g) => [LABEL_G[g], kini.treatmentG[g], kini.custG[g].size,
@@ -4974,10 +5106,15 @@ function renderTabel(kini, lalu) {
       : [],
     'Belum ada jadwal di bulan ini.');
 
+  // Tabelnya memuat kedua ukuran sekaligus, tidak ikut mode kartu di atas:
+  // yang membuka tabel justru sedang mau membandingkan sendiri, dan di sini
+  // ruangnya cukup buat memajang pembaginya terang-terangan.
   const peg = ringkasPegawai(kini.rows);
-  tambah('Per pegawai (yang sudah ditandai selesai)', ['Pegawai', 'Selesai', 'Porsi'],
-    peg.daftar.map((k) =>
-      [k.nama || 'Tanpa pegawai', k.n, Math.round(k.n / peg.selesai * 100) + '%']),
+  tambah('Per pegawai (yang sudah ditandai selesai)',
+    ['Pegawai', 'Selesai', 'Porsi', 'Hari masuk', 'Per hari'],
+    urutPegawai(peg.daftar, pegawaiMode).map((k) =>
+      [k.nama || 'Tanpa pegawai', k.n, Math.round(k.n / peg.selesai * 100) + '%',
+        k.hari, angkaRata(k.rata)]),
     'Belum ada treatment yang ditandai selesai bulan ini.');
 
   const perHari = new Map();
@@ -5095,7 +5232,8 @@ function vizPanel(ctx, C, x, y, w, h) {
   ctx.fill();
   ctx.stroke();
 }
-const vizDelta = (n) => n === 0 ? '±0' : (n > 0 ? '▲ +' : '▼ −') + Math.abs(n);
+const vizDelta = (n, desimal) =>
+  n === 0 ? '±0' : (n > 0 ? '▲ +' : '▼ −') + angkaKpi(Math.abs(n), desimal);
 const vizWarnaDelta = (C, n) => n > 0 ? C.naik : n < 0 ? C.turun : C.muted;
 
 // Digambar dua kali: sekali di canvas buangan untuk tahu tinggi totalnya,
@@ -5119,23 +5257,36 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     L, 126, { ukuran: 14, warna: C.text2 });
   let y = 154;
 
-  // --- Tiga angka utama ---
+  // --- Empat angka utama, dua baris dua kolom ---
+  // Berjejer berempat dalam satu baris kartunya tinggal ~150px, dan label
+  // sepanjang "Rata-rata per hari" tidak muat di situ. Dua-dua begini kartunya
+  // malah lebih lega daripada tiga sebaris yang lama.
   const kpi = [
     ['Total treatment', kini.total, lalu.total],
     ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
     ['Customer baru', kini.customerBaru, lalu.customerBaru],
+    ['Rata-rata per hari', kini.rataHari, lalu.rataHari, true,
+      kini.hariAktif
+        ? kini.total + ' treatment ÷ ' + kini.hariAktif + ' hari aktif'
+        : 'Belum ada hari yang terisi bulan ini'],
   ];
-  const kpiH = 112, sela = 16, kpiW = (W - sela * (kpi.length - 1)) / kpi.length;
-  kpi.forEach(([label, nilai, sebelum], i) => {
-    const x = L + i * (kpiW + sela);
-    vizPanel(ctx, C, x, y, kpiW, kpiH);
-    vizTeks(ctx, label, x + 20, y + 33, { ukuran: 13, tebal: 600, warna: C.muted });
-    vizTeks(ctx, String(nilai), x + 20, y + 78, { ukuran: 38, tebal: 700, warna: C.text });
-    const beda = nilai - sebelum;
-    vizTeks(ctx, beda === 0 ? 'sama seperti bulan lalu' : vizDelta(beda) + ' vs bulan lalu',
-      x + 20, y + 99, { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+  const kpiH = 126, sela = 16, kpiW = (W - sela) / 2;
+  kpi.forEach(([label, nilai, sebelum, desimal, ket], i) => {
+    const x = L + (i % 2) * (kpiW + sela);
+    const ky = y + Math.floor(i / 2) * (kpiH + sela);
+    vizPanel(ctx, C, x, ky, kpiW, kpiH);
+    vizTeks(ctx, label, x + 20, ky + 33, { ukuran: 13, tebal: 600, warna: C.muted });
+    vizTeks(ctx, angkaKpi(nilai, desimal), x + 20, ky + 78, { ukuran: 38, tebal: 700, warna: C.text });
+    // Pembulatan sebelum diadu dengan nol, alasannya sama dengan renderKpi()
+    const beda = desimal
+      ? Math.round((nilai - sebelum) * 10) / 10
+      : nilai - sebelum;
+    vizTeks(ctx, beda === 0 ? 'sama seperti bulan lalu'
+      : vizDelta(beda, desimal) + ' vs bulan lalu',
+      x + 20, ky + 99, { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+    if (ket) vizTeks(ctx, ket, x + 20, ky + 116, { ukuran: 11, warna: C.muted });
   });
-  y += kpiH + 18;
+  y += kpiH * 2 + sela + 18;
 
   // --- Komposisi gender ---
   const barisG = URUT_G.filter((g) => g !== '?' || kini.treatmentG[g]);
@@ -5205,9 +5356,14 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
   y += tinggiT + 18;
 
   // --- Pegawai ---
+  // Ikut mode yang sedang dipilih di layar: gambar ini dikirim sebagai "yang
+  // barusan saya lihat", jadi ia tidak boleh diam-diam memakai ukuran lain.
   const peg = ringkasPegawai(kini.rows);
-  const barisP = peg.selesai ? peg.daftar : [];
-  const tinggiP = 62 + (barisP.length ? barisP.length * 56 : 40) + 14;
+  const perHariP = pegawaiMode === 'rata';
+  const barisP = peg.selesai ? urutPegawai(peg.daftar, pegawaiMode) : [];
+  const maksRataP = barisP.length ? Math.max(...barisP.map((k) => k.rata)) : 0;
+  // Tiap baris kebagian satu baris keterangan angka penyusunnya, jadi 56 → 72
+  const tinggiP = 62 + (barisP.length ? barisP.length * 72 : 40) + 14;
   vizPanel(ctx, C, L, y, W, tinggiP);
   vizTeks(ctx, 'Pegawai', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
   let py = y + 64;
@@ -5219,18 +5375,29 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
     const persen = Math.round(k.n / peg.selesai * 100);
     const nama = k.nama || 'Tanpa pegawai';
     vizTeks(ctx, nama, L + 22, py + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
-    const teksPersen = '(' + persen + '%)';
-    vizTeks(ctx, teksPersen, L + W - 22, py + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
-    vizTeks(ctx, String(k.n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, py + 14,
+    // Satuan di mode "per hari" menggantikan persen: menjumlahkan rata-rata
+    // orang per orang tidak menghasilkan angka yang berarti, jadi porsi memang
+    // tidak ada di mode itu — alasan lengkapnya di renderPegawai().
+    const teksKanan = perHariP ? '/hari' : '(' + persen + '%)';
+    const teksNilai = perHariP ? angkaRata(k.rata) : String(k.n);
+    vizTeks(ctx, teksKanan, L + W - 22, py + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+    vizTeks(ctx, teksNilai, L + W - 22 - vizLebar(ctx, teksKanan, 12, 600) - 7, py + 14,
       { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
     const jalur = W - 44;
     ctx.fillStyle = C.field;
     vizKotak(ctx, L + 22, py + 27, jalur, 11, 6);
     ctx.fill();
     ctx.fillStyle = k.nama ? C.accent : C.gen['?'];
-    vizKotak(ctx, L + 22, py + 27, Math.max(8, jalur * k.n / peg.selesai), 11, 6);
+    vizKotak(ctx, L + 22, py + 27,
+      Math.max(8, jalur * (perHariP ? k.rata / maksRataP : k.n / peg.selesai)), 11, 6);
     ctx.fill();
-    py += 56;
+    // Angka penyusunnya ikut tercetak, sama seperti di layar: gambar ini sering
+    // dibaca tanpa yang mengirimnya ada di situ buat menjelaskan pembaginya.
+    vizTeks(ctx, perHariP
+      ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
+      : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari',
+      L + 22, py + 56, { ukuran: 11, warna: C.muted });
+    py += 72;
   });
   y += tinggiP + 18;
 
