@@ -48,7 +48,11 @@ const KEY_PEGAWAI = 'pegawai';           // [{hari, n}] — hari 0..6, Minggu = 
 // buka sampai malam, dan Sabtu hampir tidak pernah sama dengan hari kerja.
 // Sebelum ini jamnya satu pasang tetap di dalam kode — tidak ada yang bisa
 // mengubahnya tanpa mengubah app.js.
-const KEY_JAM = 'jam';                   // [{hari, buka, tutup}] — 'HH:MM'
+// Jam istirahat ikut di baris yang sama: jendela di tengah hari yang tidak
+// ditawarkan sebagai slot sama sekali, berapa pun pegawai yang luang. Kosong
+// ('') berarti hari itu tanpa istirahat; baris lama yang belum punya field ini
+// jatuh ke istirahat bawaan.
+const KEY_JAM = 'jam';                   // [{hari, buka, tutup, istMulai, istAkhir}] — 'HH:MM'
 
 const configTerisi =
   window.FIREBASE_CONFIG && !String(window.FIREBASE_CONFIG.apiKey).startsWith('ISI_');
@@ -417,7 +421,14 @@ const durasiJadwal = (a) => {
 // satu pasang untuk tiap hari dalam seminggu (lihat jamHari di bawah).
 const JAM_BUKA_BAWAAN = '10:00';
 const JAM_TUTUP_BAWAAN = '17:00';
-const JAM_BAWAAN = { buka: JAM_BUKA_BAWAAN, tutup: JAM_TUTUP_BAWAAN };
+// Istirahat siang bawaan: 12:00 dan 12:30 tidak pernah ditawarkan, dan
+// treatment yang masih berjalan lewat 12:00 juga tidak.
+const IST_MULAI_BAWAAN = '12:00';
+const IST_AKHIR_BAWAAN = '13:00';
+const JAM_BAWAAN = {
+  buka: JAM_BUKA_BAWAAN, tutup: JAM_TUTUP_BAWAAN,
+  istMulai: IST_MULAI_BAWAAN, istAkhir: IST_AKHIR_BAWAAN,
+};
 const PEGAWAI_BAWAAN = 2;
 // Batas hari yang dihitung sekali jalan. Filter "Semua" bisa menjangkau ratusan
 // hari, dan daftar sepanjang itu tidak ada yang membacanya.
@@ -2129,6 +2140,10 @@ function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
   const buka = Math.max(keMenit(jam.buka), palingAwal);
   const tutup = keMenit(jam.tutup);
   if (buka >= tutup) return [];
+  // Istirahat diperlakukan seperti semua pegawai sibuk: ruas di dalamnya
+  // dilewati, jadi rentang luang terbelah dua dan treatment yang akan menabrak
+  // istirahat tidak pernah muat di rentang pagi.
+  const ist = rentangIstirahat(jam);
   // Jadwal yang seluruhnya di luar jam kerja tidak ikut menyita pegawai di
   // dalam jendela — tapi yang mulai sebelum buka dan baru selesai sesudahnya
   // tetap ikut, karena pegawainya memang belum bebas waktu pintu dibuka.
@@ -2139,6 +2154,10 @@ function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
   // Batas ruas: jam buka, jam tutup, dan tiap awal/akhir jadwal di antaranya.
   // Di antara dua batas berurutan, jumlah yang sibuk pasti tetap.
   const batas = new Set([buka, tutup]);
+  if (ist) {
+    if (ist.a > buka && ist.a < tutup) batas.add(ist.a);
+    if (ist.b > buka && ist.b < tutup) batas.add(ist.b);
+  }
   kerja.forEach((x) => {
     if (x.m > buka && x.m < tutup) batas.add(x.m);
     if (x.s > buka && x.s < tutup) batas.add(x.s);
@@ -2148,6 +2167,7 @@ function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
   const hasil = [];
   for (let i = 0; i < titik.length - 1; i++) {
     const a = titik[i], b = titik[i + 1];
+    if (ist && a >= ist.a && b <= ist.b) continue;
     const sibuk = kerja.filter((x) => x.m < b && x.s > a).length;
     const sisa = pegawai - sibuk;
     if (sisa < 1) continue;
@@ -2435,10 +2455,23 @@ const jamUntuk = (tgl) => jamHari[new Date(tgl + 'T00:00:00').getDay()];
 const jamTerbalik = (jam) => keMenit(jam.buka) >= keMenit(jam.tutup);
 const JAM_POLA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const jamSah = (v) => typeof v === 'string' && JAM_POLA.test(v);
+// Istirahat yang berlaku, dalam menit — atau null kalau hari itu tanpa
+// istirahat: salah satu kotaknya kosong, atau selesainya tidak lewat dari
+// mulainya. Yang terbalik tidak diam-diam dibalik; kotaknya diberi tanda salah.
+function rentangIstirahat(jam) {
+  if (!jam || !jamSah(jam.istMulai) || !jamSah(jam.istAkhir)) return null;
+  const a = keMenit(jam.istMulai), b = keMenit(jam.istAkhir);
+  return a < b ? { a, b } : null;
+}
+const istTerbalik = (jam) => jamSah(jam.istMulai) && jamSah(jam.istAkhir)
+  && keMenit(jam.istMulai) >= keMenit(jam.istAkhir);
+const labelIst = (jam) => (rentangIstirahat(jam) ? jam.istMulai + '–' + jam.istAkhir : '');
+const jamSama = (p, q) => p.buka === q.buka && p.tutup === q.tutup
+  && p.istMulai === q.istMulai && p.istAkhir === q.istAkhir;
 // Seluruh minggu memakai jam yang sama itu keadaan yang paling sering, dan
 // layarnya menyebut jamnya sekali di atas kalau begitu — bukan mengulanginya di
 // tiap hari.
-const jamSeragam = () => jamHari.every((j) => j.buka === jamHari[0].buka && j.tutup === jamHari[0].tutup);
+const jamSeragam = () => jamHari.every((j) => jamSama(j, jamHari[0]));
 
 // Dokumen -> memori. Sama seperti terapkanPegawai(): baris yang tidak masuk akal
 // dibuang diam-diam, hari yang tidak disebut jatuh ke jam bawaan, dan snapshot
@@ -2450,9 +2483,17 @@ function terapkanJam(rows) {
     const h = Number(r && r.hari);
     if (!Number.isInteger(h) || h < 0 || h > 6) return;
     if (!jamSah(r.buka) || !jamSah(r.tutup)) return;
-    baru[h] = { buka: r.buka, tutup: r.tutup };
+    // Field istirahat yang belum pernah ditulis (dokumen dari versi sebelum
+    // ada istirahat) memakai bawaan; string kosong memang berarti tanpa
+    // istirahat dan dibiarkan kosong.
+    const ist = (v, bawaan) => (v === undefined ? bawaan : jamSah(v) ? v : '');
+    baru[h] = {
+      buka: r.buka, tutup: r.tutup,
+      istMulai: ist(r.istMulai, IST_MULAI_BAWAAN),
+      istAkhir: ist(r.istAkhir, IST_AKHIR_BAWAAN),
+    };
   });
-  if (baru.every((j, i) => j.buka === jamHari[i].buka && j.tutup === jamHari[i].tutup)) return;
+  if (baru.every((j, i) => jamSama(j, jamHari[i]))) return;
   jamHari = baru;
   if (!$('slotSheet').hidden) {
     renderJamHari();
@@ -2467,7 +2508,10 @@ function terapkanJam(rows) {
 // Memori -> dokumen. Ketujuh hari lengkap, urutan baca Senin..Minggu — persis
 // alasan yang sama dengan barisPegawai().
 function barisJam() {
-  return HARI_URUT.map((h) => ({ hari: h, buka: jamHari[h].buka, tutup: jamHari[h].tutup }));
+  return HARI_URUT.map((h) => ({
+    hari: h, buka: jamHari[h].buka, tutup: jamHari[h].tutup,
+    istMulai: jamHari[h].istMulai, istAkhir: jamHari[h].istAkhir,
+  }));
 }
 
 // Kotak jam berubah tiap komponen yang disentuh — jamnya dulu, menitnya
@@ -2514,13 +2558,18 @@ function renderJamHari() {
       const inp = document.createElement('input');
       inp.type = 'time';
       inp.value = jamHari[h][bagian];
-      inp.setAttribute('aria-label',
-        'Jam ' + (bagian === 'buka' ? 'buka' : 'tutup') + ' hari ' + HARI_PANJANG[h]);
+      const ist = bagian === 'istMulai' || bagian === 'istAkhir';
+      inp.setAttribute('aria-label', {
+        buka: 'Jam buka', tutup: 'Jam tutup',
+        istMulai: 'Mulai istirahat', istAkhir: 'Selesai istirahat',
+      }[bagian] + ' hari ' + HARI_PANJANG[h]);
       inp.addEventListener('input', () => {
         // Kotak yang sedang dikosongkan di tengah pengetikan tidak boleh
         // menghapus jam yang sudah tersimpan. Yang belum lengkap dibiarkan
         // menunggu ketukan berikutnya, bukan disimpan sebagai jam kosong.
-        if (!jamSah(inp.value)) return;
+        // Kecuali kotak istirahat: di situ kosong itu pilihan yang sah —
+        // artinya hari itu tanpa istirahat.
+        if (!jamSah(inp.value) && !(ist && inp.value === '')) return;
         jamHari[h][bagian] = inp.value;
         // Penandanya digeser di tempat: membangun ulang barisnya akan menutup
         // pemilih jam yang jarinya masih di situ.
@@ -2540,7 +2589,18 @@ function renderJamHari() {
     const pisah = document.createElement('span');
     pisah.className = 'jam-hari-pisah';
     pisah.textContent = '–';
-    baris.append(nama, buatKotak('buka'), pisah, buatKotak('tutup'));
+    // Istirahat di baris keduanya sendiri, menjorok sejajar kotak jam buka:
+    // empat kotak jam dalam satu baris tidak muat di lebar HP.
+    const istEl = document.createElement('div');
+    istEl.className = 'jam-hari-ist';
+    const istLabel = document.createElement('span');
+    istLabel.className = 'jam-hari-ist-label';
+    istLabel.textContent = 'istirahat';
+    const pisahIst = document.createElement('span');
+    pisahIst.className = 'jam-hari-pisah';
+    pisahIst.textContent = '–';
+    istEl.append(istLabel, buatKotak('istMulai'), pisahIst, buatKotak('istAkhir'));
+    baris.append(nama, buatKotak('buka'), pisah, buatKotak('tutup'), istEl);
     tandaiJamHari(baris, h);
     box.appendChild(baris);
   });
@@ -2553,6 +2613,7 @@ function renderJamHari() {
 function tandaiJamHari(baris, h) {
   baris.classList.toggle('tutup', pegawaiHari[h] === 0);
   baris.classList.toggle('salah', jamTerbalik(jamHari[h]));
+  baris.classList.toggle('ist-salah', istTerbalik(jamHari[h]));
 }
 
 // Baris jam pegawai ikut menyesuaikan waktu angka pegawai hari itu diubah —
@@ -2567,8 +2628,10 @@ function segarkanTandaJam(h) {
 // di sini; kalau harinya berbeda-beda, yang disebut cuma aturannya — jam tiap
 // harinya sudah terbaca di kotak setelan dan di judul tiap hari.
 function tandaiSubJam() {
+  const ist = labelIst(jamHari[0]);
   $('slotSub').textContent = (jamSeragam()
-    ? 'Jam kerja ' + jamHari[0].buka + '–' + jamHari[0].tutup + '. '
+    ? 'Jam kerja ' + jamHari[0].buka + '–' + jamHari[0].tutup
+      + (ist ? ', istirahat ' + ist : '') + '. '
     : 'Jam kerjanya beda-beda tiap hari. ')
     + 'Slot dihitung muat kalau seluruhnya masih di dalam jam hari itu.';
 }
@@ -2687,7 +2750,8 @@ function bangunHariSlot(tgl, hariIni) {
   if (!jamSeragam() && !hariTutup(tgl)) {
     const jamEl = document.createElement('span');
     jamEl.className = 'slot-jam-hari';
-    jamEl.textContent = jam.buka + '–' + jam.tutup;
+    jamEl.textContent = jam.buka + '–' + jam.tutup
+      + (labelIst(jam) ? ' · istirahat ' + labelIst(jam) : '');
     judul.appendChild(jamEl);
   }
   if (tgl === hariIni && menitSekarang() > keMenit(jam.buka)) {
