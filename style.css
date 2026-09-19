@@ -1241,7 +1241,18 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
   gap: 8px 16px;
 }
-.jam-hari { display: flex; align-items: center; gap: 7px; }
+.jam-hari { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+/* Baris kedua tiap hari: jam istirahat. Menjorok selebar nama hari supaya
+   kotaknya tegak lurus di bawah jam buka/tutup. */
+.jam-hari-ist {
+  flex: 1 0 100%; display: flex; align-items: center; gap: 7px;
+  padding-left: 37px;
+}
+.jam-hari-ist-label {
+  flex: none; font-size: .72rem; color: var(--muted);
+}
+.jam-hari.ist-salah .jam-hari-ist input[type="time"] { border-color: var(--red-border); color: var(--red-ink); }
+.jam-hari.ist-salah .jam-hari-ist-label { color: var(--red-ink); }
 /* Lebarnya dikunci supaya ketujuh baris rata kirinya, walau "Sen" dan "Kam"
    tidak pernah selebar satu sama lain. */
 .jam-hari-nama {
@@ -1268,7 +1279,7 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 /* Jam tutup yang tidak lewat dari jam buka menghasilkan nol slot sepanjang
    hari. Itu keadaan yang harus terlihat di kotaknya sendiri, bukan cuma di
    kalimat yang muncul jauh di bawah daftar. */
-.jam-hari.salah input[type="time"] { border-color: var(--red-border); color: var(--red-ink); }
+.jam-hari.salah > input[type="time"] { border-color: var(--red-border); color: var(--red-ink); }
 .jam-hari.salah .jam-hari-nama { color: var(--red-ink); }
 /* Jam kerja hari itu di judul tanggalnya, cuma muncul kalau minggunya tidak
    seragam. Duduk persis sesudah tanggalnya — yang di kanan sudah dipakai
