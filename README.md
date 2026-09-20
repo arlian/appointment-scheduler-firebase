@@ -382,6 +382,14 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
 
 ### Yang bisa diatur
 
+Kedua setelan di bawah ini — pegawai dan jam kerja — duduk di **kaki sheet**,
+di bawah daftar slot dan tombol salinnya, dipisah satu garis. Dulu keduanya di
+kepala sheet, dan itu terbalik dari cara layar ini dipakai: pegawai dan jam
+kerja disetel sekali lalu jarang disentuh lagi, sementara yang dibuka orang tiap
+hari adalah daftar slotnya untuk dilihat dan disalin. Di atas, keduanya jadi
+dinding kotak angka setinggi belasan baris yang harus digulir dulu sebelum
+sampai ke jawaban yang sebenarnya dicari.
+
 - **Pegawai** — bawaannya 2, bisa diubah 1–20 lewat tombol **−** dan **+**.
   Tombolnya bukan hiasan: di iPhone `<input type="number">` tidak punya panah
   sama sekali, jadi satu-satunya cara mengubah angka tanpa tombol itu adalah
@@ -412,7 +420,7 @@ jenis yang paling sering dan yang sudah tercentang duluan di form.
   tetap disebut cuma penanda "sisa hari ini" kalau harinya memang sudah
   terpotong jam berjalan — tanpa itu, daftar yang mulai jam 14:00 terlihat
   seperti salah hitung. Di layar paling sempit kata "pegawai" ikut dilepas;
-  artinya tetap terbaca dari kotak bawaan di atas yang berlabel lengkap.
+  artinya tetap terbaca dari kotak bawaan di kaki sheet yang berlabel lengkap.
 
   Kedua kotak — yang bawaan maupun yang per tanggal — dibangun fungsi yang sama
   (`buatStepper`), jadi perilakunya tidak pernah berbeda. Yang per tanggal
