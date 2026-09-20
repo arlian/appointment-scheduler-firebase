@@ -1193,7 +1193,7 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
    dirapatkan ke penanda itu, bukan didorong ke baris berikutnya. */
 .slot-sisa + .slot-peg-hari { margin-left: 0; }
 /* Layar paling sempit: kata "pegawai" dilepas, angkanya yang harus tetap ada.
-   Artinya tetap terbaca dari kotak bawaan di atas yang berlabel lengkap. */
+   Artinya tetap terbaca dari kotak bawaan di kaki sheet yang berlabel lengkap. */
 @media (max-width: 420px) {
   .slot-peg-hari { font-size: 0; gap: 0; }
 }
@@ -1231,6 +1231,13 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
    kalau tidak judul yang kedua menempel ke keterangan yang pertama dan keduanya
    terbaca seperti satu blok. */
 .slot-atur + .slot-atur { margin-top: 16px; }
+/* Kaki sheet slot kosong: setelan pegawai dan jam kerja, yang dulu berdiri di
+   kepala sheet. Garis di atasnya bukan hiasan — tanpa itu blok ini terbaca
+   sebagai lanjutan daftar slot, padahal ia setelan yang mengubah daftar tadi.
+   Jaraknya dihitung dari tombol salin di atasnya, yang sudah bermargin 10px. */
+.slot-setelan {
+  margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border);
+}
 /* Tujuh baris jam buka/tutup, satu kolom. Lebar minimumnya dihitung dari isi
    kotaknya yang paling panjang, bukan dari yang biasa terlihat: perangkat yang
    bahasanya Inggris menampilkan "05:00 PM", bukan "17:00", dan kotak yang cuma
