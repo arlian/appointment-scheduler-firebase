@@ -2991,6 +2991,11 @@ function bukaSlot() {
   // tertulis apa adanya di sheet ini — dan operator yang baru saja mencari dua
   // minggu ke depan hampir selalu mencari itu lagi di pertanyaan berikutnya.
   $('slotSheet').hidden = false;
+  // Sheet-nya dibuka ulang dari elemen yang sama, jadi posisi gulirnya bertahan
+  // dari kali sebelumnya. Sesudah setelan pegawai dan jam pindah ke kaki sheet
+  // itu jadi salah: yang sekali menyetel pegawai lalu menutup sheet akan
+  // membukanya lagi tepat di kotak setelan, bukan di daftar slot yang dicarinya.
+  $('slotSheet').querySelector('.sheet').scrollTop = 0;
   renderSlot();
 }
 function tutupSlot() { $('slotSheet').hidden = true; }
