@@ -446,20 +446,6 @@
     <!-- Kalimatnya diisi app.js: jam kerjanya bisa berbeda tiap hari, jadi tidak
          ada satu pasang jam yang boleh ditulis tetap di sini. -->
     <p class="slot-sub" id="slotSub"></p>
-    <div class="slot-atur">
-      <span class="slot-atur-judul">Pegawai tiap hari</span>
-      <!-- Ketujuh kotaknya dibangun app.js lewat buatStepper(), sama dengan yang
-           per tanggal — supaya bentuk dan perilakunya tidak pernah beda. -->
-      <div id="slotPegawaiBox" class="slot-peg-minggu"></div>
-      <span class="slot-atur-ket">Acuan cabang ini, tersimpan sendiri-sendiri tiap cabang. Tanggal tertentu masih bisa disetel di daftar bawah — yang itu cuma berlaku selama halaman ini terbuka.</span>
-    </div>
-    <div class="slot-atur">
-      <span class="slot-atur-judul">Jam kerja tiap hari</span>
-      <!-- Tujuh barisnya dibangun app.js, sederet dengan kotak pegawai di atas:
-           dua setelan yang sama-sama menentukan bentuk satu hari. -->
-      <div id="slotJamBox" class="slot-jam-minggu"></div>
-      <span class="slot-atur-ket">Bawaannya 10:00–17:00, istirahat 12:00–13:00, tersimpan sendiri-sendiri tiap cabang. Jam di dalam istirahat tidak ditawarkan; kosongkan kotak istirahat kalau hari itu tanpa istirahat. Hari yang jumlah pegawainya nol tetap tutup, berapa pun jamnya.</span>
-    </div>
     <!-- Rentang hari yang dicari. Berdiri sendiri, tidak lagi selalu ikut
          filter halaman: yang ditanya customer hampir selalu "kapan ada kosong
          minggu ini", sementara filternya hampir selalu tertinggal di Hari Ini —
@@ -478,7 +464,7 @@
       <!-- Kotak angkanya sebaris dengan keterangannya supaya terbaca sebagai
            satu kalimat, "7 hari ke depan" — bukan angka yang berdiri sendiri.
            Isinya dibangun app.js lewat buatStepper(), sama dengan kotak jumlah
-           pegawai di atas. -->
+           pegawai di kaki sheet. -->
       <div class="rentang-hari">
         <span id="slotHariBox"></span>
         <span class="rentang-hari-ket">hari ke depan, dihitung dari hari ini</span>
@@ -513,6 +499,28 @@
             title="Salin daftar slot kosong sebagai gambar — tinggal paste di WhatsApp">
       <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin sebagai Gambar
     </button>
+    <!-- Dua setelan di bawah ini — berapa pegawai dan jam kerja tiap hari —
+         berdiri di kaki sheet, bukan di kepalanya: keduanya disetel sekali lalu
+         jarang disentuh lagi, sementara yang dibuka orang tiap hari adalah
+         daftar slot di atas dan tombol salinnya. Ditaruh di atas, keduanya jadi
+         dinding kotak angka yang harus dilewati dulu sebelum sampai ke jawaban
+         yang dicari. -->
+    <div class="slot-setelan">
+      <div class="slot-atur">
+        <span class="slot-atur-judul">Pegawai tiap hari</span>
+        <!-- Ketujuh kotaknya dibangun app.js lewat buatStepper(), sama dengan yang
+             per tanggal — supaya bentuk dan perilakunya tidak pernah beda. -->
+        <div id="slotPegawaiBox" class="slot-peg-minggu"></div>
+        <span class="slot-atur-ket">Acuan cabang ini, tersimpan sendiri-sendiri tiap cabang. Tanggal tertentu masih bisa disetel di daftar slot di atas — yang itu cuma berlaku selama halaman ini terbuka.</span>
+      </div>
+      <div class="slot-atur">
+        <span class="slot-atur-judul">Jam kerja tiap hari</span>
+        <!-- Tujuh barisnya dibangun app.js, sederet dengan kotak pegawai di atas:
+             dua setelan yang sama-sama menentukan bentuk satu hari. -->
+        <div id="slotJamBox" class="slot-jam-minggu"></div>
+        <span class="slot-atur-ket">Bawaannya 10:00–17:00, istirahat 12:00–13:00, tersimpan sendiri-sendiri tiap cabang. Jam di dalam istirahat tidak ditawarkan; kosongkan kotak istirahat kalau hari itu tanpa istirahat. Hari yang jumlah pegawainya nol tetap tutup, berapa pun jamnya.</span>
+      </div>
+    </div>
     <div class="sheet-actions">
       <button type="button" class="ghost" id="slotTutup">Tutup</button>
       <button type="button" class="primary" id="slotWaBtn">Salin untuk WA</button>
