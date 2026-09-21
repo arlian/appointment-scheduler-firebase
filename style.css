@@ -1167,6 +1167,23 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   background: var(--accent-soft); border-radius: 10px;
   padding: 9px 11px; margin: 14px 0 4px;
 }
+/* Dua tombol salin slot kosong, sebaris tepat di bawah ringkasannya. Tempatnya
+   di atas daftar, bukan di kaki sheet: daftar tujuh hari lebih panjang dari
+   satu layar, dan menyalin hampir selalu jadi ujung dari membuka sheet ini. */
+.slot-salin {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 2px;
+}
+/* Salinan teks yang lebih sering dipakai, dibedakan tipis dari yang gambar —
+   sebentuk dengan tombol salin utama di tab Analitik. */
+.slot-salin .utama {
+  color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-ring);
+}
+.slot-salin .utama:hover { border-color: var(--accent); }
+/* Layar sempit: dua tombol berlabel panjang sebaris memaksa tulisannya
+   membungkus jadi dua baris yang tingginya beda. Lebih baik ditumpuk. */
+@media (max-width: 420px) {
+  .slot-salin { grid-template-columns: 1fr; gap: 8px; }
+}
 .slot-head {
   /* Boleh membungkus: kalau minggunya tidak seragam, judulnya bisa memuat
      tanggal + jam kerja + "sisa hari ini" + kotak pegawai sekaligus, dan di
@@ -1233,8 +1250,7 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 .slot-atur + .slot-atur { margin-top: 16px; }
 /* Kaki sheet slot kosong: setelan pegawai dan jam kerja, yang dulu berdiri di
    kepala sheet. Garis di atasnya bukan hiasan — tanpa itu blok ini terbaca
-   sebagai lanjutan daftar slot, padahal ia setelan yang mengubah daftar tadi.
-   Jaraknya dihitung dari tombol salin di atasnya, yang sudah bermargin 10px. */
+   sebagai lanjutan daftar slot, padahal ia setelan yang mengubah daftar tadi. */
 .slot-setelan {
   margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border);
 }
