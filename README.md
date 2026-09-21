@@ -531,8 +531,15 @@ yang sedang disaring keluar layar oleh mode riwayat satu customer.
 
 ### Salin slot ke WhatsApp
 
-Tombol **Salin untuk WA** di dalam sheet-nya. Isinya sengaja **cuma jam
-mulainya**, satu jam sebaris:
+Tombol **Salin untuk WA** di dalam sheet-nya, sebaris dengan **Salin sebagai
+Gambar** tepat di bawah ringkasan dan **di atas daftar slotnya** — bukan di kaki
+sheet. Daftar tujuh hari sudah lebih panjang dari satu layar, sementara membuka
+sheet ini hampir selalu berujung menyalin; tombol di kaki berarti menggulir
+melewati seluruh daftar dulu, tiap kali. Yang menentukan isi salinannya —
+rentang hari dan jenis treatment — semuanya tetap di atas tombol itu, jadi
+urutan bacanya utuh: atur, baca ringkasannya, salin.
+
+Isinya sengaja **cuma jam mulainya**, satu jam sebaris:
 
 ```
 *SLOT KOSONG PURI* 🕒
