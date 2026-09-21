@@ -490,15 +490,29 @@
       <div class="treat-hint" id="slotTreatHint"></div>
     </div>
     <p class="slot-ringkas" id="slotRingkas" aria-live="polite"></p>
+    <!-- Kedua tombol salin duduk di sini, di atas daftarnya dan bukan di kaki
+         sheet: daftar tujuh hari sudah lebih panjang dari satu layar, sementara
+         membuka sheet ini hampir selalu berujung menyalin — tombol di bawah
+         berarti menggulir melewati seluruh daftar dulu, tiap kali. Yang
+         menentukan isi salinannya — rentang hari dan jenis treatment —
+         semuanya sudah di atas tombol ini, jadi urutan bacanya tetap utuh:
+         atur, baca ringkasannya, salin; daftarnya di bawah untuk yang mau
+         memeriksa dulu.
+         Salinan teks yang utama — ia bisa dibalas dan bisa dicari. Yang
+         gambar sebentuk dengan tombol yang sama di tab Analitik: daftar jam
+         yang panjang terbaca seperti dinding waktu dikirim sebagai teks,
+         sebagai gambar tiap jam jadi kotak yang bisa dihitung sekali lihat. -->
+    <div class="slot-salin">
+      <button type="button" class="data-btn utama" id="slotWaBtn"
+              title="Salin daftar slot kosong sebagai teks — tinggal paste di WhatsApp">
+        <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin untuk WA
+      </button>
+      <button type="button" class="data-btn" id="salinSlotViz"
+              title="Salin daftar slot kosong sebagai gambar — tinggal paste di WhatsApp">
+        <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin sebagai Gambar
+      </button>
+    </div>
     <div id="slotHasil"></div>
-    <!-- Sebentuk dengan tombol yang sama di tab Analitik. Daftar jam yang
-         panjang terbaca seperti dinding waktu dikirim sebagai teks; sebagai
-         gambar tiap jam jadi kotak yang bisa dihitung sekali lihat. Salinan
-         teks tetap yang utama — ia bisa dibalas dan bisa dicari. -->
-    <button type="button" class="data-btn wide salin-viz" id="salinSlotViz"
-            title="Salin daftar slot kosong sebagai gambar — tinggal paste di WhatsApp">
-      <svg class="ico" aria-hidden="true"><use href="#i-salin"/></svg>Salin sebagai Gambar
-    </button>
     <!-- Dua setelan di bawah ini — berapa pegawai dan jam kerja tiap hari —
          berdiri di kaki sheet, bukan di kepalanya: keduanya disetel sekali lalu
          jarang disentuh lagi, sementara yang dibuka orang tiap hari adalah
@@ -521,9 +535,9 @@
         <span class="slot-atur-ket">Bawaannya 10:00–17:00, istirahat 12:00–13:00, tersimpan sendiri-sendiri tiap cabang. Jam di dalam istirahat tidak ditawarkan; kosongkan kotak istirahat kalau hari itu tanpa istirahat. Hari yang jumlah pegawainya nol tetap tutup, berapa pun jamnya.</span>
       </div>
     </div>
-    <div class="sheet-actions">
+    <!-- Tinggal satu tombol: salinannya sudah pindah ke atas daftar. -->
+    <div class="sheet-actions tumpuk">
       <button type="button" class="ghost" id="slotTutup">Tutup</button>
-      <button type="button" class="primary" id="slotWaBtn">Salin untuk WA</button>
     </div>
   </div>
 </div>
