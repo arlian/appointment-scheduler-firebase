@@ -1,5 +1,5 @@
 // Service worker: utamakan jaringan, cadangkan cache agar tetap bisa dibuka offline.
-const CACHE = 'jadwal-treatment-v53';
+const CACHE = 'jadwal-treatment-v54';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './firebase-config.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
