@@ -665,6 +665,38 @@ sama dengan salinan daftar jadwal. Kode clipboard-nya dipakai bersama kedua
 tombol salin (`salinTeks`), termasuk jalur cadangan untuk browser tanpa
 Clipboard API.
 
+### Salin slot sebagai gambar
+
+Tombol **Salin sebagai Gambar** di sebelahnya menggambar daftar yang sama di
+canvas — isinya dijaga persis sama dengan salinan teks: hari yang penuh tidak
+ditulis, dan tanda "sisa 1 slot" tunduk pada aturan yang sama.
+
+**Harinya disusun menyamping, maksimal empat hari sebaris** (`SLOT_VIZ_KOLOM`
+di [app.js](app.js)). Ditumpuk ke bawah, seminggu jadi gambar sepanjang tiga
+layar HP — yang melihat harus menggulir cuma untuk tahu ada hari apa saja,
+padahal yang ditanyakan customer justru "hari apa yang masih bisa". Empat jadi
+batasnya: lebih sempit dari itu panel harinya tidak lagi memuat dua chip jam
+sebaris, jamnya berbaris satu-satu ke bawah, dan gambarnya memanjang lagi —
+cuma dalam kolom yang lebih kurus. Tujuh hari berisi masing-masing delapan jam
+jadi 1.050 × 874, dari sebelumnya 720 × 1.584.
+
+Yang ikut menyesuaikan sendiri:
+
+- **Lebar gambarnya ikut jumlah hari** — tiga hari tidak dipaksa selebar tujuh,
+  dan minimalnya tetap `VIZ_W` (720) supaya satu-dua hari tidak jadi gambar
+  kurus. Satu hari 720, dua hari 720, tiga hari 804, empat ke atas 1.050.
+- **Berapa chip jam sebaris dihitung dari lebar panel harinya**, bukan dipatok:
+  empat kolom hari muat dua jam sebaris, dua kolom muat tiga, dan satu hari
+  sendirian muat empat (`SLOT_VIZ_CHIP_MAKS` — lebih dari itu sudah tidak
+  terbaca sebagai daftar).
+- **Tanggalnya dipendekkan di susunan tiga kolom ke atas** — "Sel, 22 Sep",
+  bukan "Selasa, 22 September 2026" yang tidak muat di panel selebar itu.
+- **Tiap panel setinggi isinya sendiri, rata atas.** Hari berisi dua jam di
+  sebelah hari berisi dua belas akan jadi kotak yang tiga perempatnya kosong
+  kalau tingginya disamakan, dan kotak kosong sebesar itu terbaca seperti ada
+  yang gagal digambar. Baris berikutnya tetap turun sekali, sesudah panel
+  terpanjang di barisnya.
+
 ### Hari dan jam yang sudah lewat dilewati
 
 Slot yang sudah lewat tidak bisa diisi lagi, jadi tidak ikut dicari:
