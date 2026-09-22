@@ -5742,17 +5742,20 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
   vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
   let y = 156;
 
+  // Semua panel seukuran — setinggi hari yang jamnya paling banyak, bukan
+  // setinggi isinya sendiri-sendiri. Kotak yang tingginya berbeda-beda membuat
+  // gambarnya terbaca seperti tumpukan yang jatuh tidak rata, dan tinggi kotak
+  // jadi terlihat seolah berarti sesuatu padahal jumlah jamnya sudah tertulis
+  // di tiap kepala panel. Ongkosnya ruang kosong di hari yang jamnya sedikit —
+  // itu yang dipilih, karena yang dibaca sekilas dari gambar ini bentuk
+  // minggunya, dan bentuk yang rata jauh lebih cepat dipindai.
+  const tinggi = Math.max(...data.hari.map((h) => tinggiHariSlot(h, uk)));
+
   for (let i = 0; i < data.hari.length; i += uk.kolom) {
     const sebaris = data.hari.slice(i, i + uk.kolom);
-    // Tiap panel setinggi isinya sendiri, rata atas — bukan disamakan setinggi
-    // hari yang paling panjang sebaris. Hari yang cuma punya dua jam di sebelah
-    // hari yang punya dua belas akan jadi kotak yang tiga perempatnya kosong,
-    // dan kotak kosong sebesar itu terbaca seperti ada yang gagal digambar.
-    // Baris berikutnya yang turun sekali, sesudah panel yang paling panjang.
-    const tinggi = Math.max(...sebaris.map((h) => tinggiHariSlot(h, uk)));
     if (tinggiTotal) sebaris.forEach((h, k) => {
       const px = L + k * (uk.panelW + SLOT_VIZ_SELA_HARI);
-      vizPanel(ctx, C, px, y, uk.panelW, tinggiHariSlot(h, uk));
+      vizPanel(ctx, C, px, y, uk.panelW, tinggi);
       // Panel yang sempit tidak memuat "Selasa, 1 September 2026" — di kolom
       // selebar itu tanggalnya dipendekkan, bukan dibiarkan terpotong di tepi.
       vizTeks(ctx, uk.kolom >= 3 ? hariPendek(h.tgl) : hariBulan(h.tgl),
