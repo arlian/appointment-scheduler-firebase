@@ -5664,9 +5664,22 @@ $('salinViz').addEventListener('click', () => salinGambar(
 // yang menyebut jam berbeda untuk pertanyaan yang sama jauh lebih buruk
 // daripada tidak punya salinan gambar sama sekali.
 // ============================================================
-const SLOT_VIZ_KOLOM = 4;
+// Susunannya grid: harinya memanjang ke samping, bukan ke bawah. Seminggu yang
+// ditumpuk ke bawah jadi gambar sepanjang tiga layar HP — yang lihat harus
+// menggulir cuma untuk tahu ada hari apa saja, padahal yang ditanyakan customer
+// justru "hari apa yang masih bisa". Empat hari sebaris jadi batasnya: lebih
+// sempit dari itu panel harinya tidak lagi memuat dua chip jam sebaris, dan
+// jamnya kembali berbaris satu-satu ke bawah — gambarnya memanjang lagi, cuma
+// dalam kolom yang lebih kurus.
+const SLOT_VIZ_KOLOM = 4;       // maks hari sebaris
+const SLOT_VIZ_HARI_W = 232;    // lebar acuan satu panel hari — lebar gambar dihitung dari sini
 const SLOT_VIZ_CHIP_H = 54;
-const SLOT_VIZ_SELA = 12;
+const SLOT_VIZ_CHIP_MIN = 84;   // chip jam tidak dipersempit lebih dari ini
+const SLOT_VIZ_CHIP_MAKS = 4;   // ... dan tidak lebih dari empat sebaris
+const SLOT_VIZ_SELA = 12;       // antar chip jam
+const SLOT_VIZ_SELA_HARI = 14;  // antar panel hari
+const SLOT_VIZ_PAD = 16;        // tepi dalam panel hari
+const SLOT_VIZ_KEPALA = 56;     // dari tepi atas panel sampai chip jam pertama
 
 function dataSlotViz() {
   const hariIni = today();
@@ -5681,14 +5694,39 @@ function dataSlotViz() {
   return { hari, total };
 }
 
+// Bentuk gridnya dihitung sekali dari banyaknya hari: berapa kolom, selebar apa
+// gambarnya, dan berapa chip jam yang muat sebaris di dalam satu hari. Lebarnya
+// ikut jumlah hari — tiga hari tidak perlu dipaksa selebar tujuh hari, dan
+// gambar yang separuhnya kosong terbaca seperti ada yang gagal digambar.
+function ukuranSlotViz(data) {
+  const kolom = Math.min(SLOT_VIZ_KOLOM, Math.max(1, data.hari.length));
+  const lebar = Math.max(VIZ_W,
+    VIZ_PAD * 2 + kolom * SLOT_VIZ_HARI_W + (kolom - 1) * SLOT_VIZ_SELA_HARI);
+  const isiW = lebar - VIZ_PAD * 2;
+  const panelW = (isiW - SLOT_VIZ_SELA_HARI * (kolom - 1)) / kolom;
+  const dalamW = panelW - SLOT_VIZ_PAD * 2;
+  // Satu hari saja tidak dibiarkan melebar jadi satu baris jam sepanjang gambar:
+  // chip yang berbaris lebih dari empat sudah tidak terbaca sebagai daftar.
+  const chipKol = Math.max(1, Math.min(SLOT_VIZ_CHIP_MAKS,
+    Math.floor((dalamW + SLOT_VIZ_SELA) / (SLOT_VIZ_CHIP_MIN + SLOT_VIZ_SELA))));
+  const chipW = (dalamW - SLOT_VIZ_SELA * (chipKol - 1)) / chipKol;
+  return { kolom, lebar, panelW, chipKol, chipW };
+}
+
+const tinggiHariSlot = (h, uk) => {
+  const baris = Math.ceil(h.jam.length / uk.chipKol);
+  return SLOT_VIZ_KEPALA + baris * SLOT_VIZ_CHIP_H
+    + (baris - 1) * SLOT_VIZ_SELA + SLOT_VIZ_PAD;
+};
+
 // Pola dua giliran yang sama dengan lukisAnalitik(): sekali di canvas buangan
 // untuk tahu tingginya, sekali lagi di canvas yang sudah pas.
-function lukisSlot(ctx, data, tinggiTotal) {
+function lukisSlot(ctx, data, uk, tinggiTotal) {
   const C = warnaViz();
-  const L = VIZ_PAD, W = VIZ_W - VIZ_PAD * 2;
+  const L = VIZ_PAD;
   if (tinggiTotal) {
     ctx.fillStyle = C.bg;
-    ctx.fillRect(0, 0, VIZ_W, tinggiTotal);
+    ctx.fillRect(0, 0, uk.lebar, tinggiTotal);
   }
 
   // --- Kepala ---
@@ -5704,21 +5742,30 @@ function lukisSlot(ctx, data, tinggiTotal) {
   vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
   let y = 156;
 
-  const chipW = (W - 40 - SLOT_VIZ_SELA * (SLOT_VIZ_KOLOM - 1)) / SLOT_VIZ_KOLOM;
+  for (let i = 0; i < data.hari.length; i += uk.kolom) {
+    const sebaris = data.hari.slice(i, i + uk.kolom);
+    // Tiap panel setinggi isinya sendiri, rata atas — bukan disamakan setinggi
+    // hari yang paling panjang sebaris. Hari yang cuma punya dua jam di sebelah
+    // hari yang punya dua belas akan jadi kotak yang tiga perempatnya kosong,
+    // dan kotak kosong sebesar itu terbaca seperti ada yang gagal digambar.
+    // Baris berikutnya yang turun sekali, sesudah panel yang paling panjang.
+    const tinggi = Math.max(...sebaris.map((h) => tinggiHariSlot(h, uk)));
+    if (tinggiTotal) sebaris.forEach((h, k) => {
+      const px = L + k * (uk.panelW + SLOT_VIZ_SELA_HARI);
+      vizPanel(ctx, C, px, y, uk.panelW, tinggiHariSlot(h, uk));
+      // Panel yang sempit tidak memuat "Selasa, 1 September 2026" — di kolom
+      // selebar itu tanggalnya dipendekkan, bukan dibiarkan terpotong di tepi.
+      vizTeks(ctx, uk.kolom >= 3 ? hariPendek(h.tgl) : hariBulan(h.tgl),
+        px + SLOT_VIZ_PAD, y + 28, { ukuran: 15.5, tebal: 700, warna: C.text });
+      // Jumlah jamnya turun ke baris sendiri, tidak lagi rata kanan di baris
+      // tanggal: di panel selebar ini keduanya akan bertumbukan.
+      vizTeks(ctx, h.jam.length + ' jam', px + SLOT_VIZ_PAD, y + 45,
+        { ukuran: 11.5, tebal: 600, warna: C.muted });
 
-  data.hari.forEach((h) => {
-    const baris = Math.ceil(h.jam.length / SLOT_VIZ_KOLOM);
-    const tinggi = 20 + 26 + baris * SLOT_VIZ_CHIP_H + (baris - 1) * SLOT_VIZ_SELA + 20;
-    if (tinggiTotal) {
-      vizPanel(ctx, C, L, y, W, tinggi);
-      vizTeks(ctx, hariBulan(h.tgl), L + 20, y + 34, { ukuran: 15.5, tebal: 700, warna: C.text });
-      vizTeks(ctx, h.jam.length + ' jam', L + W - 20, y + 34,
-        { ukuran: 12.5, tebal: 600, warna: C.muted, rata: 'right' });
-
-      h.jam.forEach((j, i) => {
-        const kol = i % SLOT_VIZ_KOLOM, brs = Math.floor(i / SLOT_VIZ_KOLOM);
-        const x = L + 20 + kol * (chipW + SLOT_VIZ_SELA);
-        const cy = y + 46 + brs * (SLOT_VIZ_CHIP_H + SLOT_VIZ_SELA);
+      h.jam.forEach((j, n) => {
+        const kol = n % uk.chipKol, brs = Math.floor(n / uk.chipKol);
+        const x = px + SLOT_VIZ_PAD + kol * (uk.chipW + SLOT_VIZ_SELA);
+        const cy = y + SLOT_VIZ_KEPALA + brs * (SLOT_VIZ_CHIP_H + SLOT_VIZ_SELA);
         // Jam yang tinggal satu pegawai dibedakan warnanya, bukan cuma diberi
         // tulisan tambahan: gambar ini dilihat sekilas, dan warna aksen terbaca
         // lebih dulu daripada baris kecil di bawah angkanya. Warna netral tidak
@@ -5727,34 +5774,35 @@ function lukisSlot(ctx, data, tinggiTotal) {
         ctx.fillStyle = sisaSatu ? C.accentSoft : C.bg;
         ctx.strokeStyle = sisaSatu ? C.accentRing : C.border;
         ctx.lineWidth = 1;
-        vizKotak(ctx, x, cy, chipW, SLOT_VIZ_CHIP_H, 13);
+        vizKotak(ctx, x, cy, uk.chipW, SLOT_VIZ_CHIP_H, 13);
         ctx.fill();
         ctx.stroke();
-        vizTeks(ctx, keJam(j.m), x + chipW / 2, cy + (sisaSatu ? 25 : 34),
+        vizTeks(ctx, keJam(j.m), x + uk.chipW / 2, cy + (sisaSatu ? 25 : 34),
           { ukuran: 18, tebal: 700, warna: sisaSatu ? C.accentInk : C.text, rata: 'center' });
         if (sisaSatu) {
-          vizTeks(ctx, 'sisa 1 slot', x + chipW / 2, cy + 42,
+          vizTeks(ctx, 'sisa 1 slot', x + uk.chipW / 2, cy + 42,
             { ukuran: 11, tebal: 600, warna: C.accentInk, rata: 'center' });
         }
       });
-    }
-    y += tinggi + 14;
-  });
+    });
+    y += tinggi + SLOT_VIZ_SELA_HARI;
+  }
 
-  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), VIZ_W / 2, y + 20,
+  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), uk.lebar / 2, y + 20,
     { ukuran: 11.5, warna: C.muted, rata: 'center' });
   return y + 42;
 }
 
 function buatBlobSlot(data) {
+  const uk = ukuranSlotViz(data);
   const tinggi = Math.round(lukisSlot(
-    document.createElement('canvas').getContext('2d'), data));
+    document.createElement('canvas').getContext('2d'), data, uk));
   const c = document.createElement('canvas');
-  c.width = VIZ_W * VIZ_SKALA;
+  c.width = uk.lebar * VIZ_SKALA;
   c.height = tinggi * VIZ_SKALA;
   const ctx = c.getContext('2d');
   ctx.scale(VIZ_SKALA, VIZ_SKALA);
-  lukisSlot(ctx, data, tinggi);
+  lukisSlot(ctx, data, uk, tinggi);
   return new Promise((resolve, reject) => {
     c.toBlob((b) => b ? resolve(b) : reject(new Error('canvas gagal jadi gambar')), 'image/png');
   });
