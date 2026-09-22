@@ -691,11 +691,13 @@ Yang ikut menyesuaikan sendiri:
   terbaca sebagai daftar).
 - **Tanggalnya dipendekkan di susunan tiga kolom ke atas** — "Sel, 22 Sep",
   bukan "Selasa, 22 September 2026" yang tidak muat di panel selebar itu.
-- **Tiap panel setinggi isinya sendiri, rata atas.** Hari berisi dua jam di
-  sebelah hari berisi dua belas akan jadi kotak yang tiga perempatnya kosong
-  kalau tingginya disamakan, dan kotak kosong sebesar itu terbaca seperti ada
-  yang gagal digambar. Baris berikutnya tetap turun sekali, sesudah panel
-  terpanjang di barisnya.
+- **Semua panel seukuran** — setinggi hari yang jamnya paling banyak, bukan
+  setinggi isinya sendiri-sendiri. Kotak yang tingginya berbeda-beda membuat
+  gambarnya terbaca seperti tumpukan yang jatuh tidak rata, dan tinggi kotaknya
+  jadi terlihat seolah berarti sesuatu padahal jumlah jam tiap hari sudah
+  tertulis di kepala panelnya. Ongkosnya ruang kosong di hari yang jamnya
+  sedikit — itu yang dipilih, karena yang dibaca sekilas dari gambar ini bentuk
+  minggunya, dan bentuk yang rata jauh lebih cepat dipindai.
 
 ### Hari dan jam yang sudah lewat dilewati
 
