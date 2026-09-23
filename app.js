@@ -5251,10 +5251,11 @@ function renderAnalitik() {
 // perlu pustaka luar (aplikasi ini sengaja tanpa build dan harus jalan offline),
 // sedangkan trik SVG foreignObject rapuh — font dan CSS-nya sering tidak ikut.
 // Angkanya toh sudah ada di tangan, jadi menggambar sendiri malah lebih ringan
-// sekaligus membebaskan tata letaknya ditata khusus untuk dikirim: potret,
+// sekaligus membebaskan tata letaknya ditata khusus untuk dikirim: dua lajur,
 // teksnya lebih besar, tanpa tombol dan tanpa panel koreksi gender.
 // ============================================================
-const VIZ_W = 720;    // lebar gambar dalam satuannya sendiri
+const VIZ_W = 720;    // lebar dasar, sekaligus lebar terkecil gambar slot kosong
+const VIZ_ANALITIK_W = 1080;  // ringkasan bulanan dua lajur, jadi lebih lebar
 const VIZ_PAD = 40;
 const VIZ_SKALA = 2;  // digambar 2x supaya tetap tajam saat di-zoom di HP
 const VIZ_FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
@@ -5305,172 +5306,135 @@ const vizDelta = (n, desimal) =>
   n === 0 ? '±0' : (n > 0 ? '▲ +' : '▼ −') + angkaKpi(Math.abs(n), desimal);
 const vizWarnaDelta = (C, n) => n > 0 ? C.naik : n < 0 ? C.turun : C.muted;
 
-// Digambar dua kali: sekali di canvas buangan untuk tahu tinggi totalnya,
-// sekali lagi di canvas sungguhan yang sudah pas ukurannya.
-function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
-  const C = warnaViz();
-  const L = VIZ_PAD, W = VIZ_W - VIZ_PAD * 2;
-  if (tinggiTotal) {
-    ctx.fillStyle = C.bg;
-    ctx.fillRect(0, 0, VIZ_W, tinggiTotal);
-  }
-
-  // --- Kepala ---
-  const cabang = cabangList.find((c) => c.id === cabangId);
-  ctx.letterSpacing = '2.5px'; // diabaikan browser lama — cuma soal rapi
-  vizTeks(ctx, 'RINGKASAN BULANAN', L, 56, { ukuran: 12.5, tebal: 700, warna: C.accent });
-  ctx.letterSpacing = '0px';
-  vizTeks(ctx, new Date(bln.y, bln.m, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
-    L, 100, { ukuran: 33, tebal: 700, warna: C.text });
-  vizTeks(ctx, cabang ? cabang.name : 'Jadwal Treatment',
-    L, 126, { ukuran: 14, warna: C.text2 });
-  let y = 154;
-
-  // --- Empat angka utama, dua baris dua kolom ---
-  // Berjejer berempat dalam satu baris kartunya tinggal ~150px, dan label
-  // sepanjang "Rata-rata per hari" tidak muat di situ. Dua-dua begini kartunya
-  // malah lebih lega daripada tiga sebaris yang lama.
-  const kpi = [
-    ['Total treatment', kini.total, lalu.total],
-    ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
-    ['Customer baru', kini.customerBaru, lalu.customerBaru],
-    ['Rata-rata per hari', kini.rataHari, lalu.rataHari, true,
-      kini.hariAktif
-        ? kini.total + ' treatment ÷ ' + kini.hariAktif + ' hari aktif'
-        : 'Belum ada hari yang terisi bulan ini'],
-  ];
-  const kpiH = 126, sela = 16, kpiW = (W - sela) / 2;
-  kpi.forEach(([label, nilai, sebelum, desimal, ket], i) => {
-    const x = L + (i % 2) * (kpiW + sela);
-    const ky = y + Math.floor(i / 2) * (kpiH + sela);
-    vizPanel(ctx, C, x, ky, kpiW, kpiH);
-    vizTeks(ctx, label, x + 20, ky + 33, { ukuran: 13, tebal: 600, warna: C.muted });
-    vizTeks(ctx, angkaKpi(nilai, desimal), x + 20, ky + 78, { ukuran: 38, tebal: 700, warna: C.text });
-    // Pembulatan sebelum diadu dengan nol, alasannya sama dengan renderKpi()
-    const beda = desimal
-      ? Math.round((nilai - sebelum) * 10) / 10
-      : nilai - sebelum;
-    vizTeks(ctx, beda === 0 ? 'sama seperti bulan lalu'
-      : vizDelta(beda, desimal) + ' vs bulan lalu',
-      x + 20, ky + 99, { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
-    if (ket) vizTeks(ctx, ket, x + 20, ky + 116, { ukuran: 11, warna: C.muted });
-  });
-  y += kpiH * 2 + sela + 18;
-
-  // --- Komposisi gender ---
-  const barisG = URUT_G.filter((g) => g !== '?' || kini.treatmentG[g]);
-  const tinggiG = 62 + (kini.total ? barisG.length * 56 : 40) + 14;
-  vizPanel(ctx, C, L, y, W, tinggiG);
-  vizTeks(ctx, 'Komposisi Gender', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  let gy = y + 64;
-  if (!kini.total) {
-    vizTeks(ctx, 'Belum ada jadwal di bulan ini.', L + 22, gy + 18, { ukuran: 14, warna: C.muted });
-  } else barisG.forEach((g) => {
-    const n = kini.treatmentG[g];
-    const persen = Math.round(n / kini.total * 100);
-    const beda = n - lalu.treatmentG[g];
-    vizTeks(ctx, LABEL_G[g], L + 22, gy + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
-    vizTeks(ctx, vizDelta(beda), L + 22 + vizLebar(ctx, LABEL_G[g], 14.5, 600) + 10, gy + 14,
-      { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
-    // Jumlah dan persen dipisah kurung dan beda bobot — "41 · 57%" terbaca
-    // seperti satu bilangan desimal. Persennya turunan, jadi ia yang mengalah.
-    const teksPersen = '(' + persen + '%)';
-    vizTeks(ctx, teksPersen, L + W - 22, gy + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
-    vizTeks(ctx, String(n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, gy + 14,
-      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
-    // Panjang batang = porsi dari total bulan itu, sama seperti di layar
-    const jalur = W - 44;
-    ctx.fillStyle = C.field;
-    vizKotak(ctx, L + 22, gy + 27, jalur, 11, 6);
-    ctx.fill();
-    if (n) {
-      ctx.fillStyle = C.gen[g];
-      vizKotak(ctx, L + 22, gy + 27, Math.max(8, jalur * n / kini.total), 11, 6);
-      ctx.fill();
+// Tiap blok badan gambar analitik menghitung tingginya sendiri dulu, baru
+// digambar. Urutannya begitu karena lajurnya baru bisa dibagi setelah tinggi
+// semua blok diketahui — dan tinggi blok tidak bergantung pada lebarnya,
+// jadi menghitungnya duluan tidak perlu tahu ia jatuh di lajur mana.
+function vizBlokGender(kini, lalu) {
+  const baris = URUT_G.filter((g) => g !== '?' || kini.treatmentG[g]);
+  const tinggi = 62 + (kini.total ? baris.length * 56 : 40) + 14;
+  return { tinggi, lukis(ctx, C, x, y, w) {
+    vizPanel(ctx, C, x, y, w, tinggi);
+    vizTeks(ctx, 'Komposisi Gender', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    let gy = y + 64;
+    if (!kini.total) {
+      vizTeks(ctx, 'Belum ada jadwal di bulan ini.', x + 22, gy + 18, { ukuran: 14, warna: C.muted });
+      return;
     }
-    gy += 56;
-  });
-  y += tinggiG + 18;
+    baris.forEach((g) => {
+      const n = kini.treatmentG[g];
+      const persen = Math.round(n / kini.total * 100);
+      const beda = n - lalu.treatmentG[g];
+      vizTeks(ctx, LABEL_G[g], x + 22, gy + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+      vizTeks(ctx, vizDelta(beda), x + 22 + vizLebar(ctx, LABEL_G[g], 14.5, 600) + 10, gy + 14,
+        { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+      // Jumlah dan persen dipisah kurung dan beda bobot — "41 · 57%" terbaca
+      // seperti satu bilangan desimal. Persennya turunan, jadi ia yang mengalah.
+      const teksPersen = '(' + persen + '%)';
+      vizTeks(ctx, teksPersen, x + w - 22, gy + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+      vizTeks(ctx, String(n), x + w - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, gy + 14,
+        { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+      // Panjang batang = porsi dari total bulan itu, sama seperti di layar
+      const jalur = w - 44;
+      ctx.fillStyle = C.field;
+      vizKotak(ctx, x + 22, gy + 27, jalur, 11, 6);
+      ctx.fill();
+      if (n) {
+        ctx.fillStyle = C.gen[g];
+        vizKotak(ctx, x + 22, gy + 27, Math.max(8, jalur * n / kini.total), 11, 6);
+        ctx.fill();
+      }
+      gy += 56;
+    });
+  } };
+}
 
-  // --- Kombinasi treatment ---
+function vizBlokKombinasi(kini) {
   const kombinasi = kini.total ? ringkasTreatment(kini.rows) : [];
-  const barisT = kombinasi.some((k) => k.t.length) ? kombinasi : [];
-  const tinggiT = 62 + (barisT.length ? barisT.length * 56 : 40) + 14;
-  vizPanel(ctx, C, L, y, W, tinggiT);
-  vizTeks(ctx, 'Kombinasi Treatment', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  let ty = y + 64;
-  if (!barisT.length) {
-    vizTeks(ctx, kini.total ? 'Belum ada jadwal yang jenisnya diisi bulan ini.'
-      : 'Belum ada jadwal di bulan ini.',
-      L + 22, ty + 18, { ukuran: 14, warna: C.muted });
-  } else barisT.forEach((k) => {
-    const persen = Math.round(k.n / kini.total * 100);
-    const nama = namaKombinasi(k.t);
-    vizTeks(ctx, nama, L + 22, ty + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
-    // Jumlah dan persen dipisah kurung dan beda bobot, sama seperti komposisi
-    // gender — persennya turunan, jadi ia yang mengalah.
-    const teksPersen = '(' + persen + '%)';
-    vizTeks(ctx, teksPersen, L + W - 22, ty + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
-    vizTeks(ctx, String(k.n), L + W - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, ty + 14,
-      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
-    const jalur = W - 44;
-    ctx.fillStyle = C.field;
-    vizKotak(ctx, L + 22, ty + 27, jalur, 11, 6);
-    ctx.fill();
-    ctx.fillStyle = k.t.length ? C.accent : C.gen['?'];
-    vizKotak(ctx, L + 22, ty + 27, Math.max(8, jalur * k.n / kini.total), 11, 6);
-    ctx.fill();
-    ty += 56;
-  });
-  y += tinggiT + 18;
+  const baris = kombinasi.some((k) => k.t.length) ? kombinasi : [];
+  const tinggi = 62 + (baris.length ? baris.length * 56 : 40) + 14;
+  return { tinggi, lukis(ctx, C, x, y, w) {
+    vizPanel(ctx, C, x, y, w, tinggi);
+    vizTeks(ctx, 'Kombinasi Treatment', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    let ty = y + 64;
+    if (!baris.length) {
+      vizTeks(ctx, kini.total ? 'Belum ada jadwal yang jenisnya diisi bulan ini.'
+        : 'Belum ada jadwal di bulan ini.',
+        x + 22, ty + 18, { ukuran: 14, warna: C.muted });
+      return;
+    }
+    baris.forEach((k) => {
+      const persen = Math.round(k.n / kini.total * 100);
+      vizTeks(ctx, namaKombinasi(k.t), x + 22, ty + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+      // Jumlah dan persen dipisah kurung dan beda bobot, sama seperti komposisi
+      // gender — persennya turunan, jadi ia yang mengalah.
+      const teksPersen = '(' + persen + '%)';
+      vizTeks(ctx, teksPersen, x + w - 22, ty + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+      vizTeks(ctx, String(k.n), x + w - 22 - vizLebar(ctx, teksPersen, 12, 600) - 7, ty + 14,
+        { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+      const jalur = w - 44;
+      ctx.fillStyle = C.field;
+      vizKotak(ctx, x + 22, ty + 27, jalur, 11, 6);
+      ctx.fill();
+      ctx.fillStyle = k.t.length ? C.accent : C.gen['?'];
+      vizKotak(ctx, x + 22, ty + 27, Math.max(8, jalur * k.n / kini.total), 11, 6);
+      ctx.fill();
+      ty += 56;
+    });
+  } };
+}
 
-  // --- Pegawai ---
-  // Ikut mode yang sedang dipilih di layar: gambar ini dikirim sebagai "yang
-  // barusan saya lihat", jadi ia tidak boleh diam-diam memakai ukuran lain.
+// Ikut mode yang sedang dipilih di layar: gambar ini dikirim sebagai "yang
+// barusan saya lihat", jadi ia tidak boleh diam-diam memakai ukuran lain.
+function vizBlokPegawai(kini) {
   const peg = ringkasPegawai(kini.rows);
-  const perHariP = pegawaiMode === 'rata';
-  const barisP = peg.selesai ? urutPegawai(peg.daftar, pegawaiMode) : [];
-  const maksRataP = barisP.length ? Math.max(...barisP.map((k) => k.rata)) : 0;
+  const perHari = pegawaiMode === 'rata';
+  const baris = peg.selesai ? urutPegawai(peg.daftar, pegawaiMode) : [];
+  const maksRata = baris.length ? Math.max(...baris.map((k) => k.rata)) : 0;
   // Tiap baris kebagian satu baris keterangan angka penyusunnya, jadi 56 → 72
-  const tinggiP = 62 + (barisP.length ? barisP.length * 72 : 40) + 14;
-  vizPanel(ctx, C, L, y, W, tinggiP);
-  vizTeks(ctx, 'Pegawai', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  let py = y + 64;
-  if (!barisP.length) {
-    vizTeks(ctx, kini.total ? 'Belum ada treatment yang ditandai selesai bulan ini.'
-      : 'Belum ada jadwal di bulan ini.',
-      L + 22, py + 18, { ukuran: 14, warna: C.muted });
-  } else barisP.forEach((k) => {
-    const persen = Math.round(k.n / peg.selesai * 100);
-    const nama = k.nama || 'Tanpa pegawai';
-    vizTeks(ctx, nama, L + 22, py + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
-    // Satuan di mode "per hari" menggantikan persen: menjumlahkan rata-rata
-    // orang per orang tidak menghasilkan angka yang berarti, jadi porsi memang
-    // tidak ada di mode itu — alasan lengkapnya di renderPegawai().
-    const teksKanan = perHariP ? '/hari' : '(' + persen + '%)';
-    const teksNilai = perHariP ? angkaRata(k.rata) : String(k.n);
-    vizTeks(ctx, teksKanan, L + W - 22, py + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
-    vizTeks(ctx, teksNilai, L + W - 22 - vizLebar(ctx, teksKanan, 12, 600) - 7, py + 14,
-      { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
-    const jalur = W - 44;
-    ctx.fillStyle = C.field;
-    vizKotak(ctx, L + 22, py + 27, jalur, 11, 6);
-    ctx.fill();
-    ctx.fillStyle = k.nama ? C.accent : C.gen['?'];
-    vizKotak(ctx, L + 22, py + 27,
-      Math.max(8, jalur * (perHariP ? k.rata / maksRataP : k.n / peg.selesai)), 11, 6);
-    ctx.fill();
-    // Angka penyusunnya ikut tercetak, sama seperti di layar: gambar ini sering
-    // dibaca tanpa yang mengirimnya ada di situ buat menjelaskan pembaginya.
-    vizTeks(ctx, perHariP
-      ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
-      : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari',
-      L + 22, py + 56, { ukuran: 11, warna: C.muted });
-    py += 72;
-  });
-  y += tinggiP + 18;
+  const tinggi = 62 + (baris.length ? baris.length * 72 : 40) + 14;
+  return { tinggi, lukis(ctx, C, x, y, w) {
+    vizPanel(ctx, C, x, y, w, tinggi);
+    vizTeks(ctx, 'Pegawai', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    let py = y + 64;
+    if (!baris.length) {
+      vizTeks(ctx, kini.total ? 'Belum ada treatment yang ditandai selesai bulan ini.'
+        : 'Belum ada jadwal di bulan ini.',
+        x + 22, py + 18, { ukuran: 14, warna: C.muted });
+      return;
+    }
+    baris.forEach((k) => {
+      const persen = Math.round(k.n / peg.selesai * 100);
+      vizTeks(ctx, k.nama || 'Tanpa pegawai', x + 22, py + 14, { ukuran: 14.5, tebal: 600, warna: C.text });
+      // Satuan di mode "per hari" menggantikan persen: menjumlahkan rata-rata
+      // orang per orang tidak menghasilkan angka yang berarti, jadi porsi memang
+      // tidak ada di mode itu — alasan lengkapnya di renderPegawai().
+      const teksKanan = perHari ? '/hari' : '(' + persen + '%)';
+      const teksNilai = perHari ? angkaRata(k.rata) : String(k.n);
+      vizTeks(ctx, teksKanan, x + w - 22, py + 14, { ukuran: 12, tebal: 600, warna: C.muted, rata: 'right' });
+      vizTeks(ctx, teksNilai, x + w - 22 - vizLebar(ctx, teksKanan, 12, 600) - 7, py + 14,
+        { ukuran: 14.5, tebal: 700, warna: C.text, rata: 'right' });
+      const jalur = w - 44;
+      ctx.fillStyle = C.field;
+      vizKotak(ctx, x + 22, py + 27, jalur, 11, 6);
+      ctx.fill();
+      ctx.fillStyle = k.nama ? C.accent : C.gen['?'];
+      vizKotak(ctx, x + 22, py + 27,
+        Math.max(8, jalur * (perHari ? k.rata / maksRata : k.n / peg.selesai)), 11, 6);
+      ctx.fill();
+      // Angka penyusunnya ikut tercetak, sama seperti di layar: gambar ini sering
+      // dibaca tanpa yang mengirimnya ada di situ buat menjelaskan pembaginya.
+      vizTeks(ctx, perHari
+        ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
+        : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari',
+        x + 22, py + 56, { ukuran: 11, warna: C.muted });
+      py += 72;
+    });
+  } };
+}
 
-  // --- Kepadatan harian (kalender sebulan) ---
+// Kalender sebulan
+function vizBlokKepadatan(kini) {
   const perHari = new Map();
   kini.rows.forEach((a) => perHari.set(a.date, (perHari.get(a.date) || 0) + 1));
   const maksHari = perHari.size ? Math.max(...perHari.values()) : 0;
@@ -5478,82 +5442,86 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
   const geser = (new Date(bln.y, bln.m, 1).getDay() + 6) % 7; // 0 = Senin
   const minggu = Math.ceil((geser + jmlHari) / 7);
   const selSela = 7, selH = 44;
-  const selW = (W - 44 - selSela * 6) / 7;
-  const tinggiK = 98 + minggu * (selH + selSela) - selSela + 40;
-  vizPanel(ctx, C, L, y, W, tinggiK);
-  vizTeks(ctx, 'Kepadatan Harian', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  vizTeks(ctx, 'Angka besarnya jumlah treatment, dan makin pekat warnanya makin ramai.',
-    L + 22, y + 62, { ukuran: 12.5, warna: C.muted });
-  ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((h, i) => {
-    vizTeks(ctx, h, L + 22 + i * (selW + selSela) + selW / 2, y + 86,
-      { ukuran: 11.5, tebal: 600, warna: C.muted, rata: 'center' });
-  });
-  for (let t = 1; t <= jmlHari; t++) {
-    const kotak = geser + t - 1;
-    const x = L + 22 + (kotak % 7) * (selW + selSela);
-    const ky = y + 98 + Math.floor(kotak / 7) * (selH + selSela);
-    const iso = kunciBulan(bln.y, bln.m) + '-' + String(t).padStart(2, '0');
-    const n = perHari.get(iso) || 0;
-    const tingkat = tingkatWarna(n, maksHari);
-    ctx.fillStyle = C.h[tingkat];
-    vizKotak(ctx, x, ky, selW, selH, 10);
-    ctx.fill();
-    // Dua langkah tergelap pakai tinta putih supaya angkanya tetap terbaca
-    const tinta = tingkat >= 3 ? '#ffffff' : C.text2;
-    // Sama seperti di layar: tanggal kecil di pojok, jumlah treatment di tengah,
-    // hari kosong tetap ditulis 0
-    vizTeks(ctx, String(t), x + 7, ky + 14, { ukuran: 10, tebal: 600, warna: tinta });
-    vizTeks(ctx, String(n), x + selW / 2, ky + selH / 2 + 7,
-      { ukuran: 16, tebal: 700, warna: tinta, rata: 'center' });
-  }
-  const ly = y + tinggiK - 18;
-  vizTeks(ctx, 'Sepi', L + 22, ly + 4, { ukuran: 11.5, warna: C.muted });
-  let lx = L + 22 + vizLebar(ctx, 'Sepi', 11.5) + 8;
-  for (let l = 0; l <= 4; l++) {
-    ctx.fillStyle = C.h[l];
-    vizKotak(ctx, lx, ly - 8, 20, 12, 4);
-    ctx.fill();
-    lx += 24;
-  }
-  vizTeks(ctx, 'Ramai', lx + 2, ly + 4, { ukuran: 11.5, warna: C.muted });
-  if (maksHari) {
-    vizTeks(ctx, 'Terpadat ' + maksHari + ' treatment/hari', L + W - 22, ly + 4,
-      { ukuran: 11.5, warna: C.muted, rata: 'right' });
-  }
-  y += tinggiK + 18;
+  const tinggi = 98 + minggu * (selH + selSela) - selSela + 40;
+  return { tinggi, lukis(ctx, C, x, y, w) {
+    const selW = (w - 44 - selSela * 6) / 7;
+    vizPanel(ctx, C, x, y, w, tinggi);
+    vizTeks(ctx, 'Kepadatan Harian', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    vizTeks(ctx, 'Angka besarnya jumlah treatment, dan makin pekat warnanya makin ramai.',
+      x + 22, y + 62, { ukuran: 12.5, warna: C.muted });
+    ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].forEach((h, i) => {
+      vizTeks(ctx, h, x + 22 + i * (selW + selSela) + selW / 2, y + 86,
+        { ukuran: 11.5, tebal: 600, warna: C.muted, rata: 'center' });
+    });
+    for (let t = 1; t <= jmlHari; t++) {
+      const kotak = geser + t - 1;
+      const kx = x + 22 + (kotak % 7) * (selW + selSela);
+      const ky = y + 98 + Math.floor(kotak / 7) * (selH + selSela);
+      const iso = kunciBulan(bln.y, bln.m) + '-' + String(t).padStart(2, '0');
+      const n = perHari.get(iso) || 0;
+      const tingkat = tingkatWarna(n, maksHari);
+      ctx.fillStyle = C.h[tingkat];
+      vizKotak(ctx, kx, ky, selW, selH, 10);
+      ctx.fill();
+      // Dua langkah tergelap pakai tinta putih supaya angkanya tetap terbaca
+      const tinta = tingkat >= 3 ? '#ffffff' : C.text2;
+      // Sama seperti di layar: tanggal kecil di pojok, jumlah treatment di tengah,
+      // hari kosong tetap ditulis 0
+      vizTeks(ctx, String(t), kx + 7, ky + 14, { ukuran: 10, tebal: 600, warna: tinta });
+      vizTeks(ctx, String(n), kx + selW / 2, ky + selH / 2 + 7,
+        { ukuran: 16, tebal: 700, warna: tinta, rata: 'center' });
+    }
+    const ly = y + tinggi - 18;
+    vizTeks(ctx, 'Sepi', x + 22, ly + 4, { ukuran: 11.5, warna: C.muted });
+    let lx = x + 22 + vizLebar(ctx, 'Sepi', 11.5) + 8;
+    for (let l = 0; l <= 4; l++) {
+      ctx.fillStyle = C.h[l];
+      vizKotak(ctx, lx, ly - 8, 20, 12, 4);
+      ctx.fill();
+      lx += 24;
+    }
+    vizTeks(ctx, 'Ramai', lx + 2, ly + 4, { ukuran: 11.5, warna: C.muted });
+    if (maksHari) {
+      vizTeks(ctx, 'Terpadat ' + maksHari + ' treatment/hari', x + w - 22, ly + 4,
+        { ukuran: 11.5, warna: C.muted, rata: 'right' });
+    }
+  } };
+}
 
-  // --- Jam tersibuk ---
+function vizBlokJam(kini) {
   const perJam = new Map();
   kini.rows.forEach((a) => {
     const j = a.time.slice(0, 2);
     perJam.set(j, (perJam.get(j) || 0) + 1);
   });
   const plotH = 132;
-  const tinggiJ = kini.total ? 84 + plotH + 42 : 84 + 34;
-  vizPanel(ctx, C, L, y, W, tinggiJ);
-  vizTeks(ctx, 'Jam Tersibuk', L + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
-  vizTeks(ctx, 'Jumlah treatment per jam mulai, sepanjang bulan ini.',
-    L + 22, y + 62, { ukuran: 12.5, warna: C.muted });
-  if (!kini.total) {
-    vizTeks(ctx, 'Belum ada jadwal di bulan ini.', L + 22, y + 90, { ukuran: 14, warna: C.muted });
-  } else {
+  const tinggi = kini.total ? 84 + plotH + 42 : 84 + 34;
+  return { tinggi, lukis(ctx, C, x, y, w) {
+    vizPanel(ctx, C, x, y, w, tinggi);
+    vizTeks(ctx, 'Jam Tersibuk', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    vizTeks(ctx, 'Jumlah treatment per jam mulai, sepanjang bulan ini.',
+      x + 22, y + 62, { ukuran: 12.5, warna: C.muted });
+    if (!kini.total) {
+      vizTeks(ctx, 'Belum ada jadwal di bulan ini.', x + 22, y + 90, { ukuran: 14, warna: C.muted });
+      return;
+    }
     const jam = [...perJam.keys()].map(Number).sort((a, b) => a - b);
     const dari = jam[0], sampai = jam[jam.length - 1];
     const maksJam = Math.max(...perJam.values());
     const jmlKolom = sampai - dari + 1;
-    const kolomW = (W - 44) / jmlKolom;
+    const kolomW = (w - 44) / jmlKolom;
     const barW = Math.min(kolomW - 8, 34);
     const dasar = y + 84 + plotH;
     ctx.strokeStyle = C.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(L + 22, dasar + .5);
-    ctx.lineTo(L + W - 22, dasar + .5);
+    ctx.moveTo(x + 22, dasar + .5);
+    ctx.lineTo(x + w - 22, dasar + .5);
     ctx.stroke();
     for (let j = dari; j <= sampai; j++) {
       const kunciJ = String(j).padStart(2, '0');
       const n = perJam.get(kunciJ) || 0;
-      const tengah = L + 22 + (j - dari) * kolomW + kolomW / 2;
+      const tengah = x + 22 + (j - dari) * kolomW + kolomW / 2;
       if (n) {
         const h = Math.max(4, Math.round(n / maksJam * (plotH - 22)));
         ctx.fillStyle = C.accent;
@@ -5570,10 +5538,83 @@ function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
         vizTeks(ctx, kunciJ, tengah, dasar + 20, { ukuran: 11.5, warna: C.muted, rata: 'center' });
       }
     }
-  }
-  y += tinggiJ + 16;
+  } };
+}
 
-  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), VIZ_W / 2, y + 20,
+// Digambar dua kali: sekali di canvas buangan untuk tahu tinggi totalnya,
+// sekali lagi di canvas sungguhan yang sudah pas ukurannya.
+function lukisAnalitik(ctx, kini, lalu, tinggiTotal) {
+  const C = warnaViz();
+  const L = VIZ_PAD, W = VIZ_ANALITIK_W - VIZ_PAD * 2, sela = 18;
+  if (tinggiTotal) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, VIZ_ANALITIK_W, tinggiTotal);
+  }
+
+  // --- Kepala ---
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  ctx.letterSpacing = '2.5px'; // diabaikan browser lama — cuma soal rapi
+  vizTeks(ctx, 'RINGKASAN BULANAN', L, 56, { ukuran: 12.5, tebal: 700, warna: C.accent });
+  ctx.letterSpacing = '0px';
+  vizTeks(ctx, new Date(bln.y, bln.m, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+    L, 100, { ukuran: 33, tebal: 700, warna: C.text });
+  vizTeks(ctx, cabang ? cabang.name : 'Jadwal Treatment',
+    L, 126, { ukuran: 14, warna: C.text2 });
+  let y = 154;
+
+  // --- Empat angka utama, sebaris berempat ---
+  const kpi = [
+    ['Total treatment', kini.total, lalu.total],
+    ['Jumlah customer', kini.jumlahCustomer, lalu.jumlahCustomer],
+    ['Customer baru', kini.customerBaru, lalu.customerBaru],
+    ['Rata-rata per hari', kini.rataHari, lalu.rataHari, true,
+      kini.hariAktif
+        ? kini.total + ' treatment ÷ ' + kini.hariAktif + ' hari aktif'
+        : 'Belum ada hari yang terisi bulan ini'],
+  ];
+  const kpiH = 126, kpiSela = 16, kpiW = (W - kpiSela * 3) / 4;
+  kpi.forEach(([label, nilai, sebelum, desimal, ket], i) => {
+    const x = L + i * (kpiW + kpiSela);
+    vizPanel(ctx, C, x, y, kpiW, kpiH);
+    vizTeks(ctx, label, x + 20, y + 33, { ukuran: 13, tebal: 600, warna: C.muted });
+    vizTeks(ctx, angkaKpi(nilai, desimal), x + 20, y + 78, { ukuran: 38, tebal: 700, warna: C.text });
+    // Pembulatan sebelum diadu dengan nol, alasannya sama dengan renderKpi()
+    const beda = desimal
+      ? Math.round((nilai - sebelum) * 10) / 10
+      : nilai - sebelum;
+    vizTeks(ctx, beda === 0 ? 'sama seperti bulan lalu'
+      : vizDelta(beda, desimal) + ' vs bulan lalu',
+      x + 20, y + 99, { ukuran: 12, tebal: 600, warna: vizWarnaDelta(C, beda) });
+    if (ket) vizTeks(ctx, ket, x + 20, y + 116, { ukuran: 11, warna: C.muted });
+  });
+  y += kpiH + sela;
+
+  // --- Sisa panelnya dibagi dua lajur ---
+  // Ditumpuk lurus ke bawah, gambarnya jadi pita sempit yang panjangnya lima
+  // enam kali lebarnya: di ruang chat pratinjaunya cuma kebagian pucuknya, dan
+  // begitu dikecilkan agar muat utuh angkanya tidak terbaca lagi. Dua lajur
+  // memangkas tingginya hampir separuh tanpa mengubah isi satu panel pun.
+  // Potongannya dicari, bukan dipatok: jumlah baris tiap panel berubah tiap
+  // bulan, jadi batas yang bikin kedua lajur sepadan ikut bergeser. Urutan
+  // bacanya tetap runut — lajur kiri sampai habis, baru pindah ke kanan.
+  const blok = [vizBlokGender(kini, lalu), vizBlokKombinasi(kini), vizBlokPegawai(kini),
+    vizBlokKepadatan(kini), vizBlokJam(kini)];
+  const tumpuk = (a) => a.reduce((s, b) => s + b.tinggi + sela, -sela);
+  let potong = blok.length, selisih = Infinity;
+  for (let i = 1; i < blok.length; i++) {
+    const d = Math.abs(tumpuk(blok.slice(0, i)) - tumpuk(blok.slice(i)));
+    if (d < selisih) { selisih = d; potong = i; }
+  }
+  const kolomW = (W - sela) / 2;
+  const bawah = [y, y];
+  blok.forEach((b, i) => {
+    const lajur = i < potong ? 0 : 1;
+    b.lukis(ctx, C, L + lajur * (kolomW + sela), bawah[lajur], kolomW);
+    bawah[lajur] += b.tinggi + sela;
+  });
+  y = Math.max(bawah[0], bawah[1]) - sela + 16;
+
+  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), VIZ_ANALITIK_W / 2, y + 20,
     { ukuran: 11.5, warna: C.muted, rata: 'center' });
   return y + 42;
 }
@@ -5587,7 +5628,7 @@ function buatBlobAnalitik() {
   const tinggi = Math.round(lukisAnalitik(
     document.createElement('canvas').getContext('2d'), kini, lalu));
   const c = document.createElement('canvas');
-  c.width = VIZ_W * VIZ_SKALA;
+  c.width = VIZ_ANALITIK_W * VIZ_SKALA;
   c.height = tinggi * VIZ_SKALA;
   const ctx = c.getContext('2d');
   ctx.scale(VIZ_SKALA, VIZ_SKALA);
