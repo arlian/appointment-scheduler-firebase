@@ -214,6 +214,39 @@ WA, export/import), ditambah:
   sekaligus (lihat bagian di bawah).
 - **Gender customer** (lihat bagian di bawah).
 
+## Ringkasan bulanan sebagai gambar
+
+Tombol **"Salin sebagai Gambar"** di panel Analitik menggambar ulang kartunya
+di canvas (`lukisAnalitik()` di [app.js](app.js)), bukan menjepret DOM —
+html2canvas perlu pustaka luar (aplikasi ini sengaja tanpa build dan harus
+jalan offline), sedangkan trik SVG foreignObject rapuh: font dan CSS-nya sering
+tidak ikut. Angkanya toh sudah di tangan, jadi menggambar sendiri malah lebih
+ringan sekaligus membebaskan tata letaknya ditata khusus untuk dikirim.
+
+**Panelnya disusun dua lajur** (`VIZ_ANALITIK_W` = 1.080). Ditumpuk lurus ke
+bawah seperti di layar, gambarnya jadi pita sempit yang panjangnya lima enam
+kali lebarnya — di ruang chat pratinjaunya cuma kebagian pucuknya, dan begitu
+dikecilkan supaya muat utuh angkanya tidak terbaca lagi. September 2026 jadi
+1.080 × 1.170, dari sebelumnya 720 × 2.034, tanpa satu panel pun berubah isi.
+
+Yang ikut menyesuaikan sendiri:
+
+- **Potongan antar-lajurnya dicari, bukan dipatok.** Jumlah baris tiap panel
+  berubah tiap bulan — kombinasi treatment bisa dua baris bisa tujuh — jadi
+  batas yang bikin kedua lajur sepadan ikut bergeser. Tinggi tiap panel
+  dihitung dulu (tingginya tidak bergantung pada lebar), baru dicoba semua
+  titik potong dan dipilih yang selisih dua lajurnya paling kecil.
+- **Urutan bacanya tetap runut** — lajur kiri dibaca sampai habis, baru pindah
+  ke kanan. Menjejalkan panel ke lajur mana pun yang sedang lebih pendek
+  memang lebih rata hasilnya, tapi urutannya jadi acak dan gambarnya tidak
+  lagi bisa dirujuk ("yang di bawah gender itu...").
+- **Empat angka utamanya sebaris berempat**, tidak lagi dua-dua: di lebar
+  1.080 kartunya masih 238px, cukup untuk label sepanjang "Rata-rata per hari"
+  — yang justru tidak muat waktu gambarnya selebar 720.
+
+`VIZ_W` (720) tetap dipakai sebagai lebar terkecil gambar Slot Kosong, yang
+lebarnya memang ikut jumlah hari.
+
 ## Jenis treatment
 
 Saat menambah jadwal ada tiga pilihan yang bisa dicentang lebih dari satu:
