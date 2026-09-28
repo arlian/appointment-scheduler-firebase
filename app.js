@@ -5249,7 +5249,7 @@ function warnaViz() {
   return {
     bg: w('--bg'), card: w('--card'), border: w('--border'), field: w('--field'),
     text: w('--text'), text2: w('--text-2'), muted: w('--muted'),
-    accent: w('--accent'), naik: w('--naik'), turun: w('--turun'),
+    accent: w('--accent'), accentSoft: w('--accent-soft'), accentInk: w('--accent-ink'), naik: w('--naik'), turun: w('--turun'),
     h: [w('--h0'), w('--h1'), w('--h2'), w('--h3'), w('--h4')],
     gen: { P: w('--gen-p'), L: w('--gen-l'), '?': w('--gen-x') },
   };
@@ -5796,14 +5796,16 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
         // Chipnya dibelah dua: jam di kiri, sisa slot di bilik kanan — "12:30 | 2".
         // Semua chip sama warnanya dan sama-sama menyebut sisanya. Dulu yang
         // tinggal satu diberi warna aksen, dan customer membacanya sebagai
-        // satu-satunya jam yang tersedia — lihat jamTawaran().
+        // satu-satunya jam yang tersedia — lihat jamTawaran(). Bilik angkanya
+        // beraksen lembut di semua chip, bukan cuma yang tinggal satu: --field
+        // terlalu dekat dengan --bg untuk memisahkan angka dari jamnya.
         const bx = x + uk.chipW - SLOT_VIZ_SISA_W;
         vizKotak(ctx, x, cy, uk.chipW, SLOT_VIZ_CHIP_H, 13);
         ctx.fillStyle = C.bg;
         ctx.fill();
         ctx.save();
         ctx.clip();
-        ctx.fillStyle = C.field;
+        ctx.fillStyle = C.accentSoft;
         ctx.fillRect(bx, cy, SLOT_VIZ_SISA_W, SLOT_VIZ_CHIP_H);
         ctx.restore();
         ctx.strokeStyle = C.border;
@@ -5817,7 +5819,7 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
         vizTeks(ctx, keJam(j.m), (x + bx) / 2, tengah,
           { ukuran: 18, tebal: 700, warna: C.text, rata: 'center' });
         vizTeks(ctx, String(j.peg), bx + SLOT_VIZ_SISA_W / 2, tengah,
-          { ukuran: 16, tebal: 700, warna: C.text2, rata: 'center' });
+          { ukuran: 16, tebal: 700, warna: C.accentInk, rata: 'center' });
       });
     });
     y += tinggi + SLOT_VIZ_SELA_HARI;
