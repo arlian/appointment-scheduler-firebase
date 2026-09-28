@@ -440,10 +440,7 @@ const MAKS_HARI_SLOT = 31;
 // menawarkan 10:30, 11:00, 11:30 — bukan 10:30, 11:00 yang bergeser sendiri.
 const KISI_SLOT = 30;
 
-// Bentuk daftar jam waktu dikirim sebagai teks — salinan Slot Kosong maupun
-// pesan reminder. Satu pasang angka untuk keduanya, bukan sendiri-sendiri: dua
-// daftar yang isinya sama persis tapi bentuknya beda cuma membuat yang
-// membacanya bertanya-tanya apa bedanya.
+// Bentuk daftar jam waktu dikirim sebagai teks lewat salinan Slot Kosong.
 //
 // Satu jam sebaris. Yang dibaca customer daftar pilihan, dan daftar yang tiap
 // barisnya satu pilihan paling gampang ditunjuk — "yang jam 14:30" — sementara
@@ -452,8 +449,7 @@ const KISI_SLOT = 30;
 //
 // Ongkosnya panjang pesan: hari yang lowong sejak pagi jadi dua puluh delapan
 // baris, dan seminggu penuh di cabang yang buka 08:00-22:00 lewat dua ratus
-// baris. Kalau itu terasa terlalu jauh digulir, angka ini yang dikembalikan ke
-// 4 — dan bentuknya kembali seperti semula di kedua teks sekaligus.
+// baris. Kalau itu terasa terlalu jauh digulir, angka ini yang dikembalikan ke 4.
 const JAM_SEBARIS = 1;
 // Pemisah antarjam di dalam satu baris. Selama JAM_SEBARIS masih 1 ia tidak
 // pernah terpakai — satu jam sebaris tidak punya yang dipisah — tapi tetap
@@ -462,12 +458,6 @@ const JAM_SEBARIS = 1;
 // Komanya dipilih karena paling gampang dibaca — deretan jam yang dipisah titik
 // tengah terbaca seperti satu blok, sedangkan koma memberi tiap jam ujungnya
 // sendiri.
-//
-// Ongkos URL-nya kebetulan yang paling murah juga, dan itu perlu diingat kalau
-// bentuk ini nanti diubah: pesan reminder berangkat lewat wa.me, dan di situ
-// ', ' jadi 6 karakter URL sementara ' · ' jadi 12. Selisihnya di seminggu penuh
-// sekitar 420 karakter — dulu itu cukup untuk membuat hari terjauh dipotong,
-// sebelum BATAS_URL di bawah dinaikkan.
 const PISAH_JAM = ', ';
 
 const keMenit = (jam) => (+jam.slice(0, 2)) * 60 + (+jam.slice(3, 5));
@@ -480,7 +470,7 @@ const menitSekarang = () => {
 };
 const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 
-// Satu jam mulai jadi teks, dipakai salinan Slot Kosong maupun pesan reminder.
+// Satu jam mulai jadi teks, dipakai salinan Slot Kosong.
 //
 // Tiap jam ditulis dengan sisa tempatnya: "14:00 - 1 slot", "14:30 - 2 slot".
 // Dulu cuma yang tinggal satu yang bertanda, dan customer membacanya terbalik
@@ -501,16 +491,10 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 //
 const jamTawaran = (j) => keJam(j.m) + ' - ' + j.peg + ' slot';
 
-// Bulatan daftar di depan tiap jam, dipakai salinan Slot Kosong maupun pesan
-// reminder. Titik tengah, bukan tanda hubung: yang di bawah judul hari itu
-// daftar pilihan, dan bulatan membacanya sebagai daftar sementara tanda hubung
-// terbaca seperti rentang atau potongan kalimat.
-//
-// '·' aman lewat wa.me — ia ada di Windows-1252, tidak seperti emoji yang
-// jatuh jadi tanda tanya (lihat REM_EMOJI) — tapi tidak gratis: 9 karakter URL
-// per baris, dari 4 waktu masih tanda hubung. Ia muncul di tiap jam, jadi ini
-// penanda yang paling sering muncul di seluruh pesan; angkanya ada di
-// BATAS_URL.
+// Bulatan daftar di depan tiap jam di salinan Slot Kosong. Titik tengah, bukan
+// tanda hubung: yang di bawah judul hari itu daftar pilihan, dan bulatan
+// membacanya sebagai daftar sementara tanda hubung terbaca seperti rentang atau
+// potongan kalimat.
 const TANDA_JAM = '· ';
 const labelDurasi = (m) => {
   const j = Math.floor(m / 60), sisa = m % 60;
@@ -3147,131 +3131,48 @@ function salamWaktu(sekarang) {
 // meleset daripada kena.
 const REM_SLOT_HARI = 7;
 
-// Emoji di judul hari. Satu sakelar, karena nasibnya beda per perangkat:
-// dikirim dari HP emojinya utuh, dikirim dari PC ia bisa jatuh jadi tanda tanya
-// di kotak ketik WhatsApp — jalur wa.me di desktop melewati tahap yang
-// menjatuhkan karakter di luar Windows-1252. Kalau itu terjadi lagi, ubah satu
-// baris ini ke false dan judul harinya kembali polos.
-//
-// Cuma judul hari yang dapat emoji, dan itu bukan soal selera: satu emoji jadi
-// 12 karakter URL, sedangkan judul hari cuma tujuh buah per pesan sementara
-// baris jam bisa dua puluh delapan. Penanda yang paling sering muncul yang
-// paling mahal — itu sebabnya bulatan daftar di TANDA_JAM berhenti di titik
-// tengah yang 9 karakter URL, bukan ikut jadi emoji.
-const REM_EMOJI = false;
-const TANDA_HARI = REM_EMOJI ? '\u{1F4C5} ' : '';
-
 // Tawaran jadwal untuk satu customer, memakai mesin slot yang sama dengan sheet
 // "Slot Kosong" — jadi jam yang ditawarkan ke customer tidak mungkin beda
-// dengan yang dilihat operator di layar.
+// dengan yang dilihat operator di layar. Bentuknya data gambar (sama dengan
+// dataSlotViz()): tawarannya tidak lagi ditulis di pesan, melainkan disalin
+// sebagai gambar waktu tombol kirim ditekan, dan operator tinggal paste di
+// chat. Daftar jam seminggu sebagai teks jadi puluhan baris yang harus digulir
+// customer, dan panjangnya dulu sampai harus dipotong supaya muat di URL wa.me.
 //
 // Durasinya diambil dari treatment terakhir orang itu, bukan dari centang di
-// sheet Slot Kosong: pesan ini harus berdiri sendiri, tidak boleh berubah isi
+// sheet Slot Kosong: tawaran ini harus berdiri sendiri, tidak boleh berubah isi
 // gara-gara pilihan yang kebetulan tertinggal di layar lain. Jadwal lama yang
-// tidak punya field treatments jatuh ke durasi bawaan lewat durasiJadwal(),
-// persis seperti perlakuan di seluruh aplikasi.
-//
-// Seluruh jam yang muat ikut ditulis — tidak ada batas berapa jam yang boleh
-// disebut per hari. Orang yang cuma bisa jam tertentu perlu melihat jam itu ada
-// di daftarnya; tawaran yang dipangkas membuat dia menjawab "tidak ada yang
-// cocok" padahal jamnya kosong. Yang menjaga panjang pesannya tinggal BATAS_URL
-// di bawah, dan ia memotong per hari dari yang terjauh — bukan memotong jam di
-// hari yang sudah terlanjur ditulis.
-//
-// Hasilnya satu blok teks per hari: judul harinya, lalu jam-jamnya menurut
-// JAM_SEBARIS, PISAH_JAM, dan jamTawaran() — bentuk yang sama persis dengan
-// salinan Slot Kosong, karena yang dilihat operator di layar dan yang dibaca
-// customer di WhatsApp tidak boleh cuma mirip. Bukan satu baris panjang berisi
-// seluruh jam hari itu: deret yang menyambung sampai membungkus tiga kali
-// justru paling susah dibaca di layar HP, dan mata yang mencari satu jam
-// tertentu kehilangan tempatnya.
-function slotTawaran(k) {
+// tidak punya field treatments jatuh ke jenis bawaan, sama seperti
+// durasiJadwal().
+function dataSlotReminder(k) {
   const hariIni = today();
   const terakhir = appointments.find((a) => a.customerId === k.id && a.date === k.tgl);
+  const jenis = rapikanTreatment(terakhir && terakhir.treatments);
   const durasi = durasiJadwal(terakhir);
-  const blok = [];
+  const hari = [];
+  let total = 0;
   for (let i = 1; i <= REM_SLOT_HARI; i++) {
     const tgl = hariGeser(i);
     const jam = slotHari(tgl, hariIni).flatMap((sl) => jamMulaiSlot(sl, durasi));
-    // Hari yang penuh tidak ditulis sama sekali — sama seperti salinan slot
-    // kosong. Baris "penuh" cuma memanjangkan pesan tanpa menambah pilihan.
+    // Hari yang penuh tidak digambar — sama seperti salinan slot kosong.
     if (!jam.length) continue;
-    // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
-    // ditebalkan, jamnya turun di bawahnya.
-    const baris = [];
-    for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
-      baris.push(TANDA_JAM
-        + jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
-    }
-    blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(baris).join('\n'));
+    total += jam.length;
+    hari.push({ tgl, jam });
   }
-  return blok;
+  return { hari, total, judul: namaKombinasi(jenis.length ? jenis : TREAT_BAWAAN), durasi };
 }
 
-// Batas panjang URL wa.me. Tidak ada batas baku untuk URL. Yang dijaga bukan
-// cuma "gagal terbuka": URL yang kepanjangan bisa terpotong diam-diam, dan pesan
-// yang terpenggal di tengah baris jam tetap terkirim tanpa ada yang menyadarinya.
-//
-// Angkanya 2048 selama pesannya masih pendek — batas lama Internet Explorer,
-// dipakai karena tidak ada ruginya waktu itu. Ia mulai memotong hari begitu
-// seluruh jam ikut ditulis dan pemisahnya diberi spasi, jadi dinaikkan ke 4096;
-// penanda jumlah orang dari jamTawaran() membuatnya kurang lagi, jadi sekarang
-// 8192. Masih jauh di bawah kemampuan semua browser yang dipakai sekarang
-// (Chrome ~32.000, Firefox ~65.000, Safari lebih tinggi lagi).
-//
-// Diukur dengan bentuk sekarang — satu jam sebaris, berbulatan titik tengah,
-// tujuh hari sekaligus, rambut 30 menit: jam kerja bawaan 10:00–17:00 berhenti
-// di 2.434, buka sampai 21:00 di 3.498, dan buka 08:00–22:00 — empat belas jam
-// sehari — di 4.296. Waktu jamnya masih empat sebaris dan berbulatan tanda
-// hubung, ketiganya 1.874, 2.616, dan 3.169.
-//
-// Penanda "- N slot" menambah 15 karakter URL lagi di tiap jam — sekarang
-// seluruh jam bertanda, apa pun jumlah pegawainya. Diukur begitu, ketiga angka
-// di atas jadi sekitar 3.900, 5.810, dan 7.235. Yang terakhir sudah lewat 4096
-// — itu yang menaikkan batasnya ke 8192, bukan perkiraan.
-//
-// Sisanya tinggal sekitar 950, dan itu yang perlu diingat kalau suatu hari ada
-// cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
-// berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan
-// hari terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan —
-// yang menaikkannya nanti keadaan, bukan jaga-jaga.
-//
-// Angkanya sengaja tidak dikembalikan ke 2048 waktu pemisahnya kembali jadi
-// koma: yang 2048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka
-// sampai malam sudah lewat batas itu dan kehilangan dua hari — persis keadaan
-// yang tidak kelihatan sampai ada yang mengeluh tawarannya cuma sampai Jumat.
-//
-// Yang belum bisa diukur dari sini cuma satu: apakah jalur wa.me sendiri
-// memotong di suatu tempat. Kalau suatu hari ada pesan yang sampai dalam
-// keadaan terpenggal, angka inilah yang pertama diturunkan.
-const BATAS_URL = 8192;
-
-// Panjang URL seandainya pesannya jadi dikirim. Nomor tujuannya belum tentu
-// diketahui waktu pesannya disusun, jadi yang dihitung nomor terpanjang yang
-// masuk akal — lebih baik memotong sehari terlalu cepat daripada kelewatan.
-const panjangUrl = (teks) =>
-  'https://wa.me/'.length + 15 + '?text='.length + encodeURIComponent(teks).length;
-
 // Satu-satunya teks di aplikasi ini yang berangkat lewat URL (wa.me), bukan
-// lewat clipboard seperti salinan jadwal, salinan slot kosong, dan salinan
-// daftar reminder. Dua hal yang perlu diingat waktu menyentuh teksnya:
+// lewat clipboard. Di jalan menuju WhatsApp ada tahap yang bisa menjatuhkan
+// karakter di luar Windows-1252 — emoji sampai di kotak ketik sebagai tanda
+// tanya kalau dikirim dari PC — jadi teksnya dijaga polos.
 //
-// Pertama, di jalan menuju WhatsApp ada tahap yang bisa menjatuhkan karakter di
-// luar Windows-1252 — emoji sampai di kotak ketik sebagai tanda tanya kalau
-// dikirim dari PC, tapi utuh kalau dikirim dari HP. Itu yang diatur REM_EMOJI.
-//
-// Kedua, encodeURIComponent menagih mahal untuk apa pun di luar ASCII: satu
-// emoji jadi 12 karakter URL, satu bullet sembilan. Karena itu pemisah jam
-// tetap tanda hubung biasa — ia muncul di tiap baris, dan yang paling sering
-// muncul yang paling mahal.
-//
-// Salinan yang lewat clipboard tidak kena dua-duanya sama sekali.
-function buildReminderText(k) {
-  const tawaran = slotTawaran(k);
+// `adaGambar` memberi tahu apakah gambar tawarannya ikut tersalin. Kalimatnya
+// menunjuk ke gambar itu hanya kalau memang ada yang akan di-paste.
+function buildReminderText(k, adaGambar) {
   // Ajakannya berbentuk pertanyaan, bukan pemberitahuan: yang diminta dari
   // pembacanya memang satu jawaban, dan kalimat begini yang paling sering
-  // dibalas. Ia juga sudah lengkap berdiri sendiri, jadi cabang yang tidak
-  // punya daftar jadwal berhenti di sini tanpa perlu penutup tambahan.
+  // dibalas.
   const ajakan = 'Apakah mau kami jadwalkan untuk treatment berikutnya?';
   // Salam, lalu langsung ke maksudnya. Kalimat "terima kasih sudah treatment
   // pada tanggal sekian" sudah tidak ada: yang membacanya tahu sendiri kapan ia
@@ -3282,23 +3183,9 @@ function buildReminderText(k) {
   // yang menanyakan sapaannya dulu kalau belum ada.
   const kepala = salamWaktu() + ', ' + (sapaanCustomer(k.id) || k.nama) + '.\n\n';
   // Seminggu ke depan yang penuh sama sekali bukan alasan menahan pesannya:
-  // ajakannya tetap terkirim, cuma tanpa daftar tawaran. Antarhari dipisah
-  // baris kosong, bukan cuma ganti baris: tanpa jeda itu judul hari berikutnya
-  // menempel di jam terakhir hari sebelumnya.
-  const susun = (blok) => kepala + (blok.length
-    ? ajakan + ' Berikut jam yang masih tersedia:\n\n' + blok.join('\n\n')
-    : ajakan);
-  let teks = susun(tawaran);
-  // Hari terjauh dibuang lebih dulu, satu per satu sampai muat: besok dan lusa
-  // yang paling mungkin dipilih orang, jadi hari ketujuh yang paling sedikit
-  // ruginya kalau hilang. Dipotong per hari, bukan per baris jam, supaya tidak
-  // ada hari yang tampil dengan daftar jamnya separuh — yang membacanya akan
-  // mengira memang cuma segitu yang tersedia.
-  while (tawaran.length && panjangUrl(teks) > BATAS_URL) {
-    tawaran.pop();
-    teks = susun(tawaran);
-  }
-  return teks;
+  // ajakannya tetap terkirim, cuma tanpa gambar tawaran.
+  return kepala + ajakan
+    + (adaGambar ? ' Berikut jadwal yang masih tersedia untuk seminggu ke depan.' : '');
 }
 
 // Daftar untuk dibaca sendiri/diteruskan ke pemilik, bukan untuk dikirim ke
@@ -3464,13 +3351,40 @@ function mulaiKirimWa(k, nomor) {
   kirimWa(k, nomor);
 }
 
-// Membuka WhatsApp dengan pesan yang sudah tersusun. Dipanggil dari dua tempat
-// — tombol kirim di baris, dan sesudah nomor baru disimpan — jadi bentuk
-// tautannya cuma tertulis sekali.
+// Membuka WhatsApp dengan pesan yang sudah tersusun, dan sekaligus menyalin
+// gambar slot seminggu ke depan supaya operator tinggal paste di chat yang
+// sama. Dipanggil dari dua tempat — tombol kirim di baris, dan sesudah nomor
+// atau sapaan baru disimpan — jadi bentuk tautannya cuma tertulis sekali.
+//
+// Urutannya disengaja: clipboard ditulis dulu, baru WhatsApp dibuka. Menulis
+// clipboard butuh halaman ini masih punya fokus dan masih dalam ketukan
+// operator; begitu tab WhatsApp terbuka, fokusnya sudah pindah.
 function kirimWa(k, nomor) {
-  window.open('https://wa.me/' + nomor + '?text=' + encodeURIComponent(buildReminderText(k)),
-    '_blank', 'noopener');
+  const data = dataSlotReminder(k);
+  if (data.total) salinGambarReminder(data);
+  window.open('https://wa.me/' + nomor + '?text='
+    + encodeURIComponent(buildReminderText(k, data.total > 0)), '_blank', 'noopener');
   tandaiIngat(k.id);
+}
+
+// Seperti salinGambar(), tapi tanpa tombol dan tanpa share sheet: di tengah
+// alur kirim, share sheet yang muncul di atas WhatsApp justru menghalangi.
+// Kalau clipboard gambar tidak didukung, filenya diunduh untuk dilampirkan.
+function salinGambarReminder(data) {
+  const namaFile = 'slot-' + hariGeser(1) + '.png';
+  const janjiBlob = buatBlobSlot(data);
+  janjiBlob.catch(() => {}); // ditangani di bawah
+  const unduh = () => janjiBlob
+    .then((b) => {
+      unduhBlob(b, namaFile);
+      toast('Gambar slot tidak bisa disalin — filenya diunduh, lampirkan di chat.');
+    })
+    .catch((e) => toast('Gagal membuat gambar slot: ' + e.message, true));
+  if (!navigator.clipboard || !window.ClipboardItem) { unduh(); return; }
+  // Janjinya yang diserahkan, bukan hasilnya — lihat salinGambar().
+  navigator.clipboard.write([new ClipboardItem({ 'image/png': janjiBlob })])
+    .then(() => toast('Gambar slot seminggu ke depan tersalin — paste di chat WhatsApp.'))
+    .catch(unduh);
 }
 
 // Yang tercatat sebenarnya "pesannya sudah dibuka di WhatsApp", bukan "sudah
@@ -5622,6 +5536,15 @@ function buatBlobAnalitik() {
 // dan daftar slot kosong. Ketiga cadangannya berurutan dari yang paling dekat
 // dengan "tinggal paste" ke yang paling jauh — clipboard, share sheet, lalu
 // unduh — karena keduanya sama-sama berakhir di tempel ke WhatsApp.
+function unduhBlob(blob, namaFile) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = namaFile;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function salinGambar(btn, namaFile, buatBlob, pesanSukses) {
   if (btn.disabled) return;
   btn.disabled = true;
@@ -5639,12 +5562,7 @@ function salinGambar(btn, namaFile, buatBlob, pesanSukses) {
       try { await navigator.share({ files: [file] }); } catch { /* dibatalkan user */ }
       return;
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = namaFile;
-    a.click();
-    URL.revokeObjectURL(url);
+    unduhBlob(blob, namaFile);
     toast('Browser ini tidak bisa menyalin gambar — filenya diunduh.');
   };
 
@@ -5712,7 +5630,7 @@ function dataSlotViz() {
     total += jam.length;
     hari.push({ tgl, jam });
   });
-  return { hari, total };
+  return { hari, total, judul: namaCari(), durasi: durasiCari() };
 }
 
 // Bentuk gridnya dihitung sekali dari banyaknya hari: berapa kolom, selebar apa
@@ -5757,8 +5675,8 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
   ctx.letterSpacing = '0px';
   // Yang dicari orangnya jenis treatment, bukan tanggal — jadi itu yang jadi
   // judul, dan tanggalnya muncul sebagai kepala tiap blok di bawah.
-  vizTeks(ctx, namaCari(), L, 100, { ukuran: 33, tebal: 700, warna: C.text });
-  const ket = [labelDurasi(durasiCari())];
+  vizTeks(ctx, data.judul, L, 100, { ukuran: 33, tebal: 700, warna: C.text });
+  const ket = [labelDurasi(data.durasi)];
   if (cabangList.length > 1 && cabang) ket.unshift(cabang.name);
   vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
   let y = 156;
