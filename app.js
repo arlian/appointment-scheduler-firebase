@@ -5761,9 +5761,16 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
   vizTeks(ctx, namaCari(), L, 100, { ukuran: 33, tebal: 700, warna: C.text });
   const ket = [labelDurasi(durasiCari())];
   if (cabangList.length > 1 && cabang) ket.unshift(cabang.name);
-  // Angka di bilik kanan chip tidak berlabel — keterangannya cukup sekali di sini.
-  ket.push('angka di samping jam = sisa slot');
   vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
+  // Angka di bilik kanan chip tidak berlabel, jadi artinya dijelaskan sekali di
+  // sini — dengan contoh biliknya sendiri, bukan kalimat: yang dicocokkan mata
+  // warnanya, jadi keterangan berwarna sama langsung nyambung ke chip di bawah.
+  const kx = L + vizLebar(ctx, ket.join(' · '), 14) + 18;
+  vizKotak(ctx, kx, 108, 24, 24, 6);
+  ctx.fillStyle = C.accentSoft;
+  ctx.fill();
+  vizTeks(ctx, 'N', kx + 12, 125, { ukuran: 13, tebal: 700, warna: C.accentInk, rata: 'center' });
+  vizTeks(ctx, 'sisa slot', kx + 32, 126, { ukuran: 14, warna: C.text2 });
   let y = 156;
 
   // Semua panel seukuran — setinggi hari yang jamnya paling banyak, bukan
