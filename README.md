@@ -382,9 +382,8 @@ Aturannya:
   dari sisa **paling sedikit** di sepanjang treatment itu, bukan di titik
   mulainya saja: mulai 10:30 selama sejam sementara satu pegawai sudah terisi
   dari jam 11:00 berarti cuma satu yang benar-benar bebas. Angka yang sama ikut
-  ke WhatsApp, tapi penandanya dibalik di sana: yang ditulis justru jam yang
-  tinggal satu tempat, `- 1 slot` — lihat [Salin slot ke
-  WhatsApp](#salin-slot-ke-whatsapp).
+  ke WhatsApp sebagai `- 2 slot` / `- 1 slot` di tiap jam — lihat [Salin slot
+  ke WhatsApp](#salin-slot-ke-whatsapp).
 - Mengganti jenis treatment langsung menghitung ulang seluruh daftarnya —
   durasinya berubah, jadi jam mulai yang muat ikut berubah.
 
@@ -578,31 +577,24 @@ Isinya sengaja **cuma jam mulainya**, satu jam sebaris:
 *SLOT KOSONG PURI* 🕒
 
 📅 *Selasa, 1 September 2026*
-· 16:15
-· 16:30
+· 16:15 - 2 slot
+· 16:30 - 2 slot
 
 📅 *Rabu, 2 September 2026*
-· 10:00
-· 10:30
-· 11:00
-· 11:30
+· 10:00 - 2 slot
+· 10:30 - 2 slot
+· 11:00 - 2 slot
+· 11:30 - 2 slot
 · 12:00 - 1 slot
 · 12:30 - 1 slot
 ```
 
-**`- 1 slot` = jam itu tinggal satu tempat**, karena cuma satu pegawai yang
-luang di sepanjang treatmentnya. Yang ditandai kelangkaannya, bukan
-kelapangannya: jam yang tinggal satu perlu dijawab hari ini juga, sedangkan jam
-yang masih muat dua orang tidak menuntut apa-apa dari yang membacanya. Karena
-itu **jam yang dua ke atas dibiarkan polos** — kalau semuanya bertanda, yang
-benar-benar tinggal satu berhenti menonjol.
-
-Dengan alasan yang sama, **hari yang pegawainya memang cuma satu tidak diberi
-tanda sama sekali**. Di hari seperti itu tidak ada jam yang bisa lebih lapang
-dari satu, jadi "1 slot" bukan kabar apa-apa — ia cuma mengulang jumlah pegawai
-hari itu di tiap baris. Yang diperiksa `pegawaiUntuk(tgl)`, jadi hari yang
-kebetulan cuma kebagian satu pegawai pun ikut polos, bukan cuma cabang yang
-pegawainya satu.
+**Tiap jam menyebut sisa tempatnya** — `- 2 slot` berarti dua pegawai luang di
+sepanjang treatmentnya, `- 1 slot` tinggal satu. Dulu cuma jam yang tinggal satu
+yang ditandai, dan customer membacanya terbalik: jam bertanda dikira
+satu-satunya yang tersedia, jam polos dikira penuh. Kalau semuanya bertanda,
+tidak ada yang bisa terbaca sebagai pengecualian. Hari yang pegawainya cuma satu
+ikut bertanda karena alasan yang sama.
 
 Satuannya ikut ditulis: satu jam sebaris memberi ruang untuk itu, dan "1 slot"
 tidak punya bacaan lain — angka telanjang dalam kurung masih bisa terbaca
@@ -613,75 +605,25 @@ tanda hubung membiarkannya menempel apa adanya di belakang jamnya.
 **Tiap jam diawali bulatan `·`**, jadi yang di bawah judul hari terbaca sebagai
 daftar pilihan — tanda hubung di posisi itu terbaca seperti rentang atau
 potongan kalimat, dan titik tengahnya juga yang membuat tanda hubung di
-belakang jam tidak berebut arti. `·` aman lewat `wa.me` (ia ada di Windows-1252,
-tidak seperti emoji yang jatuh jadi tanda tanya — lihat `REM_EMOJI`), tapi tidak
-gratis: **9 karakter URL per baris**, dari 4 waktu bulatannya masih tanda
-hubung. Ia muncul di tiap jam, jadi inilah penanda yang paling sering muncul di
-seluruh pesan.
+belakang jam tidak berebut arti.
 
-Keduanya dipegang `jamTawaran()` dan `TANDA_JAM` di [app.js](app.js) — satu
-pasang untuk salinan ini dan pesan reminder sekaligus.
+Keduanya dipegang `jamTawaran()` dan `TANDA_JAM` di [app.js](app.js).
 
 Yang tetap tidak ikut: nama pegawainya, dan sisa jadwal hari itu. Yang dikirim
 ke customer adalah tawaran jam; sisanya catatan kerja yang tidak ada urusannya
 di sana.
 
-**Satu jam sebaris**, dipegang `JAM_SEBARIS` di [app.js](app.js) — dan **pesan
-reminder memakai angka yang sama**. Daftar yang tiap barisnya satu pilihan
+**Satu jam sebaris**, dipegang `JAM_SEBARIS` di [app.js](app.js). Daftar yang tiap barisnya satu pilihan
 paling gampang ditunjuk ("yang jam 14:30"); empat jam sebaris membuat matanya
 mencari dulu di dalam barisnya. Ongkosnya panjang: hari yang lowong sejak pagi
 jadi dua puluh delapan baris, dan seminggu penuh di cabang yang buka 08:00–22:00
 lewat dua ratus baris — kalau itu terasa terlalu jauh digulir, `JAM_SEBARIS`
-dikembalikan ke 4 dan kedua teks berubah sekaligus.
+dikembalikan ke 4.
 
 `PISAH_JAM` masih ada tapi tidak terpakai selama satu jam sebaris: ia pemisah
 antarjam **di dalam** satu baris. Komanya dipilih karena paling gampang dibaca
 — deretan jam yang dipisah titik tengah terbaca seperti satu blok, sedangkan
 koma memberi tiap jam ujungnya sendiri.
-
-Yang perlu diingat kalau bentuknya nanti diubah — misalnya `JAM_SEBARIS`
-dikembalikan ke 4, dan pemisahnya terpakai lagi: pesan reminder berangkat lewat
-URL `wa.me`, dan di situ spasi pengapit berharga. Titiknya sendiri gratis — `·`
-jadi 6 karakter URL, sama persis dengan `, ` — tapi tiap spasi menambah 6 lagi.
-Diukur di seminggu penuh dengan jam kerja bawaan, waktu masih empat sebaris:
-
-| Pemisah | Panjang URL |
-|---|---|
-| `, ` koma (dipakai) | 1.874 |
-| `·` rapat | 1.874 |
-| ` · ` satu spasi | 2.294 |
-| `  ·  ` dua spasi | 2.714 |
-
-`BATAS_URL` sekarang **8.192**, naik dari 4.096 (dan sebelumnya 2.048). Dengan
-satu jam sebaris berbulatan titik tengah, tujuh hari sekaligus, dan rambut 30
-menit: jam kerja bawaan berhenti di 2.434, cabang yang buka sampai 21:00 di
-3.498, dan cabang yang buka 08:00–22:00 di 4.296. Waktu jamnya masih empat
-sebaris dan berbulatan tanda hubung, ketiganya 1.874, 2.616, dan 3.169.
-
-Penanda `- 1 slot` menambah 15 karakter URL lagi, tapi cuma di jam yang tinggal
-satu pegawainya luang **di hari yang pegawainya lebih dari satu**. Yang paling
-berat karena itu hari berpegawai dua yang satu pegawainya terisi penuh: seluruh
-jam sisanya tinggal satu tempat, jadi seluruhnya bertanda. Diukur di keadaan
-itu, ketiga angka di atas jadi sekitar **3.900, 5.810, dan 7.235**. Yang
-terakhir sudah lewat 4.096 dan kehilangan hari terjauhnya — itu yang menaikkan
-batasnya, bukan perkiraan.
-
-Cabang berpegawai satu justru yang paling pendek sekarang: tidak ada satu pun
-jamnya yang bertanda, jadi ia berhenti di angka polos di atas.
-
-Sisanya tinggal sekitar **950**, dan itu yang perlu diingat kalau suatu hari ada
-cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
-berhenti tepat di 8.190, dan yang lebih panjang dari itu mulai kehilangan hari
-terjauhnya. Belum ada cabang sepanjang itu, jadi batasnya dibiarkan — yang
-menaikkannya nanti keadaan, bukan jaga-jaga.
-
-Angkanya sengaja tidak dikembalikan ke 2.048 waktu pemisahnya kembali jadi koma:
-yang 2.048 memang cukup untuk jam kerja bawaan, tapi cabang yang buka sampai
-malam sudah lewat batas itu dan kehilangan dua hari.
-
-Yang tidak bisa diukur dari sini: apakah jalur `wa.me` sendiri memotong di suatu
-tempat. Kalau suatu saat ada pesan yang sampai dalam keadaan terpenggal, angka
-itu yang pertama diturunkan.
 
 Dua hal yang disaring diam-diam, dan keduanya disengaja:
 
@@ -702,7 +644,9 @@ Clipboard API.
 
 Tombol **Salin sebagai Gambar** di sebelahnya menggambar daftar yang sama di
 canvas — isinya dijaga persis sama dengan salinan teks: hari yang penuh tidak
-ditulis, dan tanda "sisa 1 slot" tunduk pada aturan yang sama.
+ditulis, dan tiap chip jam menyebut sisa slotnya ("sisa 2 slot") di bawah
+jamnya. Semua chip sewarna — tidak ada yang disorot, karena jam yang disorot
+terbaca sebagai satu-satunya yang tersedia.
 
 **Harinya disusun menyamping, maksimal empat hari sebaris** (`SLOT_VIZ_KOLOM`
 di [app.js](app.js)). Ditumpuk ke bawah, seminggu jadi gambar sepanjang tiga
@@ -1035,6 +979,33 @@ yang bernilai `true` yang mengeluarkan orang dari hitungan itu.
 Saat impor file cadangan, penanda dari file cuma mengisi customer yang di sini
 **belum pernah dijawab**. Jawaban yang sudah ada tidak pernah ditimpa: file
 cadangan bisa saja lebih tua daripada koreksi yang baru saja dilakukan.
+
+## Pesan reminder dan gambar slot
+
+Pesan reminder yang dibuka di WhatsApp cuma berisi salam dan ajakan — **daftar
+jamnya tidak lagi ditulis di teks**:
+
+```
+Selamat pagi, Ci Mei.
+
+Apakah mau kami jadwalkan untuk treatment berikutnya? Berikut jadwal yang masih tersedia untuk seminggu ke depan.
+```
+
+Begitu **Kirim WA** ditekan, **gambar slot kosong besok sampai tujuh hari ke
+depan ikut tersalin ke clipboard** — bentuknya sama dengan [Salin slot sebagai
+gambar](#salin-slot-sebagai-gambar). Operator tinggal mengirim teksnya, lalu
+paste gambarnya di chat yang sama. Jenis dan durasinya diambil dari treatment
+terakhir orang itu, bukan dari pilihan di sheet Slot Kosong.
+
+- Clipboard ditulis **sebelum** tab WhatsApp dibuka: menulis clipboard butuh
+  halaman ini masih punya fokus.
+- Browser yang tidak bisa menyalin gambar mengunduh filenya
+  (`slot-YYYY-MM-DD.png`) untuk dilampirkan manual.
+- Kalau seminggu ke depan penuh, tidak ada gambar yang disalin dan kalimat
+  "Berikut jadwal…" tidak ikut.
+
+Sebelumnya daftar jamnya ditulis di teks, dan seminggu penuh bisa jadi ratusan
+baris — sampai harus dipotong supaya muat di URL `wa.me`.
 
 ## Sapaan di pesan WhatsApp
 
