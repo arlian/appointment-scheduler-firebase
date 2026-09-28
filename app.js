@@ -482,17 +482,12 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 
 // Satu jam mulai jadi teks, dipakai salinan Slot Kosong maupun pesan reminder.
 //
-// Jam yang tinggal satu pegawainya luang ditulis "14:00 - 1 slot". Yang
-// ditandai kelangkaannya, bukan kelapangannya: jam yang tinggal satu tempat
-// perlu dijawab hari ini juga, sedangkan jam yang masih muat dua orang tidak
-// menuntut apa-apa dari yang membacanya. Jadi yang dua ke atas dibiarkan polos
-// — kalau semuanya bertanda, yang benar-benar tinggal satu berhenti menonjol.
-//
-// `tandai` yang menjaga tanda itu tetap berarti. Hari yang pegawainya memang
-// cuma satu tidak punya jam yang bisa lebih lapang dari satu, jadi "1 slot" di
-// sana bukan kabar apa-apa — ia cuma mengulang jumlah pegawai hari itu di tiap
-// baris. Yang menghitungnya pemanggil, dari pegawaiUntuk(tgl): kelangkaan cuma
-// ada artinya kalau hari itu memang bisa lebih longgar.
+// Tiap jam ditulis dengan sisa tempatnya: "14:00 - 1 slot", "14:30 - 2 slot".
+// Dulu cuma yang tinggal satu yang bertanda, dan customer membacanya terbalik
+// — jam bertanda dikira satu-satunya yang tersedia, jam polos dikira penuh.
+// Kalau semuanya bertanda, tidak ada yang bisa terbaca sebagai pengecualian.
+// Hari yang pegawainya cuma satu ikut bertanda karena alasan yang sama: jam
+// polos di satu hari dan jam bertanda di hari lain terbaca seolah berbeda.
 //
 // Satuannya ikut ditulis: satu jam sebaris memberi ruang untuk itu, dan "1
 // slot" tidak punya bacaan lain — angka telanjang dalam kurung masih bisa
@@ -504,10 +499,7 @@ const keJam = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(
 // ia sudah jadi bulatan daftar di depan tiap jam, dan dua titik dalam satu
 // baris membuat yang di depan berhenti terbaca sebagai penanda daftar.
 //
-// Angkanya tetap diambil dari j.peg, bukan ditulis mati "1 slot": kalau suatu
-// hari aturannya berubah lagi, yang perlu diubah cuma syaratnya.
-const jamTawaran = (j, tandai) =>
-  keJam(j.m) + (tandai && j.peg === 1 ? ' - ' + j.peg + ' slot' : '');
+const jamTawaran = (j) => keJam(j.m) + ' - ' + j.peg + ' slot';
 
 // Bulatan daftar di depan tiap jam, dipakai salinan Slot Kosong maupun pesan
 // reminder. Titik tengah, bukan tanda hubung: yang di bawah judul hari itu
@@ -2907,13 +2899,10 @@ function buildSlotWaText() {
     if (!jam.length) return;
     ada += jam.length;
     lines.push('', '📅 *' + hariBulan(tgl) + '*');
-    // Hari yang pegawainya cuma satu tidak diberi tanda "1 slot" — lihat
-    // jamTawaran().
-    const tandai = pegawaiUntuk(tgl) > 1;
     // Bentuknya sama persis dengan pesan reminder — lihat JAM_SEBARIS.
     for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
       lines.push(TANDA_JAM
-        + jam.slice(i, i + JAM_SEBARIS).map((j) => jamTawaran(j, tandai)).join(PISAH_JAM));
+        + jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
     }
   });
   return ada ? lines.join('\n') : null;
@@ -3209,11 +3198,10 @@ function slotTawaran(k) {
     if (!jam.length) continue;
     // Susunannya mengikuti salinan jadwal dan salinan slot kosong: nama hari
     // ditebalkan, jamnya turun di bawahnya.
-    const tandai = pegawaiUntuk(tgl) > 1;
     const baris = [];
     for (let i = 0; i < jam.length; i += JAM_SEBARIS) {
       baris.push(TANDA_JAM
-        + jam.slice(i, i + JAM_SEBARIS).map((j) => jamTawaran(j, tandai)).join(PISAH_JAM));
+        + jam.slice(i, i + JAM_SEBARIS).map(jamTawaran).join(PISAH_JAM));
     }
     blok.push([TANDA_HARI + '*' + hariBulan(tgl) + '*'].concat(baris).join('\n'));
   }
@@ -3237,16 +3225,10 @@ function slotTawaran(k) {
 // sehari — di 4.296. Waktu jamnya masih empat sebaris dan berbulatan tanda
 // hubung, ketiganya 1.874, 2.616, dan 3.169.
 //
-// Penanda "- 1 slot" menambah 15 karakter URL lagi, tapi cuma di jam yang
-// tinggal satu pegawainya luang di hari yang pegawainya lebih dari satu. Yang
-// paling berat karena itu hari berpegawai dua yang satu pegawainya terisi
-// penuh: seluruh jam sisanya tinggal satu tempat, jadi seluruhnya bertanda.
-// Diukur di keadaan itu, ketiga angka di atas jadi sekitar 3.900, 5.810, dan
-// 7.235. Yang terakhir sudah lewat 4096 — itu yang menaikkan batasnya ke 8192,
-// bukan perkiraan.
-//
-// Cabang berpegawai satu justru yang paling pendek sekarang: tidak ada satu pun
-// jamnya yang bertanda, jadi ia berhenti di angka polos di atas.
+// Penanda "- N slot" menambah 15 karakter URL lagi di tiap jam — sekarang
+// seluruh jam bertanda, apa pun jumlah pegawainya. Diukur begitu, ketiga angka
+// di atas jadi sekitar 3.900, 5.810, dan 7.235. Yang terakhir sudah lewat 4096
+// — itu yang menaikkan batasnya ke 8192, bukan perkiraan.
 //
 // Sisanya tinggal sekitar 950, dan itu yang perlu diingat kalau suatu hari ada
 // cabang yang buka lebih panjang: 07:00–23:00 yang seluruh jamnya bertanda
@@ -5701,7 +5683,7 @@ $('salinViz').addEventListener('click', () => salinGambar(
 // bisa dicari, dan tidak mati kalau gambarnya gagal terkirim.
 //
 // Isinya sengaja dijaga sama persis dengan buildSlotWaText(): hari yang penuh
-// tidak ditulis, dan tanda "1 slot" tunduk pada aturan yang sama. Dua salinan
+// tidak ditulis, dan tiap jam menyebut sisa slotnya seperti jamTawaran(). Dua salinan
 // yang menyebut jam berbeda untuk pertanyaan yang sama jauh lebih buruk
 // daripada tidak punya salinan gambar sama sekali.
 // ============================================================
@@ -5730,7 +5712,7 @@ function dataSlotViz() {
     const jam = jamMulaiHari(tgl, hariIni);
     if (!jam.length) return; // hari penuh tidak ditulis — sama seperti salinan teks
     total += jam.length;
-    hari.push({ tgl, jam, tandai: pegawaiUntuk(tgl) > 1 });
+    hari.push({ tgl, jam });
   });
   return { hari, total };
 }
@@ -5810,23 +5792,19 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
         const kol = n % uk.chipKol, brs = Math.floor(n / uk.chipKol);
         const x = px + SLOT_VIZ_PAD + kol * (uk.chipW + SLOT_VIZ_SELA);
         const cy = y + SLOT_VIZ_KEPALA + brs * (SLOT_VIZ_CHIP_H + SLOT_VIZ_SELA);
-        // Jam yang tinggal satu pegawai dibedakan warnanya, bukan cuma diberi
-        // tulisan tambahan: gambar ini dilihat sekilas, dan warna aksen terbaca
-        // lebih dulu daripada baris kecil di bawah angkanya. Warna netral tidak
-        // cukup — --field dan --bg terlalu berdekatan untuk jadi penanda.
-        const sisaSatu = h.tandai && j.peg === 1;
-        ctx.fillStyle = sisaSatu ? C.accentSoft : C.bg;
-        ctx.strokeStyle = sisaSatu ? C.accentRing : C.border;
+        // Semua chip sama warnanya dan sama-sama menyebut sisanya. Dulu yang
+        // tinggal satu diberi warna aksen, dan customer membacanya sebagai
+        // satu-satunya jam yang tersedia — lihat jamTawaran().
+        ctx.fillStyle = C.bg;
+        ctx.strokeStyle = C.border;
         ctx.lineWidth = 1;
         vizKotak(ctx, x, cy, uk.chipW, SLOT_VIZ_CHIP_H, 13);
         ctx.fill();
         ctx.stroke();
-        vizTeks(ctx, keJam(j.m), x + uk.chipW / 2, cy + (sisaSatu ? 25 : 34),
-          { ukuran: 18, tebal: 700, warna: sisaSatu ? C.accentInk : C.text, rata: 'center' });
-        if (sisaSatu) {
-          vizTeks(ctx, 'sisa 1 slot', x + uk.chipW / 2, cy + 42,
-            { ukuran: 11, tebal: 600, warna: C.accentInk, rata: 'center' });
-        }
+        vizTeks(ctx, keJam(j.m), x + uk.chipW / 2, cy + 25,
+          { ukuran: 18, tebal: 700, warna: C.text, rata: 'center' });
+        vizTeks(ctx, 'sisa ' + j.peg + ' slot', x + uk.chipW / 2, cy + 42,
+          { ukuran: 11, tebal: 600, warna: C.text2, rata: 'center' });
       });
     });
     y += tinggi + SLOT_VIZ_SELA_HARI;
