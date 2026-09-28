@@ -5763,15 +5763,32 @@ function lukisSlot(ctx, data, uk, tinggiTotal) {
   if (cabangList.length > 1 && cabang) ket.unshift(cabang.name);
   vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
   // Angka di bilik kanan chip tidak berlabel, jadi artinya dijelaskan sekali di
-  // sini — dengan contoh biliknya sendiri, bukan kalimat: yang dicocokkan mata
-  // warnanya, jadi keterangan berwarna sama langsung nyambung ke chip di bawah.
-  const kx = L + vizLebar(ctx, ket.join(' · '), 14) + 18;
-  vizKotak(ctx, kx, 108, 24, 24, 6);
-  ctx.fillStyle = C.accentSoft;
+  // sini — dengan satu chip contoh yang diambil dari jam pertama di gambar dan
+  // dibaca dalam kalimat biasa. Huruf "N" sebagai contoh terlalu abstrak untuk
+  // customer; jam dan angka sungguhan langsung bisa dicocokkan ke chip di bawah.
+  const cth = data.hari[0].jam[0];
+  const cw = 92, ch = 28, cbw = 26, cx = L, cyy = 142;
+  const cbx = cx + cw - cbw;
+  vizKotak(ctx, cx, cyy, cw, ch, 8);
+  ctx.fillStyle = C.bg;
   ctx.fill();
-  vizTeks(ctx, 'N', kx + 12, 125, { ukuran: 13, tebal: 700, warna: C.accentInk, rata: 'center' });
-  vizTeks(ctx, 'sisa slot', kx + 32, 126, { ukuran: 14, warna: C.text2 });
-  let y = 156;
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = C.accentSoft;
+  ctx.fillRect(cbx, cyy, cbw, ch);
+  ctx.restore();
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cbx, cyy);
+  ctx.lineTo(cbx, cyy + ch);
+  ctx.stroke();
+  vizTeks(ctx, keJam(cth.m), (cx + cbx) / 2, cyy + 19, { ukuran: 14, tebal: 700, warna: C.text, rata: 'center' });
+  vizTeks(ctx, String(cth.peg), cbx + cbw / 2, cyy + 19, { ukuran: 13, tebal: 700, warna: C.accentInk, rata: 'center' });
+  vizTeks(ctx, 'artinya jam ' + keJam(cth.m) + ' masih ada ' + cth.peg + ' slot', cx + cw + 12, cyy + 19,
+    { ukuran: 14, warna: C.text2 });
+  let y = 190;
 
   // Semua panel seukuran — setinggi hari yang jamnya paling banyak, bukan
   // setinggi isinya sendiri-sendiri. Kotak yang tingginya berbeda-beda membuat
