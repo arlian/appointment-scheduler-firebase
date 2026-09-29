@@ -5163,7 +5163,7 @@ function warnaViz() {
   return {
     bg: w('--bg'), card: w('--card'), border: w('--border'), field: w('--field'),
     text: w('--text'), text2: w('--text-2'), muted: w('--muted'),
-    accent: w('--accent'), naik: w('--naik'), turun: w('--turun'),
+    accent: w('--accent'), accentSoft: w('--accent-soft'), naik: w('--naik'), turun: w('--turun'),
     h: [w('--h0'), w('--h1'), w('--h2'), w('--h3'), w('--h4')],
     gen: { P: w('--gen-p'), L: w('--gen-l'), '?': w('--gen-x') },
   };
@@ -5760,6 +5760,287 @@ $('salinSlotViz').addEventListener('click', () => {
     'slot-kosong-' + today() + '.png',
     () => buatBlobSlot(data),
     'Gambar slot kosong tersalin — tinggal paste.');
+});
+
+// ============================================================
+// Salin daftar jadwal sebagai gambar
+// ------------------------------------------------------------
+// Isinya sama dengan salinan teks "Salin WA" — jadwal yang sedang tampil di
+// filter, dengan tanda treatment dan tanda customer baru yang sama — tapi
+// harinya dijejer menyamping, satu kolom per hari. Sebagai teks, seminggu
+// jadwal jadi satu daftar panjang ke bawah yang harus digulir hari demi hari;
+// sebagai gambar, seluruh minggunya terbaca dalam satu layar.
+//
+// Tujuh hari jadi batasnya, sama dengan gambar slot: lebih dari itu kolomnya
+// terlalu sempit untuk nama. Filter yang lebih panjang tetap tersalin utuh
+// lewat "Salin WA".
+// ============================================================
+const JADWAL_VIZ_MAKS_HARI = 7;
+const JADWAL_VIZ_KOL_W = 210;     // lebar acuan satu kolom hari — cukup untuk nama dua kata plus tag NEW sebaris
+const JADWAL_VIZ_KARTU_MIN = 170; // hari yang sedikit: kartunya berbaris menyamping, tidak lebih kecil dari ini
+const JADWAL_VIZ_SELA = 8;        // antar kartu jam
+const JADWAL_VIZ_SELA_HARI = 10;  // antar kolom hari
+const JADWAL_VIZ_PAD = 10;        // tepi dalam kolom hari
+const JADWAL_VIZ_KEPALA = 60;     // dari tepi atas kolom sampai kartu pertama
+const JADWAL_VIZ_KARTU_ATAS = 32; // dari tepi atas kartu sampai orang pertama (jamnya di sini)
+const JADWAL_VIZ_KARTU_BAWAH = 10;
+const JADWAL_VIZ_SELA_ORANG = 6;  // antar orang di dalam satu kartu
+const JADWAL_VIZ_BARIS_NAMA = 16;
+const JADWAL_VIZ_BARIS_TANDA = 14;
+
+// Jadwal di jam yang sama pada hari yang sama digabung jadi satu kartu: jamnya
+// ditulis sekali, orang-orangnya berderet di bawahnya. Kartu terpisah untuk
+// jam yang sama cuma mengulang angka yang sama dan membuat kolomnya memanjang,
+// padahal yang dibaca dari gambar ini "jam segini siapa saja".
+function dataJadwalViz() {
+  const perHari = new Map();
+  filteredRows().forEach((r) => {
+    if (!perHari.has(r.date)) perHari.set(r.date, []);
+    perHari.get(r.date).push(r);
+  });
+  const semua = [...perHari.entries()].map(([tgl, rows]) => {
+    const perJam = new Map();
+    rows.forEach((r) => {
+      if (!perJam.has(r.time)) perJam.set(r.time, []);
+      perJam.get(r.time).push(r);
+    });
+    return { tgl, rows, jam: [...perJam.entries()].map(([time, isi]) => ({ time, isi })) };
+  });
+  const hari = semua.slice(0, JADWAL_VIZ_MAKS_HARI);
+  return {
+    hari,
+    total: hari.reduce((n, h) => n + h.rows.length, 0),
+    terpotong: semua.length - hari.length,
+  };
+}
+
+// Nama dipecah paling banyak dua baris; yang masih kelebihan dipotong dengan
+// elipsis di baris kedua, bukan dibiarkan menerobos tepi kartu.
+function vizPecahNama(ctx, s, maksW, ukuran, tebal) {
+  const pas = (t) => vizLebar(ctx, t, ukuran, tebal) <= maksW;
+  const potong = (t) => {
+    if (pas(t)) return t;
+    while (t.length > 1 && !pas(t + '…')) t = t.slice(0, -1);
+    return t.trimEnd() + '…';
+  };
+  const kata = s.split(/\s+/);
+  let satu = '';
+  let i = 0;
+  for (; i < kata.length; i++) {
+    const coba = satu ? satu + ' ' + kata[i] : kata[i];
+    if (!pas(coba) && satu) break;
+    satu = coba;
+  }
+  if (i >= kata.length) return [potong(satu)];
+  return [potong(satu), potong(kata.slice(i).join(' '))];
+}
+
+// Customer baru tidak lagi ditulis "Baru" di baris tanda treatment: ia jadi
+// tag kecil hijau di belakang namanya. Di baris tanda ia tercampur dengan
+// "+Exo & Muka" yang sewarna, dan justru kata itu yang terpotong duluan di
+// kolom sempit. Hijau, bukan aksen pink: warnanya harus beda dari tanda
+// treatment supaya terbaca sebagai keterangan orangnya, bukan jenis treatmentnya.
+const JADWAL_VIZ_TAG = 'NEW';
+const JADWAL_VIZ_TAG_UKURAN = 7;
+const JADWAL_VIZ_TAG_H = 10;
+const vizLebarTag = (ctx) => vizLebar(ctx, JADWAL_VIZ_TAG, JADWAL_VIZ_TAG_UKURAN, 400) + 7;
+
+// Tinggi kartu sekarang ikut isinya — satu orang atau empat orang di jam yang
+// sama tidak mungkin muat di kotak yang sama tingginya — jadi tata letaknya
+// diukur dulu di sini, lengkap dengan pecahan nama tiap orang, lalu lukisJadwal()
+// tinggal menggambar di posisi yang sudah jadi.
+//
+// Hari yang sedikit tidak dibiarkan jadi satu kolom lebar berisi kartu yang
+// menumpuk lurus ke bawah: kartunya berbaris menyamping di dalam kolomnya, dan
+// tiap baris kartu setinggi kartu tertinggi di baris itu.
+function ukuranJadwalViz(ctx, data) {
+  const kolom = Math.max(1, Math.min(JADWAL_VIZ_MAKS_HARI, data.hari.length));
+  const lebar = Math.max(VIZ_W,
+    VIZ_PAD * 2 + kolom * JADWAL_VIZ_KOL_W + (kolom - 1) * JADWAL_VIZ_SELA_HARI);
+  const kolW = (lebar - VIZ_PAD * 2 - JADWAL_VIZ_SELA_HARI * (kolom - 1)) / kolom;
+  const dalamW = kolW - JADWAL_VIZ_PAD * 2;
+  const kartuKol = Math.max(1,
+    Math.floor((dalamW + JADWAL_VIZ_SELA) / (JADWAL_VIZ_KARTU_MIN + JADWAL_VIZ_SELA)));
+  const kartuW = (dalamW - JADWAL_VIZ_SELA * (kartuKol - 1)) / kartuKol;
+  // Nomor urut paling panjang menentukan di mana nama mulai, supaya nama di
+  // bawah nomor 9 dan nomor 10 tetap sejajar.
+  const nomorW = vizLebar(ctx, Math.max(1, ...data.hari.map((h) => h.rows.length)) + '. ', 12, 600);
+  const namaW = kartuW - 20 - nomorW;
+
+  let tinggiKol = 0;
+  const hari = data.hari.map((h) => {
+    let n = 0;
+    const kartu = h.jam.map((g) => {
+      const orang = g.isi.map((r) => {
+        n++;
+        const t = tandaTreatment(r.treatments);
+        const baru = !sudahLamaDatang(r.customerId);
+        // Tag-nya menempel di ujung baris nama terakhir kalau muat. Kalau
+        // tidak, ia turun ke depan baris tanda treatment — nama tidak pernah
+        // dipecah demi tag: "Mbak / Rina" jauh lebih susah dibaca daripada
+        // tag yang pindah satu baris.
+        const tagW = baru ? vizLebarTag(ctx) + 5 : 0;
+        const nama = vizPecahNama(ctx, nameOf(r.customerId), namaW, 13, 600);
+        const tagDiNama = baru && vizLebar(ctx, nama[nama.length - 1], 13, 600) + tagW <= namaW;
+        const tagDiTanda = baru && !tagDiNama;
+        // Tandanya juga boleh turun ke baris kedua: di kolom tujuh hari,
+        // "+Exo & Muka" belum tentu muat sebaris.
+        const tanda = t ? vizPecahNama(ctx, t, namaW - (tagDiTanda ? tagW : 0), 11, 700)
+          : tagDiTanda ? [''] : [];
+        return {
+          no: n, nama, tanda, tagDiNama, tagDiTanda,
+          h: nama.length * JADWAL_VIZ_BARIS_NAMA + tanda.length * JADWAL_VIZ_BARIS_TANDA,
+        };
+      });
+      const tinggi = JADWAL_VIZ_KARTU_ATAS + JADWAL_VIZ_KARTU_BAWAH
+        + orang.reduce((t, o) => t + o.h, 0) + (orang.length - 1) * JADWAL_VIZ_SELA_ORANG;
+      return { time: g.time, orang, h: tinggi };
+    });
+    let yy = JADWAL_VIZ_KEPALA;
+    for (let i = 0; i < kartu.length; i += kartuKol) {
+      const sebaris = kartu.slice(i, i + kartuKol);
+      const tb = Math.max(...sebaris.map((k) => k.h));
+      sebaris.forEach((k, j) => { k.dx = JADWAL_VIZ_PAD + j * (kartuW + JADWAL_VIZ_SELA); k.dy = yy; });
+      yy += tb + JADWAL_VIZ_SELA;
+    }
+    tinggiKol = Math.max(tinggiKol, yy - JADWAL_VIZ_SELA + JADWAL_VIZ_PAD);
+    return kartu;
+  });
+  return { kolom, lebar, kolW, kartuW, nomorW, hari, tinggiKol };
+}
+
+function lukisJadwal(ctx, data, uk, tinggiTotal) {
+  const C = warnaViz();
+  const L = VIZ_PAD;
+  if (tinggiTotal) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, uk.lebar, tinggiTotal);
+  }
+
+  // --- Kepala ---
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  ctx.letterSpacing = '2.5px';
+  vizTeks(ctx, 'JADWAL TREATMENT', L, 56, { ukuran: 12.5, tebal: 700, warna: C.accent });
+  ctx.letterSpacing = '0px';
+  const awal = data.hari[0].tgl, akhir = data.hari[data.hari.length - 1].tgl;
+  vizTeks(ctx, awal === akhir ? hariBulan(awal) : tglSingkat(awal) + ' – ' + tglSingkat(akhir),
+    L, 100, { ukuran: 30, tebal: 700, warna: C.text });
+  const ket = [data.total + ' jadwal'];
+  if (cabangList.length > 1 && cabang) ket.unshift(cabang.name);
+  vizTeks(ctx, ket.join(' · '), L, 126, { ukuran: 14, warna: C.text2 });
+  const y = 156;
+
+  if (tinggiTotal) data.hari.forEach((h, k) => {
+    const px = L + k * (uk.kolW + JADWAL_VIZ_SELA_HARI);
+    const tengah = px + uk.kolW / 2;
+    // Semua kolom setinggi kolom yang paling panjang — sama alasannya dengan
+    // gambar slot: kolom yang tingginya naik-turun terbaca seperti tumpukan
+    // yang jatuh tidak rata.
+    // Hari ini disorot: gambar ini sering dikirim ke grup pegawai pagi-pagi,
+    // dan yang pertama dicari di sana "hari ini siapa saja". Kolomnya diberi
+    // latar dan garis aksen, dan kepalanya menyebut "Hari ini" — warna saja
+    // tidak cukup buat yang membacanya di layar redup atau hitam-putih.
+    const kini = h.tgl === today();
+    if (kini) {
+      ctx.fillStyle = C.accentSoft;
+      ctx.strokeStyle = C.accent;
+      ctx.lineWidth = 2;
+      vizKotak(ctx, px, y, uk.kolW, uk.tinggiKol, 18);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      vizPanel(ctx, C, px, y, uk.kolW, uk.tinggiKol);
+    }
+    const d = new Date(h.tgl + 'T00:00:00');
+    // "Hari ini" duduk di baris nama hari, bukan di baris tanggal yang sudah
+    // penuh. Kolom tujuh hari terlalu sempit untuk "Hari ini · Selasa" pada
+    // nama hari yang panjang — di situ nama harinya yang mengalah.
+    let judulHari = HARI_PANJANG[d.getDay()];
+    if (kini) {
+      judulHari = 'Hari ini · ' + judulHari;
+      if (vizLebar(ctx, judulHari, 15.5, 700) > uk.kolW - 16) judulHari = 'Hari ini';
+    }
+    vizTeks(ctx, judulHari, tengah, y + 26,
+      { ukuran: 15.5, tebal: 700, warna: kini ? C.accent : C.text, rata: 'center' });
+    vizTeks(ctx, d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+      + ' · ' + h.rows.length + ' jadwal', tengah, y + 45,
+      { ukuran: 11.5, tebal: 600, warna: kini ? C.accent : C.muted, rata: 'center' });
+
+    uk.hari[k].forEach((kartu) => {
+      const x = px + kartu.dx, cy = y + kartu.dy;
+      ctx.fillStyle = C.bg;
+      ctx.strokeStyle = C.border;
+      ctx.lineWidth = 1;
+      vizKotak(ctx, x, cy, uk.kartuW, kartu.h, 12);
+      ctx.fill();
+      ctx.stroke();
+      const tx = x + 10;
+      vizTeks(ctx, kartu.time, tx, cy + 22, { ukuran: 15, tebal: 700, warna: C.text });
+      if (kartu.orang.length > 1) {
+        vizTeks(ctx, kartu.orang.length + ' orang', x + uk.kartuW - 10, cy + 22,
+          { ukuran: 11, tebal: 600, warna: C.muted, rata: 'right' });
+      }
+      let oy = cy + JADWAL_VIZ_KARTU_ATAS;
+      kartu.orang.forEach((o) => {
+        // Nomor urut tetap per orang, sama dengan salinan teks: jumlahnya
+        // terbaca dari nomor terakhir walau beberapa orang berbagi satu kartu.
+        vizTeks(ctx, o.no + '.', tx, oy + 13, { ukuran: 12, tebal: 600, warna: C.muted });
+        o.nama.forEach((b, i) => vizTeks(ctx, b, tx + uk.nomorW, oy + 13 + i * JADWAL_VIZ_BARIS_NAMA,
+          { ukuran: 13, tebal: 600, warna: C.text }));
+        const lukisTag = (bx, by) => {
+          ctx.fillStyle = C.naik;
+          vizKotak(ctx, bx, by, vizLebarTag(ctx), JADWAL_VIZ_TAG_H, JADWAL_VIZ_TAG_H / 2);
+          ctx.fill();
+          vizTeks(ctx, JADWAL_VIZ_TAG, bx + vizLebarTag(ctx) / 2, by + 7.5,
+            { ukuran: JADWAL_VIZ_TAG_UKURAN, tebal: 400, warna: C.card, rata: 'center' });
+        };
+        if (o.tagDiNama) {
+          lukisTag(tx + uk.nomorW + vizLebar(ctx, o.nama[o.nama.length - 1], 13, 600) + 5,
+            oy + 4 + (o.nama.length - 1) * JADWAL_VIZ_BARIS_NAMA);
+        }
+        const tandaY = oy + o.nama.length * JADWAL_VIZ_BARIS_NAMA;
+        if (o.tagDiTanda) lukisTag(tx + uk.nomorW, tandaY + 2);
+        o.tanda.forEach((b, i) => vizTeks(ctx, b,
+          tx + uk.nomorW + (o.tagDiTanda && i === 0 ? vizLebarTag(ctx) + 5 : 0),
+          tandaY + 11 + i * JADWAL_VIZ_BARIS_TANDA,
+          { ukuran: 11, tebal: 700, warna: C.accent }));
+        oy += o.h + JADWAL_VIZ_SELA_ORANG;
+      });
+    });
+  });
+
+  const bawah = y + uk.tinggiKol + JADWAL_VIZ_SELA_HARI;
+  vizTeks(ctx, 'Dibuat ' + hariBulan(today()), uk.lebar / 2, bawah + 20,
+    { ukuran: 11.5, warna: C.muted, rata: 'center' });
+  return bawah + 42;
+}
+
+function buatBlobJadwal(data) {
+  const uk = ukuranJadwalViz(document.createElement('canvas').getContext('2d'), data);
+  const tinggi = Math.round(lukisJadwal(
+    document.createElement('canvas').getContext('2d'), data, uk));
+  const c = document.createElement('canvas');
+  c.width = uk.lebar * VIZ_SKALA;
+  c.height = tinggi * VIZ_SKALA;
+  const ctx = c.getContext('2d');
+  ctx.scale(VIZ_SKALA, VIZ_SKALA);
+  lukisJadwal(ctx, data, uk, tinggi);
+  return new Promise((resolve, reject) => {
+    c.toBlob((b) => b ? resolve(b) : reject(new Error('canvas gagal jadi gambar')), 'image/png');
+  });
+}
+
+$('salinJadwalViz').addEventListener('click', () => {
+  const data = dataJadwalViz();
+  if (!data.total) { toast('Belum ada jadwal untuk disalin.', true); return; }
+  salinGambar(
+    $('salinJadwalViz'),
+    'jadwal-' + data.hari[0].tgl + '.png',
+    () => buatBlobJadwal(data),
+    data.terpotong
+      ? 'Gambar ' + JADWAL_VIZ_MAKS_HARI + ' hari pertama tersalin — ' + data.terpotong
+        + ' hari sesudahnya tidak ikut. Pakai "Salin WA" untuk semuanya.'
+      : 'Gambar jadwal tersalin — tinggal paste di WhatsApp.');
 });
 
 // ============================================================
