@@ -199,6 +199,12 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   .card-head { gap: 8px 10px; }
   .card-head-btns { gap: 6px; }
   .wa-btn { padding: 7px 10px; font-size: .74rem; gap: 4px; }
+  /* Empat tombol berikon tidak muat sebaris di HP, dan yang pecah sendiri
+     meninggalkan satu tombol menggantung di baris kedua. Di sini susunannya
+     dibuat grid dua kolom yang rata: pecahnya jadi disengaja, 2 x 2 sama
+     lebar, dan label lengkap dengan ikonnya tetap muat. */
+  .card-head-btns { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .card-head-btns .wa-btn { justify-content: center; }
 }
 
 /* ---- Filter ---- */
