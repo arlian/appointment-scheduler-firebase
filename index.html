@@ -216,15 +216,13 @@
       </div>
       <div class="filter-bar">
         <button type="button" class="chip active" data-f="today">Hari Ini</button>
-        <button type="button" class="chip" data-f="pastweek">Seminggu ke Belakang</button>
-        <button type="button" class="chip" data-f="nextweek">Seminggu ke Depan</button>
+        <button type="button" class="chip" data-f="week">Minggu Ini</button>
         <span class="pick-date">
           <button type="button" class="chip" id="pickDateBtn" title="Tampilkan jadwal pada tanggal tertentu">
             <svg class="ico" aria-hidden="true"><use href="#i-kalender"/></svg><span id="pickDateLabel">Pilih Tanggal</span>
           </button>
           <input type="date" id="filterDate" tabindex="-1" aria-label="Pilih tanggal tertentu">
         </span>
-        <button type="button" class="chip" data-f="week">Minggu Ini</button>
         <button type="button" class="chip" data-f="all">Semua</button>
         <!-- Riwayat satu customer. Namanya dipilih dari daftar, bukan dicocokkan
              dari tulisan: yang disaring orangnya, jadi salah ketik satu huruf
@@ -241,8 +239,9 @@
           </span>
         </span>
         <span class="range-box">
+          <label class="range-lbl" for="filterStart">Dari</label>
           <input type="date" id="filterStart" title="Dari tanggal">
-          <span class="range-sep">s.d.</span>
+          <label class="range-lbl" for="filterEnd">Sampai</label>
           <input type="date" id="filterEnd" title="Sampai tanggal">
         </span>
       </div>

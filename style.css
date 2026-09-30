@@ -226,7 +226,9 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
   outline: 2px solid var(--accent); outline-offset: -2px;
   color: var(--text); background: var(--card);
 }
-.range-sep { font-size: .76rem; color: var(--muted); }
+/* Label Dari/Sampai menggantikan "s.d.": aturan dasar label (blok, margin
+   atas-bawah) dinolkan supaya tetap sebaris dengan kotak tanggalnya. */
+.range-lbl { display: inline; margin: 0; font-size: .76rem; color: var(--muted); white-space: nowrap; }
 /* Dari-s.d.-sampai jadi satu blok flex sendiri, jadi kalau tidak muat
    di layar sempit (iPhone) turun barisnya bareng-bareng, tidak terpisah */
 .range-box { display: inline-flex; align-items: center; gap: 7px; }
@@ -252,6 +254,19 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 .pick-date input[type="date"] {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: 0; padding: 0; cursor: pointer;
+}
+/* Layar telepon: chip filter disusun grid dua kolom sama lebar, seperti
+   tombol Slot Kosong/Reminder di atasnya. Cari Nama dan rentang tanggal
+   mengambil satu baris penuh — keduanya lebih lebar dari setengah kartu.
+   Harus SESUDAH aturan dasar di atas supaya tidak kalah urutan. */
+@media (max-width: 480px) {
+  .filter-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .filter-bar .chip { justify-content: center; width: 100%; }
+  .pick-date { display: flex; }
+  .cari-box, .range-box { grid-column: 1 / -1; display: flex; }
+  .cari-box .chip { width: auto; flex: 1 0 auto; }
+  .cari-box:has(.cari-field:not([hidden])) .chip { flex: 0 0 auto; }
+  .range-box input[type="date"] { flex: 1; min-width: 0; }
 }
 
 /* ---- Form ---- */

@@ -1085,7 +1085,7 @@ $('newCustSheet').addEventListener('click', (e) => {
 // ============================================================
 // Filter daftar jadwal
 // ============================================================
-let filterMode = 'today'; // 'today' | 'pastweek' | 'nextweek' | 'day' | 'week' | 'all' | 'date' | 'cust'
+let filterMode = 'today'; // 'today' | 'day' | 'week' | 'all' | 'date' | 'cust'
 let custCari = null;      // mode 'cust': customer yang riwayatnya sedang dibuka
 
 function thisWeekRange() { // Senin s.d. Minggu pekan berjalan
@@ -1101,12 +1101,6 @@ function filteredRows() {
   let rows = appointments.slice();
   if (filterMode === 'today') {
     rows = rows.filter((a) => a.date === today());
-  } else if (filterMode === 'pastweek') { // 7 hari terakhir, termasuk hari ini
-    const start = hariGeser(-7);
-    rows = rows.filter((a) => a.date >= start && a.date <= today());
-  } else if (filterMode === 'nextweek') { // hari ini s.d. 7 hari ke depan
-    const end = hariGeser(7);
-    rows = rows.filter((a) => a.date >= today() && a.date <= end);
   } else if (filterMode === 'day') {
     rows = rows.filter((a) => a.date === $('filterDate').value);
   } else if (filterMode === 'week') {
@@ -1701,8 +1695,6 @@ function renderList() {
   setRingkasTreat(rows);
   if (!rows.length) {
     const msg = filterMode === 'today' ? 'Tidak ada jadwal hari ini.'
-      : filterMode === 'pastweek' ? 'Tidak ada jadwal seminggu ke belakang.'
-      : filterMode === 'nextweek' ? 'Tidak ada jadwal seminggu ke depan.'
       : filterMode === 'day' ? 'Tidak ada jadwal pada tanggal tersebut.'
       : filterMode === 'week' ? 'Tidak ada jadwal minggu ini.'
       : filterMode === 'date' ? 'Tidak ada jadwal pada rentang tanggal tersebut.'
@@ -2207,8 +2199,6 @@ function tanggalFilter() {
   if (filterMode === 'today') return [today()];
   if (filterMode === 'day') return $('filterDate').value ? [$('filterDate').value] : [];
   if (filterMode === 'week') { const [a, b] = thisWeekRange(); return deret(a, b); }
-  if (filterMode === 'pastweek') return deret(hariGeser(-7), today());
-  if (filterMode === 'nextweek') return deret(today(), hariGeser(7));
   if (filterMode === 'date') {
     const a = $('filterStart').value, b = $('filterEnd').value;
     if (a && b) return deret(a, b);
@@ -2238,7 +2228,7 @@ let hariCari = HARI_CARI_BAWAAN;
 // yang perlu diketahui operator bukan kode modenya, melainkan tombol mana yang
 // sedang menyala di baris filter.
 const LABEL_FILTER = {
-  today: 'Hari Ini', pastweek: 'Seminggu ke Belakang', nextweek: 'Seminggu ke Depan',
+  today: 'Hari Ini',
   day: 'tanggal yang dipilih', week: 'Minggu Ini', all: 'Semua',
   date: 'rentang tanggal', cust: 'riwayat satu customer',
 };
