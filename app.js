@@ -801,9 +801,29 @@ treatForm.set(TREAT_BAWAAN);
 
 // Ganti tanggal di form → hitungan kunjungan ikut pindah ke bulan tanggal itu
 $('date').addEventListener('change', () => {
+  perbaruiUlang();
   if (!selectedCustomer) return;
   updateBadge();
 });
+
+// ============================================================
+// Ulangi tiap minggu — satu kali simpan untuk beberapa sesi di hari dan jam
+// yang sama. Keterangannya menyebut tanggal-tanggalnya satu per satu, supaya
+// operator melihat persis apa yang akan tertulis sebelum menekan Simpan.
+// ============================================================
+const ulangSelect = $('ulang'), ulangHint = $('ulangHint');
+const tanggalUlang = (date) => {
+  const n = Number(ulangSelect.value) || 1;
+  return Array.from({ length: n }, (_, i) => isoGeser(date, i * 7));
+};
+function perbaruiUlang() {
+  const date = $('date').value, time = $('time').value;
+  if (ulangSelect.value === '1' || !date) { ulangHint.textContent = ''; return; }
+  ulangHint.textContent = tanggalUlang(date).map(hariPendek).join(', ')
+    + (time ? ' — semua jam ' + time + '.' : '.');
+}
+ulangSelect.addEventListener('change', perbaruiUlang);
+$('time').addEventListener('change', perbaruiUlang);
 
 // ============================================================
 // Simpan jadwal
@@ -825,13 +845,15 @@ $('form').addEventListener('submit', (e) => {
   // Auto-deteksi: pakai customer lama jika nama sudah ada (abaikan besar/kecil huruf).
   // Kalau namanya belum ada, jadwalnya belum langsung disimpan — operator
   // dipastikan dulu lewat sheet konfirmasi.
+  const dates = tanggalUlang(date);
   const customer = findCustomerByName(cleanName);
-  if (customer) simpanJadwal(customer, cleanName, date, time, null);
-  else bukaKonfirmasiBaru(cleanName, date, time);
+  if (customer) simpanJadwal(customer, cleanName, dates, time, null);
+  else bukaKonfirmasiBaru(cleanName, dates, time);
 });
 
+// dates: satu tanggal atau lebih (kalau diulang tiap minggu)
 // status: null (customer memang sudah terdaftar) | 'baru' | 'lama'
-function simpanJadwal(customer, cleanName, date, time, status) {
+function simpanJadwal(customer, cleanName, dates, time, status) {
   if (!bolehUbah()) return;
   const isNew = !customer;
   if (isNew) {
@@ -860,32 +882,50 @@ function simpanJadwal(customer, cleanName, date, time, status) {
     save(KEY_CUSTOMERS, customers);
   }
 
-  const dup = appointments.find((a) =>
+  // Tanggal yang sudah ada jadwalnya di jam yang sama dilewati saja — sisanya
+  // tetap ditulis, daripada seluruh rangkaian mingguan batal karena satu bentrok.
+  const ada = (date) => appointments.some((a) =>
     a.customerId === customer.id && a.date === date && a.time === time);
-  if (dup) { toast(customer.name + ' sudah punya jadwal di tanggal dan jam yang sama.', true); return; }
+  const baru = dates.filter((d) => !ada(d));
+  if (!baru.length) {
+    toast(customer.name + (dates.length > 1
+      ? ' sudah punya jadwal di semua tanggal itu pada jam yang sama.'
+      : ' sudah punya jadwal di tanggal dan jam yang sama.'), true);
+    return;
+  }
 
-  const newId = buatId();
-  const appt = { id: newId, customerId: customer.id, date, time };
   // Field-nya cuma ditulis kalau memang ada isinya, jadi jadwal tanpa jenis
   // treatment tetap sebentuk dengan seluruh jadwal lama.
   const jenis = treatForm.get();
-  if (jenis.length) appt.treatments = jenis;
-  appointments.push(appt);
-  simpanBulan(new Set([kunciDari(date)]));
+  const newIds = baru.map((date) => {
+    const appt = { id: buatId(), customerId: customer.id, date, time };
+    if (jenis.length) appt.treatments = [...jenis];
+    appointments.push(appt);
+    return appt.id;
+  });
+  simpanBulan(new Set(baru.map(kunciDari)));
 
+  const berapa = baru.length > 1 ? baru.length + ' jadwal tersimpan' : 'Jadwal tersimpan';
   let msg = !isNew
-    ? 'Jadwal tersimpan untuk ' + customer.name + ' (customer lama).'
+    ? berapa + ' untuk ' + customer.name + ' (customer lama).'
     : status === 'lama'
-      ? 'Jadwal tersimpan. ' + customer.name + ' dicatat sebagai customer lama yang baru masuk sistem.'
-      : 'Jadwal tersimpan. ' + customer.name + ' terdaftar sebagai customer baru.';
-  if (!filteredRows().some((a) => a.id === newId)) {
-    msg += ' Pilih "Semua" untuk melihatnya.';
+      ? berapa + '. ' + customer.name + ' dicatat sebagai customer lama yang baru masuk sistem.'
+      : berapa + '. ' + customer.name + ' terdaftar sebagai customer baru.';
+  const lewat = dates.length - baru.length;
+  if (lewat) msg += ' ' + lewat + ' tanggal dilewati karena sudah ada jadwalnya.';
+  const tampil = new Set(filteredRows().map((a) => a.id));
+  if (!newIds.every((id) => tampil.has(id))) {
+    msg += newIds.some((id) => tampil.has(id))
+      ? ' Sebagian di luar filter — pilih "Semua" untuk melihat semuanya.'
+      : ' Pilih "Semua" untuk melihatnya.';
   }
   toast(msg);
   nameInput.value = ''; $('time').value = '';
   selectedCustomer = null;
   genderDipilih = false;
   treatForm.set(TREAT_BAWAAN);
+  ulangSelect.value = '1';
+  perbaruiUlang();
   closeSug();
   updateBadge();
   perbaruiGender();
@@ -906,7 +946,7 @@ function simpanJadwal(customer, cleanName, date, time, status) {
 // dan riwayat kunjungannya ikut terbelah dua. Dari sini jadwalnya bisa
 // langsung ditempelkan ke customer yang sudah ada.
 // ============================================================
-let pendingJadwal = null; // {nama, date, time} yang menunggu jawaban konfirmasi
+let pendingJadwal = null; // {nama, dates, time} yang menunggu jawaban konfirmasi
 // Sheet yang sama juga dipakai untuk memperbaiki status customer yang sudah
 // terdaftar: tombol di sheet konfirmasi sering tertekan buru-buru, dan sebelum
 // ini jawaban yang telanjur salah tidak ada jalan mundurnya sama sekali —
@@ -969,8 +1009,8 @@ function cariMirip(nama) {
     .map((x) => x.c);
 }
 
-function bukaKonfirmasiBaru(nama, date, time) {
-  pendingJadwal = { nama, date, time };
+function bukaKonfirmasiBaru(nama, dates, time) {
+  pendingJadwal = { nama, dates, time };
   pendingStatus = null;
   $('newCustJudul').textContent = 'Nama ini belum ada di sistem';
   $('newCustName').textContent = nama;
@@ -1063,7 +1103,7 @@ function jawabKonfirmasi(status) {
   tutupKonfirmasiBaru();
   // Perangkat lain bisa saja mendaftarkan nama yang sama selagi sheet terbuka —
   // pakai yang sudah ada daripada membuat kembar.
-  simpanJadwal(findCustomerByName(p.nama), p.nama, p.date, p.time, status);
+  simpanJadwal(findCustomerByName(p.nama), p.nama, p.dates, p.time, status);
 }
 
 // Ternyata orangnya sudah terdaftar, cuma beda tulis: jadwalnya menempel ke
@@ -1072,7 +1112,7 @@ function pilihMirip(c) {
   const p = pendingJadwal;
   if (!p) return;
   tutupKonfirmasiBaru();
-  simpanJadwal(c, c.name, p.date, p.time, null);
+  simpanJadwal(c, c.name, p.dates, p.time, null);
 }
 
 $('newCustBaru').addEventListener('click', () => jawabKonfirmasi('baru'));
