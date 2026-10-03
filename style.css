@@ -281,6 +281,17 @@ input {
   background: var(--field); color: var(--text);
   transition: background .15s, border-color .15s, box-shadow .15s;
 }
+select {
+  width: 100%; padding: 12px 13px; font-size: 16px; font-family: inherit;
+  border: 1.5px solid transparent; border-radius: 12px;
+  background: var(--field); color: var(--text);
+}
+select:focus {
+  outline: none; border-color: var(--accent); background: var(--card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.ulang-hint { font-size: .72rem; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+.ulang-hint:empty { display: none; }
 input:focus {
   outline: none; border-color: var(--accent); background: var(--card);
   box-shadow: 0 0 0 3px var(--accent-ring);
