@@ -192,6 +192,24 @@
             <input id="time" type="time" required>
           </div>
         </div>
+        <!-- Untuk customer yang sekalian memesan beberapa sesi: jadwal yang sama
+             ditulis ulang tiap minggu, di hari dan jam yang sama. -->
+        <div class="ulang-field">
+          <label for="ulang">Ulangi tiap minggu</label>
+          <select id="ulang">
+            <option value="1">Tidak diulang</option>
+            <option value="2">2 minggu</option>
+            <option value="3">3 minggu</option>
+            <option value="4">4 minggu</option>
+            <option value="5">5 minggu</option>
+            <option value="6">6 minggu</option>
+            <option value="7">7 minggu</option>
+            <option value="8">8 minggu</option>
+            <option value="10">10 minggu</option>
+            <option value="12">12 minggu</option>
+          </select>
+          <div class="ulang-hint" id="ulangHint"></div>
+        </div>
         <button class="primary" type="submit">Simpan Jadwal</button>
       </form>
     </section>
