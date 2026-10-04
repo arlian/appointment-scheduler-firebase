@@ -4794,8 +4794,8 @@ function renderPegawai(kini) {
     const kaki = document.createElement('div');
     kaki.className = 'peg-kaki';
     kaki.textContent = perHari
-      ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
-      : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari';
+      ? k.n + ' treatment selesai ÷ ' + k.hari + ' hari masuk'
+      : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' treatment per hari';
 
     baris.append(atas, track, kaki);
     baris.setAttribute('aria-label', perHari
@@ -5319,7 +5319,7 @@ function vizBlokPegawai(kini) {
   const tinggi = 62 + (baris.length ? baris.length * 72 : 40) + 14;
   return { tinggi, lukis(ctx, C, x, y, w) {
     vizPanel(ctx, C, x, y, w, tinggi);
-    vizTeks(ctx, 'Pegawai', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
+    vizTeks(ctx, 'Jumlah Treatment per Pegawai', x + 22, y + 40, { ukuran: 17.5, tebal: 700, warna: C.text });
     let py = y + 64;
     if (!baris.length) {
       vizTeks(ctx, kini.total ? 'Belum ada treatment yang ditandai selesai bulan ini.'
@@ -5349,8 +5349,8 @@ function vizBlokPegawai(kini) {
       // Angka penyusunnya ikut tercetak, sama seperti di layar: gambar ini sering
       // dibaca tanpa yang mengirimnya ada di situ buat menjelaskan pembaginya.
       vizTeks(ctx, perHari
-        ? k.n + ' selesai ÷ ' + k.hari + ' hari masuk'
-        : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' per hari',
+        ? k.n + ' treatment selesai ÷ ' + k.hari + ' hari masuk'
+        : k.hari + ' hari masuk · ' + angkaRata(k.rata) + ' treatment per hari',
         x + 22, py + 56, { ukuran: 11, warna: C.muted });
       py += 72;
     });
