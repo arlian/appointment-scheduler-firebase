@@ -633,12 +633,12 @@ const LABEL_G = { P: 'Perempuan', L: 'Laki-laki', '?': 'Belum diketahui' };
 const IKON_G = { P: 'perempuan', L: 'lakilaki', '?': 'tanya' };
 const URUT_G = ['P', 'L', '?'];
 
-function toast(msg, isErr) {
+function toast(msg, isErr, lama = 3000) {
   const t = $('toast');
   t.textContent = msg;
   t.className = 'toast show' + (isErr ? ' err' : '');
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.className = 'toast', 3000);
+  t._h = setTimeout(() => t.className = 'toast', lama);
 }
 
 // ============================================================
@@ -897,6 +897,14 @@ function simpanJadwal(customer, cleanName, dates, time, status) {
   // Field-nya cuma ditulis kalau memang ada isinya, jadi jadwal tanpa jenis
   // treatment tetap sebentuk dengan seluruh jadwal lama.
   const jenis = treatForm.get();
+  // Dicek sebelum ada yang ditulis, supaya jadwal mingguan yang baru disimpan
+  // tidak saling menghitung satu sama lain — tiap tanggalnya beda hari.
+  const penuhTgl = baru
+    .map((date) => ({ date, alasan: cekKapasitas(date, time, jenis, null) }))
+    .filter((x) => x.alasan);
+  const penuh = !penuhTgl.length ? null
+    : baru.length === 1 ? penuhTgl[0].alasan
+    : penuhTgl.map((x) => hariPendek(x.date) + ' ' + x.alasan).join('; ');
   const newIds = baru.map((date) => {
     const appt = { id: buatId(), customerId: customer.id, date, time };
     if (jenis.length) appt.treatments = [...jenis];
@@ -919,7 +927,8 @@ function simpanJadwal(customer, cleanName, dates, time, status) {
       ? ' Sebagian di luar filter — pilih "Semua" untuk melihat semuanya.'
       : ' Pilih "Semua" untuk melihatnya.';
   }
-  toast(msg);
+  if (penuh) toast(msg + ' Perhatian: ' + penuh + '.', true, 7000);
+  else toast(msg);
   nameInput.value = ''; $('time').value = '';
   selectedCustomer = null;
   genderDipilih = false;
@@ -1385,14 +1394,22 @@ $('editSave').addEventListener('click', () => {
   // ditulis ulang, kalau tidak barisnya tertinggal di sana dan jadwalnya jadi
   // terbaca dua kali — sekali di bulan lama, sekali di bulan baru.
   const bulanTersentuh = new Set([kunciDari(a.date), kunciDari(date)]);
+  const jenis = treatEdit.get();
+  // Yang diperiksa cuma kalau jamnya atau jenisnya memang berubah: memperbaiki
+  // salah ketik nama di jadwal yang sudah lama melebihi slot tidak perlu
+  // diperingatkan ulang.
+  const geser = a.date !== date || a.time !== time
+    || rapikanTreatment(a.treatments).join('+') !== rapikanTreatment(jenis).join('+');
+  const penuh = geser ? cekKapasitas(date, time, jenis, a.id) : null;
   a.date = date;
   a.time = time;
-  const jenis = treatEdit.get();
   if (jenis.length) a.treatments = jenis; else delete a.treatments;
   simpanBulan(bulanTersentuh);
   closeEdit();
   renderList();
-  toast(namaBerubah ? 'Nama dan jadwal berhasil diubah.' : 'Jadwal berhasil diubah.');
+  const msg = namaBerubah ? 'Nama dan jadwal berhasil diubah.' : 'Jadwal berhasil diubah.';
+  if (penuh) toast(msg + ' Perhatian: ' + penuh + '.', true, 7000);
+  else toast(msg);
 });
 
 // ============================================================
@@ -2197,6 +2214,37 @@ function slotKosong(rowsHari, pegawai, palingAwal = 0, jam = JAM_BAWAAN) {
     }
   }
   return hasil;
+}
+
+// Jadwal yang mau disimpan masih muat atau tidak, menurut hitungan yang sama
+// dengan pencarian slot: jumlah pegawai hari itu, jam buka/tutup, dan istirahat.
+// Hasilnya kalimat alasan kalau tidak muat, null kalau muat.
+//
+// Cuma peringatan, tidak pernah menolak: customer yang sudah dijanjikan lewat
+// telepon, pegawai tambahan yang belum diisi di setelan, atau treatment yang
+// biasanya selesai lebih cepat — operator yang paling tahu, bukan hitungan ini.
+// `kecualiId` jadwal yang sedang diubah, supaya ia tidak terhitung dua kali.
+function cekKapasitas(date, time, treatments, kecualiId) {
+  const peg = pegawaiUntuk(date);
+  if (peg === 0) return 'hari itu tutup (0 pegawai)';
+  const jam = jamUntuk(date);
+  const m = keMenit(time), s = m + durasiJadwal({ treatments });
+  if (m < keMenit(jam.buka) || s > keMenit(jam.tutup)) {
+    return 'di luar jam kerja ' + jam.buka + '–' + jam.tutup;
+  }
+  const ist = rentangIstirahat(jam);
+  if (ist && m < ist.b && s > ist.a) return 'menabrak jam istirahat ' + labelIst(jam);
+  const lain = appointments
+    .filter((a) => a.date === date && a.id !== kecualiId)
+    .map((a) => ({ m: keMenit(a.time), s: keMenit(a.time) + durasiJadwal(a) }))
+    .filter((x) => x.m < s && x.s > m);
+  // Jumlah yang sibuk cuma bisa naik di awal sebuah jadwal, jadi puncaknya
+  // pasti jatuh di jam mulai yang baru atau di jam mulai salah satu yang lain.
+  const titik = [m, ...lain.map((x) => x.m).filter((t) => t > m)];
+  const puncak = 1 + Math.max(...titik.map((t) => lain.filter((x) => x.m <= t && x.s > t).length));
+  return puncak > peg
+    ? 'slot penuh — ' + puncak + ' jadwal bersamaan, pegawai cuma ' + peg
+    : null;
 }
 
 // Jam mulai yang bisa ditawarkan di dalam satu rentang luang, untuk treatment
