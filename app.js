@@ -351,9 +351,9 @@ const nameOf = (id) => (customers.find((c) => c.id === id) || { name: '?' }).nam
 // ============================================================
 // Jenis treatment
 // ------------------------------------------------------------
-// Disimpan di appointment.treatments sebagai array kode. Boleh kosong: jadwal
-// yang jenisnya belum ditanyakan tetap sah, dan seluruh jadwal lama memang
-// tidak punya field ini sama sekali.
+// Disimpan di appointment.treatments sebagai array kode. Jadwal baru wajib
+// punya setidaknya satu, tapi seluruh jadwal lama memang tidak punya field ini
+// sama sekali — jadi pembacanya tetap harus tahan kosong.
 //
 // Ketiganya berdiri sendiri-sendiri: boleh dicentang satu, dua, atau ketiganya,
 // dan tidak ada yang mensyaratkan yang lain. Rambut cuma istimewa waktu ditulis
@@ -774,7 +774,7 @@ function pasangTreatSeg(segId, hintId, opsi = {}) {
     // langsung tahu bentuk tulisan yang nanti masuk ke salinan WA.
     const tanda = tandaTreatment([...pilih]);
     hint.textContent = !pilih.size
-      ? 'Boleh dikosongkan kalau jenisnya belum ditanyakan.'
+      ? 'Pilih setidaknya satu.'
       : tanda
         ? 'Ditulis: Nama (' + tanda + ')'
         : 'Rambut saja — tidak ditulis apa-apa di belakang nama.';
@@ -834,6 +834,11 @@ $('form').addEventListener('submit', (e) => {
   const cleanName = nameInput.value.trim().replace(/\s+/g, ' ');
   const date = $('date').value, time = $('time').value;
   if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
+  if (!treatForm.get().length) {
+    toast('Pilih jenis treatment dulu, setidaknya satu.', true);
+    $('formTreat').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return;
+  }
   // Hampir selalu sudah terisi sendiri dari sapaannya; yang sampai ke sini
   // cuma nama yang sapaannya tidak dikenali sama sekali.
   if (!genderForm) {
@@ -894,8 +899,6 @@ function simpanJadwal(customer, cleanName, dates, time, status) {
     return;
   }
 
-  // Field-nya cuma ditulis kalau memang ada isinya, jadi jadwal tanpa jenis
-  // treatment tetap sebentuk dengan seluruh jadwal lama.
   const jenis = treatForm.get();
   // Dicek sebelum ada yang ditulis, supaya jadwal mingguan yang baru disimpan
   // tidak saling menghitung satu sama lain — tiap tanggalnya beda hari.
@@ -907,7 +910,7 @@ function simpanJadwal(customer, cleanName, dates, time, status) {
     : penuhTgl.map((x) => hariPendek(x.date) + ' ' + x.alasan).join('; ');
   const newIds = baru.map((date) => {
     const appt = { id: buatId(), customerId: customer.id, date, time };
-    if (jenis.length) appt.treatments = [...jenis];
+    appt.treatments = [...jenis];
     appointments.push(appt);
     return appt.id;
   });
@@ -1320,6 +1323,7 @@ function openEdit(apptId) {
   $('editTime').value = a.time;
   // Jadwal lama belum punya field ini — di sheet ia tampil kosong, bukan
   // ikut bawaan Rambut, supaya yang belum pernah diisi tidak diam-diam terisi.
+  // Operator yang menyimpannya akan diminta memilih sendiri.
   treatEdit.set(a.treatments);
   $('editSheet').hidden = false;
 }
@@ -1359,6 +1363,7 @@ $('editSave').addEventListener('click', () => {
   const date = $('editDate').value, time = $('editTime').value;
   const cleanName = $('editName').value.trim().replace(/\s+/g, ' ');
   if (!cleanName || !date || !time) { toast('Nama, tanggal, dan jam wajib diisi.', true); return; }
+  if (!treatEdit.get().length) { toast('Pilih jenis treatment dulu, setidaknya satu.', true); return; }
 
   const c = customers.find((x) => x.id === a.customerId);
 
@@ -1403,7 +1408,7 @@ $('editSave').addEventListener('click', () => {
   const penuh = geser ? cekKapasitas(date, time, jenis, a.id) : null;
   a.date = date;
   a.time = time;
-  if (jenis.length) a.treatments = jenis; else delete a.treatments;
+  a.treatments = jenis;
   simpanBulan(bulanTersentuh);
   closeEdit();
   renderList();
