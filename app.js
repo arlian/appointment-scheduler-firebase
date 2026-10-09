@@ -633,10 +633,24 @@ const LABEL_G = { P: 'Perempuan', L: 'Laki-laki', '?': 'Belum diketahui' };
 const IKON_G = { P: 'perempuan', L: 'lakilaki', '?': 'tanya' };
 const URUT_G = ['P', 'L', '?'];
 
-function toast(msg, isErr, lama = 3000) {
+// `aksi` opsional: { label, fn } memasang satu tombol di ujung toast, mis.
+// "Urungkan". Toast yang lain menimpanya, jadi tombolnya ikut hilang.
+function toast(msg, isErr, lama = 3000, aksi = null) {
   const t = $('toast');
   t.textContent = msg;
-  t.className = 'toast show' + (isErr ? ' err' : '');
+  if (aksi) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-aksi';
+    b.textContent = aksi.label;
+    b.addEventListener('click', () => {
+      clearTimeout(t._h);
+      t.className = 'toast';
+      aksi.fn();
+    });
+    t.append(' ', b);
+  }
+  t.className = 'toast show' + (isErr ? ' err' : '') + (aksi ? ' ada-aksi' : '');
   clearTimeout(t._h);
   t._h = setTimeout(() => t.className = 'toast', lama);
 }
@@ -2028,13 +2042,45 @@ function setRingkasTreat(rows) {
   });
 }
 
+// Tidak ada dialog konfirmasi: jadwal langsung terhapus dan toast-nya memberi
+// beberapa detik untuk mengurungkan. Foto lama baru dibersihkan setelah jeda
+// itu lewat — dokumen foto yang sudah terhapus tidak bisa ikut dikembalikan.
+const JEDA_URUNGKAN = 6000;
+let hapusTertunda = null; // { r, timer } jadwal terakhir yang masih bisa diurungkan
+
+function tuntaskanHapus() {
+  if (!hapusTertunda) return;
+  clearTimeout(hapusTertunda.timer);
+  hapusFotoJadwal(hapusTertunda.r);
+  hapusTertunda = null;
+}
+
 function confirmDelete(r) {
   if (!bolehUbah()) return;
-  if (!confirm('Hapus jadwal ' + nameOf(r.customerId) + ' pada ' + hariBulan(r.date) + ' ' + r.time + '?')) return;
-  hapusFotoJadwal(r);
+  // Menghapus lagi menutup kesempatan mengurungkan yang sebelumnya — toast-nya
+  // juga sudah tertimpa.
+  tuntaskanHapus();
   appointments = appointments.filter((a) => a.id !== r.id);
   simpanBulan(new Set([kunciDari(r.date)]));
-  toast('Jadwal dihapus.');
+  hapusTertunda = { r, timer: setTimeout(tuntaskanHapus, JEDA_URUNGKAN) };
+  toast('Jadwal ' + nameOf(r.customerId) + ' ' + hariBulan(r.date) + ' ' + r.time + ' dihapus.',
+    false, JEDA_URUNGKAN, { label: 'Urungkan', fn: () => urungkanHapus(r) });
+  renderList();
+}
+
+function urungkanHapus(r) {
+  if (!hapusTertunda || hapusTertunda.r !== r) {
+    toast('Sudah tidak bisa diurungkan.', true);
+    return;
+  }
+  if (!bolehUbah()) return; // jedanya masih jalan; foto tetap dibersihkan nanti
+  clearTimeout(hapusTertunda.timer);
+  hapusTertunda = null;
+  // Bisa saja perangkat lain sudah menulis ulang bulan itu; yang dikembalikan
+  // cuma baris ini, dan tidak digandakan kalau ternyata masih ada.
+  if (!appointments.some((a) => a.id === r.id)) appointments.push(r);
+  simpanBulan(new Set([kunciDari(r.date)]));
+  toast('Jadwal dikembalikan.');
   renderList();
 }
 
@@ -4345,6 +4391,7 @@ function renderCabangBar() {
 
 function pilihCabang(id) {
   if (id === cabangId) return;
+  tuntaskanHapus(); // jadwal yang baru dihapus milik cabang lama — tidak bisa diurungkan dari cabang lain
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
@@ -4402,6 +4449,7 @@ if (!configTerisi) {
       $('loginScreen').hidden = true;
       mulaiSync();
     } else {
+      tuntaskanHapus();
       uid = null;
       if (stopCabangList) { stopCabangList(); stopCabangList = null; }
       if (stopProfil) { stopProfil(); stopProfil = null; }
