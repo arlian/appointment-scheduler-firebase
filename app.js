@@ -1238,6 +1238,19 @@ function pilihTanggal(iso) {
 const geserHari = (n) => pilihTanggal(isoGeser(hariTampil(), n));
 $('hariPrev').addEventListener('click', () => geserHari(-1));
 $('hariNext').addEventListener('click', () => geserHari(1));
+
+// Pintasan keyboard di desktop. Hanya jalan kalau tidak sedang mengetik dan
+// tidak ada kotak yang terbuka — panah di kolom isian tetap milik kolomnya.
+const sedangMengetik = (el) => !!el && (el.isContentEditable
+  || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+const adaSheetTerbuka = () => !!document.querySelector('.sheet-backdrop:not([hidden])');
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  if (sedangMengetik(document.activeElement) || adaSheetTerbuka()) return;
+  if (!hariTampil()) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); geserHari(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); geserHari(1); }
+});
 perbaruiGeserHari(); // filter awal "Hari Ini" — palangnya langsung terisi
 
 document.querySelectorAll('.chip[data-f]').forEach((c) =>
