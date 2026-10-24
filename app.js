@@ -1221,8 +1221,8 @@ function perbaruiGeserHari() {
   const kemarin = isoGeser(hari, -1), besok = isoGeser(hari, 1);
   $('hariPrevLabel').textContent = hariPendek(kemarin);
   $('hariNextLabel').textContent = hariPendek(besok);
-  $('hariPrev').title = 'Lihat jadwal ' + hariBulan(kemarin);
-  $('hariNext').title = 'Lihat jadwal ' + hariBulan(besok);
+  $('hariPrev').title = 'Lihat jadwal ' + hariBulan(kemarin) + ' (←)';
+  $('hariNext').title = 'Lihat jadwal ' + hariBulan(besok) + ' (→)';
 }
 
 // Satu-satunya jalan untuk menampilkan satu tanggal tertentu. Tanggal hari ini
