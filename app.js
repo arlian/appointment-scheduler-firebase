@@ -1247,6 +1247,11 @@ const adaSheetTerbuka = () => !!document.querySelector('.sheet-backdrop:not([hid
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   if (sedangMengetik(document.activeElement) || adaSheetTerbuka()) return;
+  // T = kembali ke hari ini, dari filter apa pun selain riwayat customer.
+  if (e.key === 't' || e.key === 'T') {
+    if (filterMode !== 'today' && filterMode !== 'cust') setFilter('today');
+    return;
+  }
   if (!hariTampil()) return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); geserHari(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); geserHari(1); }
