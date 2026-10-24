@@ -644,15 +644,20 @@ function toast(msg, isErr, lama = 3000, aksi = null) {
     b.className = 'toast-aksi';
     b.textContent = aksi.label;
     b.addEventListener('click', () => {
-      clearTimeout(t._h);
-      t.className = 'toast';
+      tutupToast();
       aksi.fn();
     });
     t.append(' ', b);
   }
   t.className = 'toast show' + (isErr ? ' err' : '') + (aksi ? ' ada-aksi' : '');
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.className = 'toast', lama);
+  t._h = setTimeout(tutupToast, lama);
+}
+
+function tutupToast() {
+  const t = $('toast');
+  clearTimeout(t._h);
+  t.className = 'toast';
 }
 
 // ============================================================
