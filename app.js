@@ -1391,6 +1391,8 @@ document.addEventListener('keydown', (e) => {
   // Paling belakang: mode pilih bukan lapisan di atas layar, jadi ia baru
   // dimatikan kalau memang tidak ada kotak apa pun yang sedang terbuka.
   else if (modePilih) setModePilih(false);
+  // Tidak ada lagi yang bisa ditutup: Esc menyingkirkan toast yang masih tampil.
+  else if ($('toast').classList.contains('show')) tutupToast();
 });
 
 $('editSave').addEventListener('click', () => {
