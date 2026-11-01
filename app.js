@@ -26,7 +26,7 @@ import {
 import {
   initializeFirestore, memoryLocalCache, doc, collection, getDoc,
   getDocFromServer, getDocsFromServer,
-  setDoc, deleteDoc, onSnapshot, runTransaction,
+  setDoc, deleteDoc, onSnapshot, runTransaction, query, orderBy, limit,
 } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const KEY_CUSTOMERS = 'customers';       // [{id, name, gender?, genderManual?, sudahLama?, phone?, sapaan?, diingatkan?}]
@@ -53,6 +53,11 @@ const KEY_PEGAWAI = 'pegawai';           // [{hari, n}] — hari 0..6, Minggu = 
 // ('') berarti hari itu tanpa istirahat; baris lama yang belum punya field ini
 // jatuh ke istirahat bawaan.
 const KEY_JAM = 'jam';                   // [{hari, buka, tutup, istMulai, istAkhir}] — 'HH:MM'
+// Penimpa master item untuk cabang ini. Master-nya sendiri ({id, nama, harga})
+// berdiri di tingkat akun, users/{uid}/data/items, karena itemnya sama di
+// semua cabang — yang beda cuma harganya, atau item yang memang tidak dijual
+// di cabang tertentu. Baris tanpa harga berarti ikut harga dasar.
+const KEY_ITEM = 'items';                // [{id, harga?, sembunyi?}] — id = id master item
 
 const configTerisi =
   window.FIREBASE_CONFIG && !String(window.FIREBASE_CONFIG.apiKey).startsWith('ISI_');
@@ -80,6 +85,17 @@ let namaKlinik = '';
 let cabangList = []; // [{id, name}]
 let cabangId = null; // cabang yang sedang dibuka di perangkat ini
 
+// Master item tingkat akun dan penimpanya di cabang ini (lihat KEY_ITEM).
+// Master-nya satu dokumen yang ditulis utuh, jadi punya penanda siap sendiri
+// seperti daftar cabang: baru true setelah jawaban server yang pertama datang.
+let itemGlobal = [];  // [{id, nama, harga}]
+let itemSiap = false;
+let itemCabang = [];  // [{id, harga?, sembunyi?}]
+// Receipt terakhir cabang ini, terbaru di depan. Satu dokumen per receipt di
+// users/{uid}/cabang/{id}/receipts/{id} — bukan satu array besar — jadi
+// menyimpan satu receipt tidak pernah bisa menimpa receipt lain.
+let receipts = [];
+
 // Status sambungan, dibaca dari metadata snapshot Firestore. Selama snapshot
 // masih fromCache, isi layar belum tentu sama dengan isi server.
 let tersambung = false;
@@ -96,7 +112,7 @@ let tersambung = false;
 // kosong karena memang dikosongkan operator dengan kosong karena belum dimuat.
 // Ketiganya tetap punya penanda kesiapan sendiri, walau jadwal sekarang datang
 // dari koleksi bulanan dan bukan lagi dari satu dokumen seperti dua yang lain.
-const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI, KEY_JAM];
+const KEYS_DATA = [KEY_CUSTOMERS, KEY_APPOINTMENTS, KEY_STAFF, KEY_PEGAWAI, KEY_JAM, KEY_ITEM];
 let dataSiap = {};
 // Rangka "sedang memuat" tidak boleh berkedip selamanya waktu yang sebenarnya
 // terjadi adalah pembacaan yang gagal — itu menyuruh operator menunggu sesuatu
@@ -177,6 +193,9 @@ function bolehUbahCabang() {
 const refData = (id, key) => doc(db, 'users', uid, 'cabang', id, 'data', key);
 const refJadwalKol = (id) => collection(db, 'users', uid, 'cabang', id, 'appointments');
 const refJadwal = (id, kunci) => doc(db, 'users', uid, 'cabang', id, 'appointments', kunci);
+const refItemGlobal = () => doc(db, 'users', uid, 'data', 'items');
+const refReceiptKol = (id) => collection(db, 'users', uid, 'cabang', id, 'receipts');
+const refReceipt = (id, rcId) => doc(db, 'users', uid, 'cabang', id, 'receipts', rcId);
 
 // Cuma dipakai customers & staff sekarang; jadwal lewat simpanJadwal().
 function save(key, data) {
@@ -4180,6 +4199,8 @@ function ambilLokalLama(key) { // data versi lama (localStorage), untuk migrasi
 
 let stopCabangList = null;
 let stopProfil = null;
+let stopItem = null;
+let stopLogo = null;
 let stopData = [];
 // Sekali cukup: dengan includeMetadataChanges, keadaan buntu ini akan menyala
 // lagi tiap kali metadata snapshot-nya berubah, dan toast-nya jadi beruntun.
@@ -4204,6 +4225,29 @@ function mulaiSync() {
       namaKlinik = typeof n === 'string' ? n.trim() : '';
     },
     () => { namaKlinik = ''; }
+  );
+  // Master item juga di tingkat akun. Beda dengan profil, dokumen ini ditulis
+  // dari aplikasi — utuh sekali kirim — jadi gerbang tulisnya baru dibuka oleh
+  // jawaban server, bukan oleh snapshot cache yang bisa saja kosong.
+  itemSiap = false;
+  // Logo receipt: gagal dibaca cukup jatuh ke ikon bawaan, sama seperti profil
+  stopLogo = onSnapshot(
+    refLogo(),
+    (snap) => terapkanLogo(snap.exists() ? snap.data().dataUrl : ''),
+    () => terapkanLogo('')
+  );
+  stopItem = onSnapshot(
+    refItemGlobal(),
+    { includeMetadataChanges: true },
+    (snap) => {
+      if (!snap.metadata.fromCache) itemSiap = true;
+      itemGlobal = snap.exists() ? (snap.data().rows || []) : [];
+      segarkanReceipt();
+    },
+    (e) => {
+      itemSiap = false;
+      toast('Gagal memuat master item: ' + e.message, true);
+    }
   );
   stopCabangList = onSnapshot(
     doc(db, 'users', uid, 'data', 'branches'),
@@ -4316,12 +4360,30 @@ function mulaiSyncData() {
       renderList();
     }
   );
+  // Receipt cuma dibaca yang terbaru: riwayatnya tumbuh terus, dan membaca
+  // seluruhnya tiap kali cabang dibuka berarti ongkos baca yang ikut tumbuh.
+  // Penanda siapnya tidak perlu — tiap receipt dokumennya sendiri, jadi daftar
+  // yang belum termuat tidak bisa ikut tertulis menimpa apa pun.
+  const pasangReceipt = () => onSnapshot(
+    query(refReceiptKol(cabangDipasang), orderBy('dibuat', 'desc'), limit(RC_MAKS_RIWAYAT)),
+    (snap) => {
+      if (cabangId !== cabangDipasang) return;
+      receipts = snap.docs.map((d) => d.data());
+      renderRiwayatRc();
+    },
+    (e) => {
+      if (cabangId !== cabangDipasang) return;
+      toast('Gagal memuat receipt: ' + e.message, true);
+    }
+  );
   stopData = [
     pasang(KEY_CUSTOMERS, (rows) => { customers = rows; lengkapiGender(); }),
     pasang(KEY_STAFF, (rows) => { staff = rows; }),
     pasang(KEY_PEGAWAI, terapkanPegawai),
     pasang(KEY_JAM, terapkanJam),
+    pasang(KEY_ITEM, (rows) => { itemCabang = rows; segarkanReceipt(); }),
     pasangJadwal(),
+    pasangReceipt(),
   ];
 }
 
@@ -4420,6 +4482,10 @@ function pilihCabang(id) {
   cabangId = id;
   localStorage.setItem('jt_cabang', id);
   customers = []; appointments = []; staff = [];
+  // Receipt yang sedang disusun memakai harga dan id cabang lama — disimpan di
+  // cabang baru, isinya salah dua-duanya. Formnya mulai dari kosong lagi.
+  itemCabang = []; receipts = [];
+  resetRc();
   // Jumlah pegawai dan jam kerja milik cabang sebelumnya — termasuk tulisan yang
   // masih tertunda — tidak boleh ikut menyeberang. Keduanya kembali ke bawaan
   // sampai setelan cabang yang baru datang dari server.
@@ -4478,7 +4544,12 @@ if (!configTerisi) {
       uid = null;
       if (stopCabangList) { stopCabangList(); stopCabangList = null; }
       if (stopProfil) { stopProfil(); stopProfil = null; }
+      if (stopItem) { stopItem(); stopItem = null; }
+      if (stopLogo) { stopLogo(); stopLogo = null; }
+      terapkanLogo('');
       namaKlinik = '';
+      itemGlobal = []; itemSiap = false; itemCabang = []; receipts = [];
+      resetRc();
       stopData.forEach((lepas) => lepas());
       stopData = [];
       setSambung(false); // palang ikut disembunyikan karena uid sudah kosong
@@ -4522,8 +4593,10 @@ function pilihTab(nama) {
   });
   $('panelJadwal').hidden = nama !== 'jadwal';
   $('panelAnalitik').hidden = nama !== 'analitik';
+  $('panelReceipt').hidden = nama !== 'receipt';
   tipSembunyi();
   if (nama === 'analitik') renderAnalitik();
+  if (nama === 'receipt') renderReceiptPanel();
 }
 document.querySelectorAll('.tab').forEach((t) =>
   t.addEventListener('click', () => pilihTab(t.dataset.tab)));
@@ -6198,6 +6271,1337 @@ $('salinJadwalViz').addEventListener('click', () => {
         + ' hari sesudahnya tidak ikut. Pakai "Salin WA" untuk semuanya.'
       : 'Gambar jadwal tersalin — tinggal paste di WhatsApp.');
 });
+
+// ============================================================
+// Receipt
+// ------------------------------------------------------------
+// Disusun di tab Receipt: satu atau beberapa customer, tiap customer dengan
+// item-nya sendiri, diskon per baris item dan satu diskon tambahan di total.
+// Hasilnya disalin sebagai gambar untuk WhatsApp — digambar di canvas dengan
+// perkakas yang sama dengan salinan analitik — dan disimpan sebagai data,
+// bukan gambar: gambarnya bisa dilukis ulang kapan saja dari datanya.
+//
+// Nama dan harga item ikut disalin ke dalam receipt waktu dipilih, bukan
+// dirujuk lewat id saja. Harga master yang naik bulan depan tidak boleh
+// diam-diam mengubah receipt yang sudah dikirim ke customer.
+// ============================================================
+const RC_MAKS_RIWAYAT = 50;
+const RC_MAKS_QTY = 99;
+
+const rupiah = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
+// Kotak harga menerima "150.000", "150000", atau "Rp 150.000" — yang dibaca
+// cuma angkanya. Kosong berarti null, bukan nol: di harga cabang, kosong
+// artinya ikut harga dasar.
+const bacaRupiah = (s) => {
+  const d = String(s ?? '').replace(/\D/g, '');
+  return d ? Number(d) : null;
+};
+const hargaSah = (n) => Number.isFinite(n) && n >= 0;
+const angkaRupiah = (n) => (hargaSah(n) ? n.toLocaleString('id-ID') : '');
+
+// Snapshot yang mendarat selagi operator mengetik di dalam daftar tidak boleh
+// membangun ulang daftarnya — kotak yang sedang diketik ikut hilang. Gambar
+// ulangnya ditunda sampai fokus keluar dari daftar itu.
+function renderKecualiFokus(el, fn) {
+  if (el.contains(document.activeElement)) el._tunda = fn;
+  else { el._tunda = null; fn(); }
+}
+['itemDaftar', 'rcCustomers'].forEach((id) => $(id).addEventListener('focusout', () => {
+  setTimeout(() => {
+    const el = $(id);
+    if (el._tunda && !el.contains(document.activeElement)) {
+      const fn = el._tunda;
+      el._tunda = null;
+      fn();
+    }
+  }, 0);
+}));
+
+// ---- Master item -------------------------------------------
+// Item yang berlaku di cabang ini: master + penimpanya.
+function itemBerlaku() {
+  return itemGlobal
+    .map((g) => {
+      const o = itemCabang.find((x) => x.id === g.id) || {};
+      const timpa = hargaSah(o.harga);
+      const diskonDasar = diskonSah(g.diskon);
+      const diskonCabang = diskonSah(o.diskon);
+      return {
+        id: g.id, nama: g.nama, hargaDasar: g.harga,
+        harga: timpa ? o.harga : g.harga, timpa, sembunyi: !!o.sembunyi,
+        // Penimpa cabang menang walau nilainya 0 — itu cara cabang berkata
+        // "di sini tidak ada diskon" untuk item yang di master didiskon.
+        diskonDasar, diskonCabang, diskon: diskonCabang || diskonDasar,
+      };
+    })
+    .sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+}
+
+function bolehUbahItem() {
+  if (!tersambung) {
+    toast('Belum tersambung ke server — perubahan tidak bisa disimpan dulu.', true);
+    return false;
+  }
+  if (!itemSiap) {
+    toast('Master item masih dimuat — tunggu sebentar sebelum menyimpan.', true);
+    return false;
+  }
+  return true;
+}
+
+function simpanItemGlobal() {
+  setDoc(refItemGlobal(), { rows: itemGlobal })
+    .catch((e) => toast('Gagal menyimpan master item: ' + e.message, true));
+}
+
+// Baris penimpa yang tidak lagi menimpa apa pun dibuang, supaya dokumennya
+// tidak menumpuk baris {id} kosong untuk tiap item yang pernah disentuh.
+function ubahItemCabang(id, ubah) {
+  if (!bolehUbah()) return false;
+  const baru = { ...(itemCabang.find((x) => x.id === id) || { id }), ...ubah };
+  if (!hargaSah(baru.harga)) delete baru.harga;
+  if (!baru.sembunyi) delete baru.sembunyi;
+  if (!diskonSah(baru.diskon)) delete baru.diskon;
+  itemCabang = itemCabang.filter((x) => x.id !== id);
+  if (Object.keys(baru).length > 1) itemCabang.push(baru);
+  save(KEY_ITEM, itemCabang);
+  return true;
+}
+
+function kolomHarga(label, nilai, placeholder, onUbah) {
+  const w = document.createElement('label');
+  w.className = 'item-kolom';
+  const s = document.createElement('span');
+  s.textContent = label;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = 'numeric';
+  inp.autocomplete = 'off';
+  inp.value = angkaRupiah(nilai);
+  inp.placeholder = placeholder;
+  inp.addEventListener('change', () => onUbah(bacaRupiah(inp.value), inp));
+  w.append(s, inp);
+  return w;
+}
+
+// Diskon di master/cabang: { tipe, nilai } atau null. Beda dengan kotak diskon
+// di receipt, kosong di sini punya arti sendiri — "tidak diatur", jadi di
+// cabang berarti ikut diskon dasar — sedangkan 0 berarti tanpa diskon.
+// Disimpan waktu kotaknya ditinggalkan, bukan tiap ketukan: tiap simpan
+// menulis ulang seluruh dokumennya.
+const diskonSah = (d) => (d && (d.tipe === 'persen' || d.tipe === 'nominal')
+  && Number.isFinite(d.nilai) && d.nilai >= 0 ? { tipe: d.tipe, nilai: d.nilai } : null);
+
+function kolomDiskon(label, d, placeholder, harga, onUbah) {
+  const w = document.createElement('div');
+  w.className = 'item-kolom';
+  const s = document.createElement('span');
+  s.textContent = label;
+  let tipe = d ? d.tipe : 'persen';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = 'decimal';
+  inp.autocomplete = 'off';
+  inp.placeholder = placeholder;
+  inp.setAttribute('aria-label', label);
+  inp.value = d ? (tipe === 'persen' ? angkaPersen(d.nilai) : angkaRupiah(d.nilai)) : '';
+  const baca = () => (inp.value.trim() ? { tipe, nilai: bacaDiskon(inp.value, tipe) } : null);
+  inp.addEventListener('change', () => onUbah(baca(), inp));
+  const seg = document.createElement('span');
+  seg.className = 'gen-seg diskon-seg';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Satuan ' + label.toLowerCase());
+  const tombol = [['persen', '%'], ['nominal', 'Rp']].map(([t, teks]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gen-seg-btn';
+    b.textContent = teks;
+    b.title = t === 'persen' ? 'Persen dari harga' : 'Rupiah per item';
+    b.addEventListener('click', () => {
+      if (tipe === t) return;
+      const lama = baca();
+      tipe = t;
+      perbaruiSeg();
+      if (!lama) return; // belum ada angkanya: cuma satuannya yang dipilih
+      // Angkanya dikonversi terhadap harga, sama seperti kotak diskon di receipt
+      const h = harga();
+      const nilai = t === 'nominal'
+        ? potongan(h, lama)
+        : (h > 0 ? Math.min(100, Math.round(lama.nilai / h * 10000) / 100) : 0);
+      inp.value = t === 'persen' ? angkaPersen(nilai) : angkaRupiah(nilai);
+      onUbah({ tipe: t, nilai }, inp);
+    });
+    seg.appendChild(b);
+    return [t, b];
+  });
+  const perbaruiSeg = () => tombol.forEach(([t, b]) => {
+    b.classList.toggle('aktif', tipe === t);
+    b.setAttribute('aria-pressed', tipe === t ? 'true' : 'false');
+  });
+  perbaruiSeg();
+  const baris = document.createElement('span');
+  baris.className = 'diskon';
+  baris.append(inp, seg);
+  w.append(s, baris);
+  return w;
+}
+
+function renderItemMaster() {
+  const box = $('itemDaftar');
+  box.innerHTML = '';
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  const namaCab = cabang ? cabang.name : 'cabang ini';
+  const daftar = itemBerlaku();
+  if (!daftar.length) {
+    box.innerHTML = '<p class="empty">Belum ada item. Tambahkan lewat kotak di bawah.</p>';
+    return;
+  }
+  daftar.forEach((it) => {
+    const row = document.createElement('div');
+    row.className = 'item-row' + (it.sembunyi ? ' sembunyi' : '');
+
+    const atas = document.createElement('div');
+    atas.className = 'item-atas';
+    const nama = document.createElement('input');
+    nama.className = 'item-nama';
+    nama.value = it.nama;
+    nama.maxLength = 60;
+    nama.autocomplete = 'off';
+    nama.setAttribute('aria-label', 'Nama item');
+    nama.addEventListener('change', () => {
+      const v = nama.value.trim().replace(/\s+/g, ' ');
+      if (!v) { nama.value = it.nama; toast('Nama item tidak boleh kosong.', true); return; }
+      if (!bolehUbahItem()) { nama.value = it.nama; return; }
+      itemGlobal = itemGlobal.map((g) => (g.id === it.id ? { ...g, nama: v } : g));
+      simpanItemGlobal();
+    });
+    const hapus = document.createElement('button');
+    hapus.type = 'button';
+    hapus.className = 'item-hapus';
+    hapus.title = 'Hapus item dari semua cabang';
+    hapus.setAttribute('aria-label', 'Hapus ' + it.nama);
+    hapus.innerHTML = ikon('hapus');
+    hapus.addEventListener('click', () => hapusItem(it.id));
+    atas.append(nama, hapus);
+
+    const bawah = document.createElement('div');
+    bawah.className = 'item-bawah';
+    bawah.append(
+      kolomHarga('Harga dasar', it.hargaDasar, '0', (n, inp) => {
+        if (n == null) { inp.value = angkaRupiah(it.hargaDasar); toast('Harga dasar wajib diisi.', true); return; }
+        if (!bolehUbahItem()) { inp.value = angkaRupiah(it.hargaDasar); return; }
+        itemGlobal = itemGlobal.map((g) => (g.id === it.id ? { ...g, harga: n } : g));
+        simpanItemGlobal();
+        inp.value = angkaRupiah(n);
+      }),
+      kolomHarga('Harga ' + namaCab, it.timpa ? it.harga : null, 'ikut dasar', (n, inp) => {
+        if (!ubahItemCabang(it.id, { harga: n })) { inp.value = it.timpa ? angkaRupiah(it.harga) : ''; return; }
+        inp.value = angkaRupiah(n);
+      })
+    );
+    const jual = document.createElement('label');
+    jual.className = 'item-jual';
+    const cek = document.createElement('input');
+    cek.type = 'checkbox';
+    cek.checked = !it.sembunyi;
+    cek.addEventListener('change', () => {
+      if (!ubahItemCabang(it.id, { sembunyi: !cek.checked })) { cek.checked = !it.sembunyi; return; }
+      row.classList.toggle('sembunyi', !cek.checked);
+    });
+    jual.append(cek, 'Dijual');
+    bawah.append(jual);
+
+    // Kotak yang gagal tersimpan dikembalikan ke isi lamanya
+    const isiDiskon = (d) => (d ? (d.tipe === 'persen' ? angkaPersen(d.nilai) : angkaRupiah(d.nilai)) : '');
+    const diskon = document.createElement('div');
+    diskon.className = 'item-bawah item-diskon';
+    diskon.append(
+      kolomDiskon('Diskon dasar', it.diskonDasar, 'tanpa', () => it.hargaDasar, (d, inp) => {
+        if (!bolehUbahItem()) { inp.value = isiDiskon(it.diskonDasar); return; }
+        itemGlobal = itemGlobal.map((g) => {
+          if (g.id !== it.id) return g;
+          const baru = { ...g };
+          // 0 dan kosong sama-sama berarti tanpa diskon di tingkat dasar
+          if (d && d.nilai > 0) baru.diskon = d; else delete baru.diskon;
+          return baru;
+        });
+        simpanItemGlobal();
+      }),
+      kolomDiskon('Diskon ' + namaCab, it.diskonCabang, 'ikut dasar', () => it.harga, (d, inp) => {
+        if (!ubahItemCabang(it.id, { diskon: d })) inp.value = isiDiskon(it.diskonCabang);
+      })
+    );
+
+    row.append(atas, bawah, diskon);
+    box.appendChild(row);
+  });
+}
+
+function tambahItem() {
+  const nama = $('itemNamaBaru').value.trim().replace(/\s+/g, ' ');
+  const harga = bacaRupiah($('itemHargaBaru').value);
+  if (!nama) { toast('Nama item wajib diisi.', true); $('itemNamaBaru').focus(); return; }
+  if (harga == null) { toast('Harga item wajib diisi.', true); $('itemHargaBaru').focus(); return; }
+  if (itemGlobal.some((g) => g.nama.toLowerCase() === nama.toLowerCase())) {
+    toast('Item "' + nama + '" sudah ada.', true);
+    return;
+  }
+  if (!bolehUbahItem()) return;
+  itemGlobal = [...itemGlobal, { id: buatId(), nama, harga }];
+  simpanItemGlobal();
+  $('itemNamaBaru').value = '';
+  $('itemHargaBaru').value = '';
+  renderItemMaster();
+  renderKecualiFokus($('rcCustomers'), renderRcCustomers);
+  $('itemNamaBaru').focus();
+  toast('Item "' + nama + '" ditambahkan.');
+}
+$('itemTambah').addEventListener('click', tambahItem);
+['itemNamaBaru', 'itemHargaBaru'].forEach((id) => $(id).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); tambahItem(); }
+}));
+// Harga baru langsung dirapikan jadi bertitik begitu kotaknya ditinggalkan
+$('itemHargaBaru').addEventListener('blur', () => {
+  $('itemHargaBaru').value = angkaRupiah(bacaRupiah($('itemHargaBaru').value));
+});
+
+// Menghapus item master menyentuh semua cabang, jadi diberi jalan pulang
+// lewat toast — sama seperti hapus jadwal. Receipt lama tidak terpengaruh:
+// nama dan harganya sudah tersalin di dalam receipt itu sendiri.
+function hapusItem(id) {
+  if (!bolehUbahItem()) return;
+  const idx = itemGlobal.findIndex((g) => g.id === id);
+  if (idx < 0) return;
+  const it = itemGlobal[idx];
+  itemGlobal = itemGlobal.filter((g) => g.id !== id);
+  simpanItemGlobal();
+  renderItemMaster();
+  renderKecualiFokus($('rcCustomers'), renderRcCustomers);
+  toast('"' + it.nama + '" dihapus dari semua cabang.', false, JEDA_URUNGKAN, {
+    label: 'Urungkan',
+    fn: () => {
+      if (itemGlobal.some((g) => g.id === id) || !bolehUbahItem()) return;
+      const baru = itemGlobal.slice();
+      baru.splice(Math.min(idx, baru.length), 0, it);
+      itemGlobal = baru;
+      simpanItemGlobal();
+      renderItemMaster();
+      renderKecualiFokus($('rcCustomers'), renderRcCustomers);
+    },
+  });
+}
+
+// ---- Hitungan ----------------------------------------------
+// Diskon { tipe: 'persen' | 'nominal', nilai }. Potongannya tidak pernah
+// melebihi dasarnya — diskon Rp 50.000 untuk item Rp 30.000 berarti gratis,
+// bukan minus.
+const diskonKosong = () => ({ tipe: 'nominal', nilai: 0 });
+function potongan(dasar, d) {
+  if (!d || !(d.nilai > 0) || dasar <= 0) return 0;
+  const p = d.tipe === 'persen'
+    ? Math.round(dasar * Math.min(d.nilai, 100) / 100)
+    : Math.round(d.nilai);
+  return Math.min(p, dasar);
+}
+const kotorBaris = (it) => it.harga * it.qty;
+// Diskon item yang nominal berlaku per unit: "Rp 20.000" di master berarti
+// tiap item dipotong segitu, jadi dua item dipotong Rp 40.000. Nilainya boleh
+// pecahan (harga akhir yang diketik dibagi jumlahnya) — pembulatannya di
+// tingkat baris, jadi harga akhir yang diketik keluar persis.
+const potonganBaris = (it) => (it.diskon && it.diskon.tipe === 'nominal'
+  ? Math.min(Math.max(Math.round(it.diskon.nilai * it.qty), 0), kotorBaris(it))
+  : potongan(kotorBaris(it), it.diskon));
+const bersihBaris = (it) => kotorBaris(it) - potonganBaris(it);
+const subtotalCust = (c) => c.items.reduce((s, it) => s + bersihBaris(it), 0);
+// Rincian seperti di struk: harga normal (kotor), total diskon item, diskon
+// tambahan dari total, lalu yang dibayar. `hemat` = semua potongan.
+function hitungRc(r) {
+  let kotor = 0, potItem = 0;
+  r.customers.forEach((c) => c.items.forEach((it) => {
+    kotor += kotorBaris(it);
+    potItem += potonganBaris(it);
+  }));
+  const subtotal = kotor - potItem;
+  const pot = potongan(subtotal, r.diskon);
+  return { kotor, potItem, subtotal, potongan: pot, total: subtotal - pot, hemat: potItem + pot };
+}
+const angkaPersen = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
+const labelDiskon = (d) => (d.tipe === 'persen' ? 'Diskon ' + angkaPersen(d.nilai) + '%' : 'Diskon');
+// Di daftar pilihan item, yang nominal ikut disebut angkanya: potongannya per
+// unit, jadi "diskon Rp 20.000/item" menerangkan kenapa dua item terpotong
+// Rp 40.000.
+const labelDiskonItem = (d) => (d.tipe === 'persen' ? labelDiskon(d) : 'Diskon ' + rupiah(d.nilai) + '/item');
+
+const bacaDiskon = (s, tipe) => {
+  if (tipe !== 'persen') return bacaRupiah(s) || 0;
+  const n = parseFloat(String(s).replace(',', '.').replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), 100) : 0;
+};
+const keNominal = (d, dasar) => ({ tipe: 'nominal', nilai: potongan(dasar, d) });
+
+// Kotak angka berawalan/berakhiran satuan ("Rp 270.000", "10 %"), dipakai
+// diskon tambahan dan dua kotak diskon di baris item.
+function kotakSatuan({ awalan, akhiran, aria, mode, id, kelas }) {
+  const w = document.createElement('span');
+  w.className = 'rc-kotak' + (kelas ? ' ' + kelas : '');
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.inputMode = mode;
+  inp.autocomplete = 'off';
+  inp.placeholder = '0';
+  if (id) inp.id = id;
+  inp.setAttribute('aria-label', aria);
+  const satuan = (teks) => {
+    const s = document.createElement('span');
+    s.className = 'rc-kotak-satuan';
+    s.textContent = teks;
+    return s;
+  };
+  if (awalan) w.append(satuan(awalan));
+  w.append(inp);
+  if (akhiran) w.append(satuan(akhiran));
+  return [w, inp];
+}
+
+// ---- Receipt yang sedang disusun ---------------------------
+const custKosong = () => ({ customerId: null, nama: '', items: [] });
+// Jam receipt dicatat waktu formnya dimulai, bukan waktu disimpan: operator
+// biasanya menyusun receipt tepat saat customer membayar.
+const jamKini = () => new Date().toTimeString().slice(0, 5);
+let rc = null; // { id|null, dibuat?, tanggal, jam, bayar, catatan, customers: [...], diskon }
+// Penghitung ulang tiap baris yang sedang tampil. Mengetik angka diskon atau
+// jumlah cuma memperbarui angka-angkanya, bukan membangun ulang form — kotak
+// yang sedang diketik tidak boleh hilang di tengah ketikan.
+let rcPerbarui = [];
+// Baris item yang panel diskonnya sedang dibuka walau belum ada diskonnya.
+// Disimpan di luar DOM supaya tetap terbuka waktu formnya dibangun ulang.
+const rcDiskonBuka = new WeakSet();
+
+function resetRc() {
+  rc = {
+    id: null, tanggal: today(), jam: jamKini(), bayar: '', catatan: '',
+    customers: [custKosong()], diskon: diskonKosong(),
+  };
+  if (!$('panelReceipt').hidden) { renderRcForm(); renderRiwayatRc(); }
+}
+
+const noRc = (id) => String(id).replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+
+function hitungUlangRc() {
+  rcPerbarui.forEach((fn) => fn());
+  const h = hitungRc(rc);
+  // Sama dengan gambarnya: subtotal sesudah diskon item, hematnya di bawah total
+  $('rcSubtotal').textContent = rupiah(h.subtotal);
+  $('rcHematBaris').hidden = !h.hemat;
+  $('rcHemat').textContent = rupiah(h.hemat);
+  $('rcGrand').textContent = rupiah(h.total);
+  jadwalkanPratinjau();
+}
+
+function renderRcForm() {
+  $('rcJudul').textContent = rc.id ? 'Receipt No. ' + noRc(rc.id) : 'Receipt baru';
+  $('rcHapus').hidden = !rc.id;
+  $('rcTanggal').value = rc.tanggal;
+  $('rcBayar').value = rc.bayar || '';
+  $('rcCatatan').value = rc.catatan || '';
+  const boxD = $('rcDiskonBox');
+  boxD.innerHTML = '';
+  const [w, inp] = kotakSatuan({
+    awalan: 'Rp', aria: 'Diskon tambahan dari total', mode: 'numeric', id: 'rcDiskonTambahan',
+  });
+  const tampil = () => { inp.value = rc.diskon.nilai ? angkaRupiah(rc.diskon.nilai) : ''; };
+  inp.addEventListener('input', () => {
+    rc.diskon = { tipe: 'nominal', nilai: bacaRupiah(inp.value) || 0 };
+    hitungUlangRc();
+  });
+  inp.addEventListener('blur', tampil);
+  tampil();
+  boxD.append(w);
+  renderRcCustomers();
+}
+
+function renderRcCustomers() {
+  const box = $('rcCustomers');
+  box.innerHTML = '';
+  rcPerbarui = [];
+  const pilihan = itemBerlaku().filter((it) => !it.sembunyi);
+  rc.customers.forEach((c, ci) => box.appendChild(blokCustomerRc(c, ci, pilihan)));
+  hitungUlangRc();
+}
+
+// Inisial di bulatan depan nama — kata pertama sesudah sapaan kalau ada
+// ("Ci Lulu" -> L), supaya dua customer bersapaan sama tidak berinisial kembar.
+function inisialRc(nama) {
+  const kata = String(nama || '').trim().split(/\s+/).filter(Boolean);
+  if (!kata.length) return '?';
+  const inti = kata.length > 1 && SAPAAN.has(kata[0].toLowerCase()) ? kata[1] : kata[0];
+  return inti[0].toUpperCase();
+}
+
+// Nama customer: dipilih dari yang terdaftar lewat saran, atau diketik bebas
+// untuk yang belum terdaftar — nama itu tetap dicetak apa adanya di receipt.
+function kotakNamaRc(c, ket, onNama) {
+  const box = document.createElement('div');
+  box.className = 'name-box rc-cust-nama';
+  const inp = document.createElement('input');
+  inp.value = c.nama;
+  inp.placeholder = 'Nama customer';
+  inp.autocomplete = 'off';
+  inp.setAttribute('aria-label', 'Nama customer');
+  const sugBox = document.createElement('div');
+  sugBox.className = 'suggestions';
+  let aktif = -1;
+  const tutup = () => { sugBox.classList.remove('open'); sugBox.innerHTML = ''; aktif = -1; };
+  const perbaruiKet = () => {
+    const isi = c.nama.trim();
+    ket.className = 'rc-cust-ket' + (c.customerId ? ' terdaftar' : '');
+    ket.textContent = !isi ? ''
+      : c.customerId ? 'Customer terdaftar'
+        : 'Belum terdaftar — namanya tetap dicetak apa adanya';
+    onNama();
+  };
+  const pilih = (cust) => {
+    c.nama = cust.name;
+    c.customerId = cust.id;
+    inp.value = cust.name;
+    tutup();
+    perbaruiKet();
+  };
+  inp.addEventListener('input', () => {
+    c.nama = inp.value;
+    const persis = findCustomerByName(inp.value);
+    c.customerId = persis ? persis.id : null;
+    perbaruiKet();
+    sugBox.innerHTML = '';
+    aktif = -1;
+    const rows = searchCustomerList(inp.value).filter((r) => !persis || r.id !== persis.id);
+    if (!rows.length) { tutup(); return; }
+    rows.forEach((r) => {
+      const d = document.createElement('div');
+      d.innerHTML = '<span></span><span class="meta"></span>';
+      d.firstChild.textContent = r.name;
+      d.lastChild.textContent = visitCount(r.id) + 'x kunjungan';
+      d.onmousedown = (e) => { e.preventDefault(); pilih(r); };
+      sugBox.appendChild(d);
+    });
+    sugBox.classList.add('open');
+  });
+  inp.addEventListener('keydown', (e) => {
+    const items = [...sugBox.children];
+    if (!items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      aktif = (aktif + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((el, i) => el.classList.toggle('active', i === aktif));
+    } else if (e.key === 'Enter' && aktif >= 0) {
+      e.preventDefault();
+      items[aktif].dispatchEvent(new MouseEvent('mousedown'));
+    } else if (e.key === 'Escape') tutup();
+  });
+  inp.addEventListener('blur', () => setTimeout(tutup, 120));
+  box.append(inp, sugBox);
+  perbaruiKet();
+  return box;
+}
+
+function blokCustomerRc(c, ci, pilihan) {
+  const blok = document.createElement('div');
+  blok.className = 'rc-cust';
+
+  const kepala = document.createElement('div');
+  kepala.className = 'rc-cust-head';
+  const bulat = document.createElement('span');
+  bulat.className = 'rc-avatar';
+  bulat.setAttribute('aria-hidden', 'true');
+  const ket = document.createElement('div');
+  const nama = kotakNamaRc(c, ket, () => { bulat.textContent = inisialRc(c.nama); jadwalkanPratinjau(); });
+  kepala.append(bulat, nama);
+  if (rc.customers.length > 1) {
+    const hapus = document.createElement('button');
+    hapus.type = 'button';
+    hapus.className = 'rc-x';
+    hapus.title = 'Hapus customer ini dari receipt';
+    hapus.setAttribute('aria-label', 'Hapus customer ' + (ci + 1));
+    hapus.innerHTML = ikon('hapus');
+    hapus.addEventListener('click', () => { rc.customers.splice(ci, 1); renderRcCustomers(); });
+    kepala.appendChild(hapus);
+  }
+
+  const daftar = document.createElement('div');
+  daftar.className = 'rc-items';
+  c.items.forEach((it, ii) => daftar.appendChild(barisItemRc(c, it, ii)));
+
+  // Pemilih item berpenampilan tombol: <select> asli tetap dipakai karena di
+  // HP ia membuka daftar bawaan yang paling enak dipakai ibu jari.
+  const tambah = document.createElement('label');
+  tambah.className = 'rc-tambah-item';
+  const sel = document.createElement('select');
+  sel.setAttribute('aria-label', 'Tambah item untuk customer ' + (ci + 1));
+  const opsi = (value, teks) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = teks;
+    return o;
+  };
+  if (pilihan.length) {
+    sel.appendChild(opsi('', 'Pilih item'));
+    pilihan.forEach((p) => sel.appendChild(opsi(p.id, p.nama + ' — ' + rupiah(p.harga)
+      + (p.diskon && p.diskon.nilai > 0 ? ' (' + labelDiskonItem(p.diskon).toLowerCase() + ')' : ''))));
+  } else {
+    sel.appendChild(opsi('', 'Belum ada item'));
+    sel.disabled = true;
+    tambah.classList.add('mati');
+  }
+  sel.addEventListener('change', () => {
+    const p = pilihan.find((x) => x.id === sel.value);
+    if (!p) return;
+    // Diskon terisi dari master/cabang, dan tetap bisa diubah di barisnya.
+    // Item yang sama dipilih lagi menambah jumlahnya, bukan baris kembar —
+    // selama harga dan diskonnya memang masih sama.
+    const diskon = p.diskon ? { ...p.diskon } : diskonKosong();
+    const ada = c.items.find((x) => x.itemId === p.id && x.harga === p.harga
+      && x.diskon.tipe === diskon.tipe && (x.diskon.nilai || 0) === (diskon.nilai || 0));
+    if (ada) ada.qty = Math.min(RC_MAKS_QTY, ada.qty + 1);
+    else c.items.push({ itemId: p.id, nama: p.nama, harga: p.harga, qty: 1, diskon });
+    renderRcCustomers();
+  });
+  const tambahTeks = document.createElement('span');
+  tambahTeks.innerHTML = ikon('plus');
+  tambahTeks.append(pilihan.length ? 'Tambah item' : 'Isi Master Item dulu di bawah');
+  tambah.append(tambahTeks, sel);
+
+  const sub = document.createElement('div');
+  sub.className = 'rc-cust-sub';
+  sub.innerHTML = '<span>Subtotal</span><span></span>';
+  rcPerbarui.push(() => {
+    sub.hidden = !c.items.length;
+    sub.lastChild.textContent = rupiah(subtotalCust(c));
+  });
+
+  blok.append(kepala, ket, daftar, tambah, sub);
+  return blok;
+}
+
+// Satu baris item: nama dan harga akhir sebaris, jumlah × harga satuan di
+// bawahnya. Diskonnya diatur di panel yang dibuka tombol "Diskon": ketik
+// harga akhirnya atau persennya — yang satu mengisi yang lain. Yang tersimpan
+// mengikuti kotak yang terakhir diketik: persen tetap persen, harga akhir
+// jadi potongan rupiah per item, jadi dua-duanya ikut menyesuaikan kalau
+// jumlahnya diubah sesudahnya.
+function barisItemRc(c, it, ii) {
+  const row = document.createElement('div');
+  row.className = 'rc-item';
+
+  const atas = document.createElement('div');
+  atas.className = 'rc-item-atas';
+  const nama = document.createElement('span');
+  nama.className = 'rc-item-nama';
+  nama.textContent = it.nama;
+  const harga = document.createElement('span');
+  harga.className = 'rc-item-akhir';
+  const coret = document.createElement('s');
+  coret.className = 'rc-item-coret';
+  const akhir = document.createElement('span');
+  harga.append(coret, akhir);
+  atas.append(nama, harga);
+
+  const bawah = document.createElement('div');
+  bawah.className = 'rc-item-bawah';
+  const qty = buatStepper({
+    nilai: it.qty, min: 1, max: RC_MAKS_QTY, aria: 'Jumlah ' + it.nama, kecil: true,
+    onUbah: (n) => { it.qty = n; hitungUlangRc(); },
+  });
+  const satuan = document.createElement('span');
+  satuan.className = 'rc-item-satuan';
+  satuan.textContent = '× ' + rupiah(it.harga);
+  const tDiskon = document.createElement('button');
+  tDiskon.type = 'button';
+  tDiskon.className = 'rc-chip';
+  tDiskon.setAttribute('aria-expanded', 'false');
+  const hapus = document.createElement('button');
+  hapus.type = 'button';
+  hapus.className = 'rc-x';
+  hapus.title = 'Hapus item ini dari receipt';
+  hapus.setAttribute('aria-label', 'Hapus ' + it.nama);
+  hapus.innerHTML = ikon('hapus');
+  hapus.addEventListener('click', () => { c.items.splice(ii, 1); renderRcCustomers(); });
+  bawah.append(qty, satuan, tDiskon, hapus);
+
+  const panel = document.createElement('div');
+  panel.className = 'rc-item-diskon';
+  const lbl = document.createElement('span');
+  lbl.className = 'rc-item-diskon-lbl';
+  lbl.textContent = 'Harga akhir';
+  const [boxTotal, inpTotal] = kotakSatuan({
+    awalan: 'Rp', aria: 'Harga akhir ' + it.nama + ' setelah diskon', mode: 'numeric', kelas: 'lebar',
+  });
+  const atau = document.createElement('span');
+  atau.className = 'rc-item-diskon-lbl';
+  atau.textContent = 'atau';
+  const [boxPersen, inpPersen] = kotakSatuan({
+    akhiran: '%', aria: 'Diskon persen ' + it.nama, mode: 'decimal', kelas: 'sempit',
+  });
+  panel.append(lbl, boxTotal, atau, boxPersen);
+
+  const buka = (nyala) => {
+    if (nyala) rcDiskonBuka.add(it); else rcDiskonBuka.delete(it);
+    perbaruiPanel();
+  };
+  tDiskon.addEventListener('click', () => {
+    const terbuka = rcDiskonBuka.has(it) || potonganBaris(it) > 0;
+    if (!terbuka) { buka(true); inpPersen.focus(); return; }
+    // Menutup panel yang berisi diskon berarti mencabut diskonnya
+    it.diskon = diskonKosong();
+    buka(false);
+    hitungUlangRc();
+  });
+  const perbaruiPanel = () => {
+    const ada = potonganBaris(it) > 0;
+    const terbuka = ada || rcDiskonBuka.has(it);
+    panel.hidden = !terbuka;
+    tDiskon.classList.toggle('aktif', ada);
+    tDiskon.setAttribute('aria-expanded', terbuka ? 'true' : 'false');
+    tDiskon.textContent = ada
+      ? '−' + (it.diskon.tipe === 'persen' ? angkaPersen(it.diskon.nilai) + '%' : rupiah(potonganBaris(it)))
+      : terbuka ? 'Batal diskon' : 'Diskon';
+    tDiskon.title = ada ? 'Cabut diskon item ini' : 'Beri diskon untuk item ini';
+  };
+
+  inpTotal.addEventListener('input', () => {
+    const kotor = kotorBaris(it);
+    const t = bacaRupiah(inpTotal.value);
+    // Kosong = belum diketik apa-apa, dianggap tanpa diskon
+    const hasil = t == null ? kotor : Math.min(t, kotor);
+    it.diskon = { tipe: 'nominal', nilai: (kotor - hasil) / it.qty };
+    rcDiskonBuka.add(it);
+    hitungUlangRc();
+  });
+  inpPersen.addEventListener('input', () => {
+    it.diskon = { tipe: 'persen', nilai: bacaDiskon(inpPersen.value, 'persen') };
+    rcDiskonBuka.add(it);
+    hitungUlangRc();
+  });
+  // Kotak yang ditinggalkan dirapikan ke angka yang benar-benar berlaku
+  [inpTotal, inpPersen].forEach((inp) => inp.addEventListener('blur', () => hitungUlangRc()));
+
+  rcPerbarui.push(() => {
+    const kotor = kotorBaris(it);
+    const p = potonganBaris(it);
+    coret.textContent = p ? rupiah(kotor) : '';
+    coret.hidden = !p;
+    akhir.textContent = rupiah(kotor - p);
+    if (document.activeElement !== inpTotal) inpTotal.value = p ? angkaRupiah(kotor - p) : '';
+    if (document.activeElement !== inpPersen) {
+      inpPersen.value = !p ? '' : it.diskon.tipe === 'persen'
+        ? angkaPersen(it.diskon.nilai) : angkaPersen(p / kotor * 100);
+    }
+    inpTotal.placeholder = angkaRupiah(kotor);
+    perbaruiPanel();
+  });
+
+  row.append(atas, bawah, panel);
+  return row;
+}
+
+// Isi receipt dalam bentuk simpanan. `ketat` dipakai waktu menyimpan dan
+// menyalin: yang belum lengkap ditolak dengan toast. Pratinjau memakai yang
+// longgar — form setengah jadi tetap tergambar apa adanya.
+function dataRc(ketat = true) {
+  if (ketat) {
+    if (!rc.tanggal) { toast('Tanggal receipt belum diisi.', true); return null; }
+    for (let i = 0; i < rc.customers.length; i++) {
+      const c = rc.customers[i];
+      if (!c.nama.trim()) { toast('Nama customer ke-' + (i + 1) + ' belum diisi.', true); return null; }
+      if (!c.items.length) { toast(c.nama.trim() + ' belum punya item.', true); return null; }
+    }
+  }
+  const r = {
+    tanggal: rc.tanggal || today(),
+    jam: rc.jam || '',
+    bayar: rc.bayar || '',
+    catatan: (rc.catatan || '').trim(),
+    customers: rc.customers.map((c) => ({
+      customerId: c.customerId || null,
+      nama: c.nama.trim().replace(/\s+/g, ' '),
+      items: c.items.map((it) => ({
+        itemId: it.itemId || null, nama: it.nama, harga: it.harga, qty: it.qty,
+        diskon: { tipe: it.diskon.tipe, nilai: it.diskon.nilai || 0 },
+      })),
+    })),
+    diskon: { tipe: 'nominal', nilai: rc.diskon.nilai || 0 },
+  };
+  const h = hitungRc(r);
+  return { ...r, subtotal: h.subtotal, total: h.total };
+}
+
+function simpanRc() {
+  const data = dataRc();
+  if (!data || !bolehUbah()) return;
+  const sekarang = Date.now();
+  const lama = !!rc.id;
+  const isi = { ...data, id: rc.id || buatId(), dibuat: rc.dibuat || sekarang, diubah: sekarang };
+  setDoc(refReceipt(cabangId, isi.id), isi)
+    .catch((e) => toast('Gagal menyimpan receipt: ' + e.message, true));
+  rc.id = isi.id;
+  rc.dibuat = isi.dibuat;
+  renderRcForm();
+  toast(lama ? 'Receipt No. ' + noRc(isi.id) + ' diperbarui.' : 'Receipt No. ' + noRc(isi.id) + ' tersimpan.');
+}
+
+function bukaRc(id) {
+  const r = receipts.find((x) => x.id === id);
+  if (!r) return;
+  // Salinan lepas: yang diubah di form tidak boleh ikut mengubah isi daftar
+  // riwayat sebelum benar-benar disimpan.
+  rc = JSON.parse(JSON.stringify({
+    id: r.id, dibuat: r.dibuat, tanggal: r.tanggal,
+    // Receipt dari sebelum jam dicatat: jam pembuatannya yang dipakai
+    jam: r.jam || (r.dibuat ? new Date(r.dibuat).toTimeString().slice(0, 5) : ''),
+    bayar: r.bayar || '', catatan: r.catatan || '',
+    customers: r.customers || [], diskon: r.diskon || diskonKosong(),
+  }));
+  rc.customers.forEach((c) => c.items.forEach((it) => { if (!it.diskon) it.diskon = diskonKosong(); }));
+  // Kotak diskon tambahan cuma mengenal rupiah. Receipt yang masih menyimpan
+  // persen di situ dijadikan rupiah dengan potongan yang sama.
+  if (rc.diskon.tipe === 'persen') {
+    rc.diskon = keNominal(rc.diskon, rc.customers.reduce((s, c) => s + subtotalCust(c), 0));
+  }
+  renderRcForm();
+  renderRiwayatRc();
+  $('rcForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Dipakai tombol hapus di form dan tombol × di tiap baris riwayat. Receipt
+// yang sedang terbuka di form ikut dikosongkan kalau dialah yang dihapus.
+function hapusRc(id) {
+  if (!id || !bolehUbah()) return;
+  const cab = cabangId;
+  const simpanan = receipts.find((x) => x.id === id);
+  deleteDoc(refReceipt(cab, id)).catch((e) => toast('Gagal menghapus receipt: ' + e.message, true));
+  if (rc.id === id) resetRc();
+  toast('Receipt No. ' + noRc(id) + ' dihapus.', false, JEDA_URUNGKAN, simpanan ? {
+    label: 'Urungkan',
+    fn: () => {
+      if (cabangId !== cab || !bolehUbah()) return;
+      setDoc(refReceipt(cab, id), simpanan)
+        .catch((e) => toast('Gagal mengembalikan receipt: ' + e.message, true));
+    },
+  } : null);
+}
+
+function renderRiwayatRc() {
+  if ($('panelReceipt').hidden) return;
+  const box = $('rcRiwayat');
+  box.innerHTML = '';
+  if (!receipts.length) {
+    box.innerHTML = '<p class="empty">Belum ada receipt di cabang ini. Receipt yang disimpan muncul di sini.</p>';
+    return;
+  }
+  receipts.forEach((r) => {
+    // Tombol buka dan tombol hapus bersebelahan, bukan bersarang — tombol di
+    // dalam tombol tidak sah dan ketukannya ikut membuka receipt-nya.
+    const baris = document.createElement('div');
+    baris.className = 'rc-riwayat-baris' + (rc && r.id === rc.id ? ' aktif' : '');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rc-riwayat';
+    b.innerHTML = '<span class="rc-avatar kecil" aria-hidden="true"></span>'
+      + '<span class="rc-riwayat-kiri"><span class="rc-riwayat-nama"></span>'
+      + '<span class="rc-riwayat-meta"></span></span><span class="rc-riwayat-total"></span>';
+    const custs = r.customers || [];
+    const nItem = custs.reduce((s, c) => s + (c.items || []).reduce((t, it) => t + it.qty, 0), 0);
+    b.querySelector('.rc-avatar').textContent = inisialRc(custs[0] && custs[0].nama);
+    b.querySelector('.rc-riwayat-nama').textContent = custs.map((c) => c.nama).join(', ');
+    b.querySelector('.rc-riwayat-meta').textContent = [
+      tglSingkat(r.tanggal) + (r.jam ? ' ' + r.jam : ''), 'No. ' + noRc(r.id),
+      nItem + ' item', r.bayar,
+    ].filter(Boolean).join(' · ');
+    b.querySelector('.rc-riwayat-total').textContent = rupiah(r.total);
+    b.addEventListener('click', () => bukaRc(r.id));
+    const hapus = document.createElement('button');
+    hapus.type = 'button';
+    hapus.className = 'rc-x';
+    hapus.title = 'Hapus receipt ini';
+    hapus.setAttribute('aria-label', 'Hapus receipt No. ' + noRc(r.id));
+    hapus.innerHTML = ikon('hapus');
+    hapus.addEventListener('click', () => hapusRc(r.id));
+    baris.append(b, hapus);
+    box.appendChild(baris);
+  });
+}
+
+// Dipanggil tiap snapshot master item / penimpa cabang mendarat
+function segarkanReceipt() {
+  if ($('panelReceipt').hidden) return;
+  renderKecualiFokus($('itemDaftar'), renderItemMaster);
+  renderKecualiFokus($('rcCustomers'), renderRcCustomers);
+}
+
+function renderReceiptPanel() {
+  renderRcForm();
+  renderRiwayatRc();
+  renderItemMaster();
+}
+
+$('rcTanggal').addEventListener('change', () => { rc.tanggal = $('rcTanggal').value; jadwalkanPratinjau(); });
+$('rcBayar').addEventListener('change', () => { rc.bayar = $('rcBayar').value; jadwalkanPratinjau(); });
+$('rcCatatan').addEventListener('input', () => { rc.catatan = $('rcCatatan').value; jadwalkanPratinjau(); });
+$('rcTambahCust').addEventListener('click', () => {
+  rc.customers.push(custKosong());
+  renderRcCustomers();
+  const semua = $('rcCustomers').querySelectorAll('.rc-cust-nama input');
+  if (semua.length) semua[semua.length - 1].focus();
+});
+$('rcBaru').addEventListener('click', resetRc);
+$('rcSimpan').addEventListener('click', simpanRc);
+$('rcHapus').addEventListener('click', () => hapusRc(rc.id));
+
+// ---- Receipt sebagai gambar --------------------------------
+// Bentuknya slip kertas di atas latar merah muda pucat, bertepi gerigi di
+// bawah seperti struk yang baru disobek. Yang pertama dibaca customer adalah
+// yang ia bayar — totalnya besar di atas, seperti receipt Square/Stripe —
+// baru rinciannya di bawah untuk yang mau memeriksa.
+//
+// Warnanya sengaja tidak ikut tema aplikasi seperti gambar lain: struk itu
+// kertas putih. Receipt yang terkirim gelap gara-gara HP kasirnya kebetulan
+// sedang mode gelap terbaca seperti tangkapan layar, bukan bukti bayar.
+const RC_VIZ_W = 520;  // cukup untuk harga coret + harga akhir sebaris dengan nama item, tanpa jadi melebar
+const RC_VIZ_M = 22;   // latar di sekeliling slip
+const RC_VIZ_P = 30;   // tepi dalam slip
+const RC_VIZ_GIGI = 12; // lebar satu gigi sobekan
+const RC_KERTAS = {
+  latar: '#f6e9ef', kertas: '#ffffff', tinta: '#241820', tinta2: '#6b5560',
+  redup: '#9a8790', garis: '#ecdfe5', aksen: '#d6336c', aksenLembut: '#fdeef3',
+  hemat: '#0b7a3e', hematLembut: '#e6f4ec',
+};
+// Tanda di kepala struk: logo bunga yang sama dengan ikon aplikasi
+const RC_LOGO = new Path2D('M12 21.5c-4.7 0-8.4-3.1-8.4-6.9 0-2.2 1.5-3.8 3.4-3.8 1.4 0 2.6.8 3.2 2 '
+  + '.2-3.7.8-7 1.8-9.3 1 2.3 1.6 5.6 1.8 9.3.6-1.2 1.8-2 3.2-2 1.9 0 3.4 1.6 3.4 3.8 0 3.8-3.7 6.9-8.4 6.9z');
+
+// ---- Logo klinik -------------------------------------------
+// Satu logo untuk seluruh akun, di users/{uid}/data/logo sebagai data URL —
+// tanpa Firebase Storage, yang belum disiapkan di proyek ini. Gambarnya
+// dikecilkan dulu di perangkat (RC_LOGO_SIMPAN px sisi terpanjang) supaya
+// dokumennya cuma puluhan KB, jauh di bawah batas 1 MiB per dokumen.
+// Dokumennya milik fitur ini sendiri dan memang ditimpa utuh tiap ganti logo,
+// jadi tidak perlu penanda siap seperti dokumen data lain.
+const RC_LOGO_MAKS_W = 200;
+const RC_LOGO_MAKS_H = 72;
+const RC_LOGO_SIMPAN = 480; // 2× kotak terbesarnya, supaya tetap tajam di gambar 2×
+let logoUrl = '';
+let logoImg = null; // HTMLImageElement yang sudah selesai dimuat, atau null
+const refLogo = () => doc(db, 'users', uid, 'data', 'logo');
+
+function terapkanLogo(url) {
+  logoUrl = typeof url === 'string' && url.startsWith('data:image/') ? url : '';
+  if (!logoUrl) { logoImg = null; renderLogoKartu(); jadwalkanPratinjau(); return; }
+  const img = new Image();
+  img.onload = () => {
+    if (logoUrl !== url) return; // sudah diganti logo lain selagi memuat
+    logoImg = img;
+    renderLogoKartu();
+    jadwalkanPratinjau();
+  };
+  img.onerror = () => { logoImg = null; renderLogoKartu(); };
+  img.src = logoUrl;
+}
+
+function renderLogoKartu() {
+  const ada = !!logoUrl;
+  $('logoPratinjau').hidden = !ada;
+  $('logoKosong').hidden = ada;
+  if (ada) $('logoPratinjau').src = logoUrl;
+  $('logoHapus').hidden = !ada;
+  $('logoPilihTeks').textContent = ada ? 'Ganti logo' : 'Pilih gambar';
+}
+
+// Kotak isi logo: pinggiran yang putih atau transparan dibuang. Logo hasil
+// unduhan hampir selalu dibingkai ruang kosong lebar, dan di kotak 200 × 72
+// ruang kosong itu yang memakan tempat — tulisannya sendiri jadi kecil.
+function kotakIsiLogo(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  let x1 = w, y1 = h, x2 = -1, y2 = -1, transparan = false;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (px[i + 3] < 250) transparan = true;
+      // Isi = tidak transparan dan tidak (hampir) putih. Ambang 235 menelan
+      // derau kompresi JPEG di sekitar latar putih.
+      if (px[i + 3] > 16 && Math.min(px[i], px[i + 1], px[i + 2]) < 235) {
+        if (x < x1) x1 = x;
+        if (x > x2) x2 = x;
+        if (y < y1) y1 = y;
+        if (y > y2) y2 = y;
+      }
+    }
+  }
+  if (x2 < 0) return { x: 0, y: 0, w, h, transparan }; // polos seluruhnya: tidak dipotong
+  const sela = Math.round(Math.max(x2 - x1, y2 - y1) * 0.04); // sedikit napas di tepi
+  x1 = Math.max(0, x1 - sela); y1 = Math.max(0, y1 - sela);
+  x2 = Math.min(w - 1, x2 + sela); y2 = Math.min(h - 1, y2 + sela);
+  return { x: x1, y: y1, w: x2 - x1 + 1, h: y2 - y1 + 1, transparan };
+}
+
+// Logo tanpa transparansi (JPEG, PNG berlatar putih) latarnya jarang putih
+// bersih — di atas kertas struk ia tampil sebagai kotak abu samar. Piksel
+// yang hampir putih dijadikan transparan, dengan peralihan halus supaya
+// tepi huruf tidak bergerigi. Logo yang sudah transparan tidak disentuh:
+// putih di dalamnya memang bagian dari gambarnya.
+function buangLatarPutih(ctx, w, h) {
+  const data = ctx.getImageData(0, 0, w, h);
+  const px = data.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const terang = Math.min(px[i], px[i + 1], px[i + 2]);
+    if (terang >= 245) px[i + 3] = 0;
+    else if (terang > 215) px[i + 3] = Math.round(px[i + 3] * (245 - terang) / 30);
+  }
+  ctx.putImageData(data, 0, 0);
+}
+
+// Dipotong ke isinya, lalu dikecilkan lewat canvas. PNG supaya latar
+// transparan tetap transparan di atas kertas putih struk.
+function kecilkanLogo(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const k = kotakIsiLogo(img);
+      const sk = Math.min(1, RC_LOGO_SIMPAN / Math.max(k.w, k.h));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(k.w * sk));
+      c.height = Math.max(1, Math.round(k.h * sk));
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, k.x, k.y, k.w, k.h, 0, 0, c.width, c.height);
+      if (!k.transparan) buangLatarPutih(ctx, c.width, c.height);
+      resolve({ dataUrl: c.toDataURL('image/png'), lebar: k.w, tinggi: k.h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('file ini bukan gambar yang bisa dibaca')); };
+    img.src = url;
+  });
+}
+
+$('logoFile').addEventListener('change', async () => {
+  const file = $('logoFile').files[0];
+  $('logoFile').value = '';
+  if (!file) return;
+  if (!tersambung) { toast('Belum tersambung ke server — logo belum bisa disimpan.', true); return; }
+  try {
+    const { dataUrl, lebar, tinggi } = await kecilkanLogo(file);
+    // Batas jaga-jaga: gambar penuh detail bisa tetap besar walau sudah 480 px
+    if (dataUrl.length > 700000) { toast('Logo terlalu rumit untuk disimpan — coba gambar yang lebih sederhana.', true); return; }
+    await setDoc(refLogo(), { dataUrl, diubah: Date.now() });
+    // Gambar 2× butuh isi logo selebar 400 / setinggi 144 px supaya tajam.
+    // Yang lebih kecil tetap dipakai, cuma diberi tahu akan sedikit buram.
+    const kecil = Math.min(lebar / (RC_LOGO_MAKS_W * VIZ_SKALA), tinggi / (RC_LOGO_MAKS_H * VIZ_SKALA)) < 0.75;
+    toast(kecil
+      ? 'Logo tersimpan, tapi resolusinya kecil — bisa sedikit buram. Pakai file yang lebih besar kalau ada.'
+      : 'Logo tersimpan — dipakai di semua receipt.', false, kecil ? 6000 : 3000);
+  } catch (e) {
+    toast('Gagal menyimpan logo: ' + e.message, true);
+  }
+});
+$('logoHapus').addEventListener('click', () => {
+  if (!tersambung) { toast('Belum tersambung ke server — logo belum bisa dihapus.', true); return; }
+  const lama = logoUrl;
+  deleteDoc(refLogo()).catch((e) => toast('Gagal menghapus logo: ' + e.message, true));
+  toast('Logo dihapus — receipt kembali memakai ikon bawaan.', false, JEDA_URUNGKAN, {
+    label: 'Urungkan',
+    fn: () => {
+      if (!tersambung) return;
+      setDoc(refLogo(), { dataUrl: lama, diubah: Date.now() })
+        .catch((e) => toast('Gagal mengembalikan logo: ' + e.message, true));
+    },
+  });
+});
+
+function vizPotong(ctx, s, maksW, ukuran, tebal) {
+  if (vizLebar(ctx, s, ukuran, tebal) <= maksW) return s;
+  let t = s;
+  while (t.length > 1 && vizLebar(ctx, t + '…', ukuran, tebal) > maksW) t = t.slice(0, -1);
+  return t + '…';
+}
+// Pecah kalimat jadi beberapa baris selebar maksW
+function vizBungkus(ctx, s, maksW, ukuran, tebal) {
+  const hasil = [];
+  String(s).split('\n').forEach((para) => {
+    let baris = '';
+    para.split(/\s+/).filter(Boolean).forEach((kata) => {
+      const coba = baris ? baris + ' ' + kata : kata;
+      if (baris && vizLebar(ctx, coba, ukuran, tebal) > maksW) { hasil.push(baris); baris = kata; }
+      else baris = coba;
+    });
+    if (baris) hasil.push(vizPotong(ctx, baris, maksW, ukuran, tebal));
+  });
+  return hasil;
+}
+// Huruf kapital berjarak untuk label kecil. letterSpacing belum ada di semua
+// browser; yang tidak punya tetap menggambar labelnya, cuma tanpa jarak.
+function vizLabel(ctx, s, x, y, warna, rata) {
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '1.2px';
+  vizTeks(ctx, s.toUpperCase(), x, y, { ukuran: 10.5, tebal: 700, warna, rata });
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+function vizGaris(ctx, warna, y, x1, x2, putus) {
+  ctx.save();
+  ctx.strokeStyle = warna;
+  ctx.lineWidth = 1;
+  if (putus) ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x1, Math.round(y) + 0.5);
+  ctx.lineTo(x2, Math.round(y) + 0.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Pola dua giliran yang sama dengan lukisAnalitik(): sekali di canvas buangan
+// untuk tahu tingginya, sekali lagi di canvas yang sebenarnya — slipnya baru
+// bisa digambar setelah panjangnya diketahui.
+function lukisReceipt(ctx, r, no, tinggiTotal) {
+  const K = RC_KERTAS;
+  const W = RC_VIZ_W, M = RC_VIZ_M, L = M + RC_VIZ_P, R = W - M - RC_VIZ_P, isiW = R - L;
+  const tengah = W / 2;
+  const h = hitungRc(r);
+
+  if (tinggiTotal) {
+    ctx.fillStyle = K.latar;
+    ctx.fillRect(0, 0, W, tinggiTotal);
+    // Slip dengan tepi bawah bergerigi
+    const bawah = tinggiTotal - M;
+    const n = Math.floor((W - 2 * M) / RC_VIZ_GIGI);
+    const gigi = (W - 2 * M) / n;
+    ctx.save();
+    ctx.shadowColor = 'rgba(36, 24, 32, .10)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = K.kertas;
+    ctx.beginPath();
+    ctx.moveTo(M, M + 12);
+    ctx.arcTo(M, M, M + 12, M, 12);
+    ctx.lineTo(W - M - 12, M);
+    ctx.arcTo(W - M, M, W - M, M + 12, 12);
+    ctx.lineTo(W - M, bawah - 7);
+    for (let i = n; i > 0; i--) {
+      ctx.lineTo(M + (i - 0.5) * gigi, bawah);
+      ctx.lineTo(M + (i - 1) * gigi, bawah - 7);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    // Pita merek tipis di tepi atas slip
+    ctx.save();
+    ctx.beginPath();
+    vizKotak(ctx, M, M, W - 2 * M, 40, 12);
+    ctx.clip();
+    ctx.fillStyle = K.aksen;
+    ctx.fillRect(M, M, W - 2 * M, 4);
+    ctx.restore();
+  }
+
+  // ---- Kepala: logo, nama tempat ----
+  let y = M + 34;
+  if (logoImg) {
+    // Logo klinik dimuatkan ke kotak 200 × 72 tanpa diregangkan: logo persegi
+    // jadi setinggi 72, logo memanjang (tulisan) selebar 200.
+    const sk = Math.min(RC_LOGO_MAKS_W / logoImg.naturalWidth, RC_LOGO_MAKS_H / logoImg.naturalHeight);
+    const w = logoImg.naturalWidth * sk, hL = logoImg.naturalHeight * sk;
+    ctx.drawImage(logoImg, tengah - w / 2, y, w, hL);
+    y += hL;
+  } else {
+    ctx.fillStyle = K.aksenLembut;
+    ctx.beginPath();
+    ctx.arc(tengah, y + 20, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(tengah - 13, y + 7);
+    ctx.scale(26 / 24, 26 / 24);
+    ctx.fillStyle = K.aksen;
+    ctx.fill(RC_LOGO);
+    ctx.restore();
+    y += 42;
+  }
+
+  const cabang = cabangList.find((c) => c.id === cabangId);
+  // Logo hampir selalu sudah memuat nama kliniknya, jadi judul teksnya cuma
+  // dicetak kalau tidak ada logo — kalau tidak, namanya tertulis dua kali.
+  // Nama cabang tetap tercetak: itu yang tidak ada di logo.
+  if (!logoImg) {
+    const judul = namaKlinik || (cabang ? cabang.name : 'Receipt');
+    y += 30;
+    vizTeks(ctx, vizPotong(ctx, judul, isiW, 19, 700), tengah, y,
+      { ukuran: 19, tebal: 700, warna: K.tinta, rata: 'center' });
+  }
+  if (cabang && (logoImg || namaKlinik)) {
+    y += logoImg ? 22 : 19;
+    vizTeks(ctx, 'Cabang ' + cabang.name, tengah, y, { ukuran: 12.5, warna: K.tinta2, rata: 'center' });
+  }
+
+  // ---- Total besar ----
+  y += 34;
+  vizLabel(ctx, 'Total pembayaran', tengah, y, K.redup, 'center');
+  y += 40;
+  vizTeks(ctx, rupiah(h.total), tengah, y, { ukuran: 34, tebal: 800, warna: K.tinta, rata: 'center' });
+  if (h.hemat) {
+    const teks = 'Hemat ' + rupiah(h.hemat);
+    const w = vizLebar(ctx, teks, 12, 700) + 24;
+    y += 14;
+    ctx.fillStyle = K.hematLembut;
+    vizKotak(ctx, tengah - w / 2, y, w, 24, 12);
+    ctx.fill();
+    vizTeks(ctx, teks, tengah, y + 16, { ukuran: 12, tebal: 700, warna: K.hemat, rata: 'center' });
+    y += 24;
+  }
+
+  // ---- Keterangan ----
+  y += 24;
+  vizGaris(ctx, K.garis, y, L, R);
+  const info = [
+    no ? ['No. receipt', no] : null,
+    ['Tanggal', tglSingkat(r.tanggal) + (r.jam ? ', ' + r.jam : '')],
+    r.bayar ? ['Pembayaran', r.bayar] : null,
+  ].filter(Boolean);
+  info.forEach(([k, v]) => {
+    y += 24;
+    vizTeks(ctx, k, L, y, { ukuran: 12.5, warna: K.tinta2 });
+    vizTeks(ctx, v, R, y, { ukuran: 12.5, tebal: 600, warna: K.tinta, rata: 'right' });
+  });
+  y += 16;
+  vizGaris(ctx, K.garis, y, L, R, true);
+
+  // ---- Item per customer ----
+  r.customers.forEach((c, ci) => {
+    y += ci ? 38 : 28;
+    vizLabel(ctx, vizPotong(ctx, c.nama || 'Customer ' + (ci + 1), isiW, 10.5, 700), L, y, K.aksen);
+    if (!c.items.length) {
+      y += 22;
+      vizTeks(ctx, 'Belum ada item', L, y, { ukuran: 13, warna: K.redup });
+    }
+    c.items.forEach((it, ii) => {
+      const kotor = kotorBaris(it), pot = potonganBaris(it);
+      const akhir = rupiah(kotor - pot);
+      const atas = y + (ii ? 11 : 8);
+      // Item dipisah garis tipis, supaya tiap pasangan nama–harga terbaca
+      // sebagai satu baris sendiri
+      if (ii) vizGaris(ctx, K.garis, atas, L, R);
+      y = atas + (ii ? 23 : 21);
+      // Sebaris: harga normal dicoret dulu, baru harga akhirnya — urutan baca
+      // "dari sekian jadi sekian". Besar potongannya sendiri tidak ditulis.
+      // Harganya berdiri di tengah tinggi baris item (antara baris nama dan
+      // baris jumlah × harga), bukan menempel di baris nama.
+      const yHarga = y + 9;
+      const wAkhir = vizLebar(ctx, akhir, 14, 700);
+      let wKanan = wAkhir;
+      if (pot) {
+        const asli = rupiah(kotor);
+        const wAsli = vizLebar(ctx, asli, 13, 400);
+        const xAsli = R - wAkhir - 10;
+        vizTeks(ctx, asli, xAsli, yHarga, { ukuran: 13, warna: K.redup, rata: 'right' });
+        ctx.fillStyle = K.redup;
+        ctx.fillRect(xAsli - wAsli, yHarga - 4.5, wAsli, 1);
+        wKanan += 10 + wAsli;
+      }
+      vizTeks(ctx, vizPotong(ctx, it.nama, isiW - wKanan - 16, 14, 500), L, y,
+        { ukuran: 14, tebal: 500, warna: K.tinta });
+      vizTeks(ctx, akhir, R, yHarga, { ukuran: 14, tebal: 700, warna: K.tinta, rata: 'right' });
+      y += 18;
+      vizTeks(ctx, it.qty + ' × ' + rupiah(it.harga), L, y, { ukuran: 12, warna: K.redup });
+    });
+  });
+
+  // ---- Rincian ----
+  // Subtotal di sini sudah sesudah diskon item — jumlah harga akhir yang
+  // tercetak di tiap baris, jadi bisa dicocokkan langsung. Diskon item sendiri
+  // sudah terbaca dari harga coret, dan total hematnya di label hijau di
+  // kepala struk. Tanpa diskon tambahan subtotal sama persis dengan total,
+  // jadi rinciannya dilewati.
+  y += 20;
+  if (h.potongan) {
+    vizGaris(ctx, K.garis, y, L, R, true);
+    [['Subtotal', rupiah(h.subtotal), K.tinta],
+      ['Diskon tambahan', '−' + rupiah(h.potongan), K.hemat]].forEach(([k, v, warna]) => {
+      y += 24;
+      vizTeks(ctx, k, L, y, { ukuran: 13, warna: K.tinta2 });
+      vizTeks(ctx, v, R, y, { ukuran: 13, tebal: 600, warna, rata: 'right' });
+    });
+    y += 16;
+  }
+  vizGaris(ctx, K.garis, y, L, R);
+  y += 30;
+  vizTeks(ctx, 'Total', L, y, { ukuran: 15, tebal: 700, warna: K.tinta });
+  vizTeks(ctx, rupiah(h.total), R, y, { ukuran: 18, tebal: 800, warna: K.aksen, rata: 'right' });
+
+  // ---- Catatan ----
+  if (r.catatan) {
+    const baris = vizBungkus(ctx, r.catatan, isiW - 28, 12.5, 400);
+    const tinggi = 40 + baris.length * 18;
+    y += 22;
+    ctx.fillStyle = K.aksenLembut;
+    vizKotak(ctx, L, y, isiW, tinggi, 10);
+    ctx.fill();
+    vizLabel(ctx, 'Catatan', L + 14, y + 22, K.aksen);
+    baris.forEach((b, i) => {
+      vizTeks(ctx, b, L + 14, y + 42 + i * 18, { ukuran: 12.5, warna: K.tinta });
+    });
+    y += tinggi;
+  }
+
+  // ---- Kaki ----
+  y += 36;
+  vizTeks(ctx, 'Terima kasih atas kunjungannya', tengah, y,
+    { ukuran: 13, tebal: 600, warna: K.tinta2, rata: 'center' });
+  return y + 34 + M;
+}
+
+function kanvasReceipt(r, no, kanvas) {
+  const tinggi = Math.ceil(lukisReceipt(document.createElement('canvas').getContext('2d'), r, no));
+  const c = kanvas || document.createElement('canvas');
+  c.width = RC_VIZ_W * VIZ_SKALA;
+  c.height = tinggi * VIZ_SKALA;
+  const ctx = c.getContext('2d');
+  ctx.scale(VIZ_SKALA, VIZ_SKALA);
+  lukisReceipt(ctx, r, no, tinggi);
+  return c;
+}
+
+function buatBlobRc(r, no) {
+  const c = kanvasReceipt(r, no);
+  return new Promise((resolve, reject) => {
+    c.toBlob((b) => b ? resolve(b) : reject(new Error('canvas gagal jadi gambar')), 'image/png');
+  });
+}
+
+// Pratinjau digambar ulang sesudah ketikan berhenti sebentar, bukan di tiap
+// huruf — satu gambar 960 px lebarnya cukup berat untuk HP lama.
+let tundaPratinjau = null;
+function jadwalkanPratinjau() {
+  clearTimeout(tundaPratinjau);
+  tundaPratinjau = setTimeout(() => {
+    if ($('panelReceipt').hidden || !rc) return;
+    kanvasReceipt(dataRc(false), rc.id ? noRc(rc.id) : '', $('rcPratinjau'));
+  }, 120);
+}
+
+// Menyalin tidak mensyaratkan disimpan dulu — yang belum disimpan cuma belum
+// punya nomor, jadi baris nomornya tidak ikut tercetak.
+$('rcSalin').addEventListener('click', () => {
+  const data = dataRc();
+  if (!data) return;
+  salinGambar(
+    $('rcSalin'),
+    'receipt-' + data.tanggal + (rc.id ? '-' + noRc(rc.id) : '') + '.png',
+    () => buatBlobRc(data, rc.id ? noRc(rc.id) : ''),
+    'Gambar receipt tersalin — tinggal paste di WhatsApp.');
+});
+
+renderLogoKartu();
+resetRc();
 
 // ============================================================
 // Tema terang / gelap
