@@ -85,6 +85,12 @@
     <path d="M18 9.5a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16s-2-1.5-2-6.5"/>
     <path d="M13.7 19.5a2 2 0 0 1-3.4 0"/>
   </symbol>
+  <!-- Struk: kertas bergerigi di bawah, dua baris isian -->
+  <symbol id="i-struk" viewBox="0 0 24 24">
+    <path d="M5.25 3.25h13.5v17.5l-2.25-1.5-2.25 1.5-2.25-1.5-2.25 1.5-2.25-1.5-2.25 1.5z"/>
+    <path d="M8.75 8.25h6.5M8.75 12h6.5"/>
+  </symbol>
+  <symbol id="i-hapus" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
   <symbol id="i-cek" viewBox="0 0 24 24"><path d="m5 12.75 4.75 4.75L19 6.5"/></symbol>
   <symbol id="i-kiri" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
@@ -136,6 +142,10 @@
     <button type="button" class="tab" role="tab" data-tab="analitik"
             id="tabAnalitik" aria-selected="false" aria-controls="panelAnalitik">
       <svg class="ico" aria-hidden="true"><use href="#i-analitik"/></svg>Analitik
+    </button>
+    <button type="button" class="tab" role="tab" data-tab="receipt"
+            id="tabReceipt" aria-selected="false" aria-controls="panelReceipt">
+      <svg class="ico" aria-hidden="true"><use href="#i-struk"/></svg>Receipt
     </button>
   </nav>
 
@@ -376,6 +386,122 @@
       Lihat angka dalam tabel
     </button>
     <div class="tabel-wrap" id="tabelWrap" hidden></div>
+  </div>
+
+  <!-- Receipt: disusun di sini, disalin sebagai gambar untuk WhatsApp, dan
+       disimpan sebagai data (bukan gambar) per cabang. Item dipilih dari
+       master item — daftarnya di kartu paling bawah. -->
+  <div class="panel" id="panelReceipt" role="tabpanel" aria-labelledby="tabReceipt" hidden>
+    <section class="card" id="rcForm">
+      <div class="card-head">
+        <h2 id="rcJudul">Receipt baru</h2>
+        <div class="card-head-btns">
+          <button type="button" class="wa-btn" id="rcBaru" title="Kosongkan form untuk receipt baru">
+            <svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Mulai baru
+          </button>
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label for="rcTanggal">Tanggal</label>
+          <input id="rcTanggal" type="date">
+        </div>
+        <div>
+          <label for="rcBayar">Pembayaran</label>
+          <select id="rcBayar">
+            <option value="">Tidak dicantumkan</option>
+            <option>Tunai</option>
+            <option>QRIS</option>
+            <option>Transfer</option>
+            <option>Debit</option>
+            <option>Kartu kredit</option>
+          </select>
+        </div>
+      </div>
+      <!-- Satu blok per customer, masing-masing dengan daftar itemnya sendiri.
+           Dibangun app.js. -->
+      <div id="rcCustomers"></div>
+      <button type="button" class="rc-tambah-cust" id="rcTambahCust">
+        <svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Tambah customer
+      </button>
+
+      <!-- Rincian sama dengan di gambar: subtotal sesudah diskon item (jumlah
+           subtotal tiap customer), diskon tambahan, lalu yang dibayar. Diskon
+           tambahan satu-satunya yang diketik di sini. -->
+      <div class="rc-ringkas">
+        <div class="rc-baris"><span>Subtotal</span><span id="rcSubtotal">Rp 0</span></div>
+        <div class="rc-baris">
+          <label for="rcDiskonTambahan" class="rc-baris-label">Diskon tambahan</label>
+          <span id="rcDiskonBox"></span>
+        </div>
+        <div class="rc-baris rc-grand"><span>Total</span><span id="rcGrand">Rp 0</span></div>
+        <div class="rc-baris rc-hemat" id="rcHematBaris" hidden>
+          <span>Customer hemat</span><span id="rcHemat"></span>
+        </div>
+      </div>
+
+      <label for="rcCatatan">Catatan <span class="rc-opsional">opsional, ikut tercetak</span></label>
+      <textarea id="rcCatatan" rows="2" maxlength="200"
+                placeholder="mis. Paket 5x, sisa 3 sesi"></textarea>
+
+      <div class="rc-aksi">
+        <button type="button" class="data-btn" id="rcSalin"
+                title="Salin receipt sebagai gambar — tinggal paste di WhatsApp">
+          <svg class="ico" aria-hidden="true"><use href="#i-gambar"/></svg>Salin gambar
+        </button>
+        <button type="button" class="primary" id="rcSimpan">Simpan receipt</button>
+      </div>
+      <button type="button" class="sheet-batal" id="rcHapus" hidden>Hapus receipt ini</button>
+    </section>
+
+    <!-- Gambar yang akan disalin, digambar ulang tiap isian berubah: yang
+         dikirim ke customer persis yang terlihat di sini. -->
+    <section class="card rc-pratinjau-kartu">
+      <div class="card-head"><h2>Pratinjau gambar</h2></div>
+      <div class="rc-pratinjau"><canvas id="rcPratinjau" aria-label="Pratinjau gambar receipt"></canvas></div>
+    </section>
+
+    <!-- Logo di kepala gambar receipt. Satu untuk seluruh akun, bukan per
+         cabang: logonya milik klinik. -->
+    <section class="card">
+      <div class="card-head"><h2>Logo receipt</h2></div>
+      <div class="logo-kartu">
+        <div class="logo-bingkai">
+          <img id="logoPratinjau" alt="Logo klinik" hidden>
+          <span id="logoKosong">Belum ada logo — receipt memakai ikon bawaan.</span>
+        </div>
+        <div class="logo-aksi">
+          <label class="data-btn logo-pilih">
+            <svg class="ico" aria-hidden="true"><use href="#i-gambar"/></svg><span id="logoPilihTeks">Pilih gambar</span>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
+          </label>
+          <button type="button" class="rc-teks-hapus" id="logoHapus" hidden>Hapus logo</button>
+        </div>
+      </div>
+      <p class="card-sub logo-ket">Berlaku untuk semua cabang. PNG berlatar transparan paling rapi
+        di atas kertas putih; logo memanjang maupun persegi sama-sama muat.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Riwayat Receipt</h2></div>
+      <p class="card-sub">Receipt terakhir di cabang ini. Ketuk satu untuk membuka, mengubah, atau menyalin ulang gambarnya; tombol × menghapusnya.</p>
+      <div id="rcRiwayat"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Master Item</h2></div>
+      <p class="card-sub">Item dan harga dasarnya berlaku untuk semua cabang. Harga cabang
+        menimpa harga dasar khusus di cabang yang sedang dibuka — kosongkan untuk ikut
+        harga dasar. Matikan "Dijual" untuk menyembunyikan item dari cabang ini saja.</p>
+      <div id="itemDaftar"></div>
+      <div class="item-tambah">
+        <input id="itemNamaBaru" type="text" autocomplete="off" maxlength="60"
+               placeholder="Nama item baru" aria-label="Nama item baru">
+        <input id="itemHargaBaru" type="text" inputmode="numeric" autocomplete="off"
+               placeholder="Harga" aria-label="Harga dasar item baru">
+        <button type="button" class="ghost" id="itemTambah">Tambah</button>
+      </div>
+    </section>
   </div>
 </div>
 
