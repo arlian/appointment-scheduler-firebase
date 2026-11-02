@@ -5,3 +5,6 @@ data.db
 
 # Cache lokal Firebase CLI — dibuat ulang tiap deploy, bukan konfigurasi
 .firebase/
+
+# Logo klinik — diunggah lewat aplikasi (tersimpan di Firestore), bukan bagian repo
+logo.*
