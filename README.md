@@ -214,6 +214,77 @@ WA, export/import), ditambah:
   sekaligus (lihat bagian di bawah).
 - **Gender customer** (lihat bagian di bawah).
 
+## Receipt
+
+Tab **Receipt** untuk menyusun nota lalu menyalinnya sebagai gambar ke
+WhatsApp (jalur salinnya sama dengan tombol gambar lain: clipboard → share
+sheet → unduh).
+
+- **Customer**: satu receipt boleh berisi beberapa customer. Nama dipilih dari
+  customer terdaftar lewat saran, atau diketik bebas — yang belum terdaftar
+  tetap dicetak apa adanya. Tiap customer punya daftar item dan subtotalnya
+  sendiri.
+- **Gambarnya berbentuk struk**: slip kertas putih bertepi gerigi. Yang
+  pertama terbaca adalah total yang dibayar (besar, di atas) beserta label
+  "Hemat Rp …", lalu nomor, tanggal & jam, metode pembayaran, item per
+  customer (harga normal cukup dicoret kalau didiskon, tanpa angka potongannya), rincian subtotal/diskon, dan
+  catatan. Warnanya selalu terang walau aplikasinya sedang mode gelap — struk
+  itu kertas putih. Item dipisah garis tipis, tanpa subtotal per customer.
+  Subtotal di bawah dihitung **sesudah** diskon item — jumlah harga akhir
+  yang tercetak — jadi bisa dicocokkan langsung; diskon item cukup terbaca
+  dari harga coret, dan total hematnya di label hijau. Subtotal dan diskon tambahan cuma digambar kalau memang ada
+  diskon tambahan — tanpa itu subtotal sama persis dengan total.
+- **Logo klinik** di kepala struk, diunggah lewat kartu "Logo receipt" dan
+  berlaku untuk semua cabang. Gambarnya dikecilkan di perangkat (maks. 480 px)
+  lalu disimpan sebagai data URL di `users/{uid}/data/logo` — tanpa Firebase
+  Storage. Pinggiran putih/transparan dipotong otomatis, dan latar terang
+  logo yang tidak transparan (mis. JPEG berlatar putih) dibuat transparan
+  supaya tidak tampil sebagai kotak abu di atas kertas. Logo dimuatkan ke
+  kotak 200 × 72 tanpa diregangkan; logo yang resolusinya terlalu kecil tetap
+  dipakai, dengan peringatan. Selama ada logo, judul nama klinik tidak
+  dicetak lagi (logonya hampir selalu sudah memuat nama itu) — nama cabang
+  tetap. Tanpa logo, struk memakai ikon bunga dan nama klinik.
+  File logonya sendiri tidak masuk repo (`logo.*` di `.gitignore`).
+- **Pratinjau langsung** di bawah form: gambar yang akan disalin digambar
+  ulang tiap isian berubah.
+- **Pembayaran** (Tunai, QRIS, Transfer, Debit, Kartu kredit — boleh tidak
+  dicantumkan) dan **catatan** opsional ikut tercetak. Jam receipt dicatat
+  waktu formnya dimulai.
+- **Item** dipilih dari master item. Diskon tiap item dibuka lewat tombol
+  "Diskon" di barisnya; menutupnya lagi mencabut diskon itu. Memilih item yang sama lagi menambah
+  jumlahnya, bukan membuat baris kembar.
+- **Diskon item diatur di total barisnya**: ketik langsung harga akhirnya
+  (Rp) atau persennya — yang satu mengisi yang lain, dan harga aslinya tampil
+  dicoret, di form maupun di gambar. Diskonnya terisi sendiri dari
+  master/cabang (lihat di bawah) dan tetap bisa diubah. Yang tersimpan ikut
+  kotak terakhir yang diketik: persen tetap persen, harga akhir jadi potongan
+  rupiah per item — jadi kalau jumlahnya diubah sesudahnya, potongannya ikut
+  menyesuaikan. **Diskon tambahan** di total akhir rupiah saja, sekali
+  potong. Potongan tidak pernah melebihi harganya.
+- **Disimpan sebagai data, bukan gambar**, satu dokumen per receipt di
+  `users/{uid}/cabang/{id}/receipts/{id}` — jadi menyimpan satu receipt tidak
+  bisa menimpa receipt lain. Nama dan harga item ikut tersalin ke dalam
+  receipt, sehingga harga master yang berubah belakangan tidak mengubah
+  receipt lama. Riwayat menampilkan 50 receipt terakhir cabang itu; ketuk satu
+  untuk mengubah, menghapus (bisa diurungkan), atau menyalin ulang gambarnya.
+  Nomor receipt (`No. AB12CD`) baru ada setelah disimpan.
+
+### Master item
+
+- **Tingkat akun** (`users/{uid}/data/items`): nama, harga dasar, dan diskon
+  dasar (opsional), berlaku di semua cabang. Menghapus item di sini
+  menghapusnya dari semua cabang (bisa diurungkan lewat toast).
+- **Tingkat cabang** (`users/{uid}/cabang/{id}/data/items`): harga dan diskon
+  khusus cabang yang menimpa nilai dasar, dan tanda "Dijual" untuk
+  menyembunyikan item dari cabang itu saja. Kotak yang dikosongkan berarti
+  ikut nilai dasar; diskon cabang **0** berarti item itu tidak didiskon di
+  cabang ini walaupun di master didiskon.
+
+Urutannya: **receipt** (diubah langsung) → **cabang** → **dasar**. Mengubah
+diskon di master tidak mengubah item yang sudah ada di receipt.
+
+Master item, penimpa cabang, dan receipt **belum ikut export/import**.
+
 ## Ringkasan bulanan sebagai gambar
 
 Tombol **"Salin sebagai Gambar"** di panel Analitik menggambar ulang kartunya
