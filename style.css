@@ -152,7 +152,7 @@ h1 { font-size: 1.25rem; font-weight: 700; margin: 0; letter-spacing: -.021em; }
 
 /* ---- Tab Jadwal / Analitik ---- */
 .tabs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
   background: var(--field); padding: 4px; border-radius: 14px; margin-bottom: 18px;
 }
 .tab {
@@ -1432,3 +1432,230 @@ button.primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
 /* Kotak nomor berdiri di atas sheet yang memanggilnya, tapi tetap di bawah
    toast (40) supaya pesan gagal simpan tidak tertimbun olehnya. */
 .sheet-backdrop.atas { z-index: 25; }
+
+/* ============================================================
+   Receipt
+   ============================================================ */
+/* Satu blok per customer: bulatan inisial + nama, lalu daftar itemnya */
+.rc-cust {
+  margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--card);
+}
+.rc-cust-head { display: flex; align-items: center; gap: 10px; }
+.rc-cust-nama { flex: 1; min-width: 0; }
+.rc-cust-nama input { padding: 10px 12px; font-weight: 600; }
+.rc-avatar {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: .95rem; font-weight: 800;
+}
+.rc-avatar.kecil { width: 34px; height: 34px; font-size: .85rem; }
+.rc-cust-ket { margin: 6px 0 0 48px; font-size: .74rem; color: var(--muted); line-height: 1.4; }
+.rc-cust-ket:empty { display: none; }
+.rc-cust-ket.terdaftar { color: var(--accent-ink); font-weight: 600; }
+.rc-cust-ket.terdaftar::before { content: '✓ '; }
+
+/* Tombol hapus kecil (customer, item) — abu sampai disentuh, baru merah */
+.rc-x {
+  flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  background: transparent; color: var(--muted);
+}
+.rc-x:hover, .rc-x:focus-visible { background: var(--red-soft); color: var(--red-ink); }
+.rc-x:active { transform: scale(.94); }
+
+/* Baris item */
+.rc-items { margin-top: 12px; }
+.rc-item { padding: 12px 0; border-top: 1px solid var(--border); }
+.rc-item-atas { display: flex; align-items: baseline; gap: 10px; }
+.rc-item-nama { flex: 1; min-width: 0; font-weight: 600; font-size: .92rem; overflow-wrap: anywhere; }
+.rc-item-akhir {
+  display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap;
+  font-weight: 700; font-size: .92rem; font-variant-numeric: tabular-nums;
+}
+.rc-item-coret { font-size: .78rem; font-weight: 400; color: var(--muted); }
+.rc-item-coret[hidden] { display: none; }
+.rc-item-bawah { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.rc-item-satuan { font-size: .8rem; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-chip {
+  margin-left: auto; padding: 5px 11px; border: 1px solid var(--border-kuat); border-radius: 999px;
+  background: var(--card); color: var(--text-2); cursor: pointer; white-space: nowrap;
+  font-family: inherit; font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.rc-chip:hover { color: var(--accent-ink); border-color: var(--accent-ring); }
+/* Diskon yang berlaku: hijau, warna "hemat" yang sama dengan di gambar */
+.rc-chip.aktif { background: var(--naik); border-color: var(--naik); color: var(--card); }
+
+/* Panel diskon: harga akhir atau persen, dua-duanya saling mengisi */
+.rc-item-diskon {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;
+  margin-top: 10px; padding: 8px 10px; border-radius: 11px; background: var(--field);
+}
+.rc-item-diskon[hidden] { display: none; }
+.rc-item-diskon-lbl { font-size: .74rem; color: var(--muted); }
+.rc-item-diskon-lbl:first-child { margin-right: auto; font-weight: 600; color: var(--text-2); }
+
+/* Kotak angka bersatuan */
+.rc-kotak {
+  display: inline-flex; align-items: center; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border-kuat); border-radius: 9px;
+}
+.rc-kotak:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.rc-kotak input {
+  width: 90px; padding: 7px 8px 7px 2px; border: 0; border-radius: 0; background: transparent;
+  font-size: .9rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums;
+}
+.rc-kotak input:focus { box-shadow: none; background: transparent; }
+.rc-kotak input::placeholder { color: var(--muted); font-weight: 400; }
+.rc-kotak.lebar input { width: 96px; }
+.rc-kotak.sempit input { width: 40px; padding: 7px 2px 7px 8px; }
+.rc-kotak-satuan { padding: 0 8px; font-size: .76rem; font-weight: 600; color: var(--muted); }
+.rc-kotak-satuan:first-child { padding-right: 4px; }
+.rc-kotak-satuan:last-child:not(:first-child) { padding-left: 2px; }
+
+/* Tambah item: <select> asli tak terlihat menutupi tombolnya */
+.rc-tambah-item {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 4px 0 0; padding: 10px; border: 1.5px dashed var(--border-kuat); border-radius: 11px;
+  font-size: .84rem; font-weight: 600; color: var(--accent-ink); cursor: pointer;
+}
+.rc-tambah-item > span { display: inline-flex; align-items: center; gap: 6px; }
+.rc-tambah-item:hover { border-color: var(--accent-ring); background: var(--accent-soft); }
+.rc-tambah-item:focus-within { border-color: var(--accent); }
+.rc-tambah-item select {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+}
+.rc-tambah-item.mati { color: var(--muted); cursor: default; }
+.rc-tambah-item.mati:hover { background: transparent; border-color: var(--border-kuat); }
+.rc-items:empty + .rc-tambah-item { margin-top: 12px; }
+.rc-cust-sub {
+  display: flex; justify-content: space-between; margin-top: 12px;
+  font-size: .84rem; color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.rc-cust-sub span:last-child { color: var(--text); font-weight: 700; }
+.rc-cust-sub[hidden] { display: none; }
+
+.rc-tambah-cust {
+  display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+  margin-top: 12px; padding: 12px; border: 0; border-radius: 13px; cursor: pointer;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-family: inherit; font-size: .86rem; font-weight: 700;
+}
+.rc-tambah-cust:hover { background: var(--hover-accent); }
+
+/* Rincian pembayaran */
+.rc-ringkas {
+  display: grid; gap: 10px; margin-top: 16px; padding: 14px 16px;
+  border-radius: 16px; background: var(--field);
+}
+.rc-baris {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: .875rem; color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.rc-baris > span:last-child { color: var(--text); font-weight: 600; }
+.rc-baris[hidden] { display: none; }
+.rc-baris-label { margin: 0; font-size: inherit; font-weight: 400; color: inherit; letter-spacing: 0; }
+.rc-hemat > span:last-child { color: var(--naik); }
+.rc-grand {
+  margin-top: 2px; padding-top: 12px; border-top: 1px dashed var(--border-kuat);
+  font-size: .95rem; font-weight: 700; color: var(--text);
+}
+.rc-grand > span:last-child { font-size: 1.4rem; font-weight: 800; color: var(--accent-ink); letter-spacing: -.02em; }
+
+textarea {
+  width: 100%; padding: 12px 13px; font-size: 16px; font-family: inherit; line-height: 1.45;
+  border: 1.5px solid transparent; border-radius: 12px; resize: vertical;
+  background: var(--field); color: var(--text);
+}
+textarea:focus {
+  outline: none; border-color: var(--accent); background: var(--card);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.rc-opsional { font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.rc-aksi { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 18px; }
+.rc-aksi .primary { margin-top: 0; }
+#rcHapus { width: 100%; margin-top: 10px; }
+#rcHapus[hidden] { display: none; }
+
+/* Pratinjau: gambar yang akan disalin, diperkecil selebar kartu */
+.rc-pratinjau { display: flex; justify-content: center; }
+.rc-pratinjau canvas { display: block; width: 100%; max-width: 400px; height: auto; border-radius: 12px; }
+
+/* Riwayat */
+.rc-riwayat-baris {
+  display: flex; align-items: center; gap: 4px; padding-right: 4px;
+  border-bottom: 1px solid var(--border); border-radius: 10px;
+}
+.rc-riwayat-baris:last-child { border-bottom: 0; }
+.rc-riwayat-baris:hover { background: var(--field); }
+.rc-riwayat-baris.aktif { background: var(--accent-soft); }
+.rc-riwayat-baris.aktif .rc-avatar { background: var(--card); }
+.rc-riwayat {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 11px 6px;
+  border: 0; background: transparent; border-radius: 10px;
+  font-family: inherit; text-align: left; cursor: pointer; color: var(--text);
+}
+.rc-riwayat-kiri { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rc-riwayat-nama {
+  font-weight: 600; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rc-riwayat-meta { font-size: .74rem; color: var(--muted); }
+.rc-riwayat-total { font-weight: 700; font-size: .9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Master item */
+.item-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.item-row:first-child { padding-top: 0; }
+.item-row.sembunyi .item-nama, .item-row.sembunyi .item-kolom { opacity: .5; }
+.item-atas { display: flex; align-items: center; gap: 8px; }
+.item-nama { flex: 1; min-width: 0; padding: 9px 11px; font-size: .95rem; font-weight: 600; }
+.item-hapus {
+  flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  background: var(--red-soft); color: var(--red-ink);
+}
+.item-hapus:active { transform: scale(.94); }
+.item-bawah { display: flex; align-items: flex-end; gap: 10px; margin-top: 8px; }
+.item-kolom { flex: 1; min-width: 0; margin: 0; }
+.item-kolom span {
+  display: block; margin-bottom: 4px; font-size: .7rem; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.item-kolom input { padding: 8px 10px; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.item-jual {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; margin: 0 0 9px;
+  font-size: .78rem; color: var(--text-2); cursor: pointer;
+}
+.item-jual input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.item-tambah { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; margin-top: 14px; }
+.item-tambah input { margin: 0; padding: 10px 12px; font-size: .95rem; }
+.item-tambah .ghost {
+  padding: 0 16px; font-size: .9rem; font-weight: 600; font-family: inherit; cursor: pointer;
+  color: var(--accent-ink); background: var(--accent-soft); border: 0; border-radius: 12px;
+}
+/* Baris diskon master item: kotak angka melebar mengisi kolomnya */
+.item-diskon { align-items: stretch; }
+.item-diskon .diskon { display: flex; }
+.item-diskon .diskon input { flex: 1; min-width: 0; width: auto; padding: 8px 10px; }
+
+/* Logo receipt */
+.logo-kartu { display: flex; align-items: center; gap: 14px; }
+.logo-bingkai {
+  flex: 1; min-width: 0; min-height: 92px; padding: 12px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px dashed var(--border-kuat); border-radius: 14px;
+  /* Selalu putih, seperti kertas struknya — logo gelap tetap kelihatan di tema gelap */
+  background: #fff;
+}
+.logo-bingkai img { display: block; max-width: 100%; max-height: 72px; object-fit: contain; }
+.logo-bingkai img[hidden], #logoKosong[hidden] { display: none; }
+#logoKosong { font-size: .78rem; color: #7d626b; text-align: center; line-height: 1.4; }
+.logo-aksi { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.logo-pilih { margin: 0; cursor: pointer; }
+.rc-teks-hapus {
+  padding: 6px; border: 0; background: transparent; cursor: pointer;
+  font-family: inherit; font-size: .78rem; font-weight: 600; color: var(--red-ink);
+}
+.rc-teks-hapus:hover { text-decoration: underline; }
+.rc-teks-hapus[hidden] { display: none; }
+.logo-ket { margin: 12px 0 0; }
