@@ -268,6 +268,12 @@ sheet → unduh).
   receipt lama. Riwayat menampilkan 50 receipt terakhir cabang itu; ketuk satu
   untuk mengubah, menghapus (bisa diurungkan), atau menyalin ulang gambarnya.
   Nomor receipt (`No. AB12CD`) baru ada setelah disimpan.
+- **Langsung ke WhatsApp customer**: kalau nomor customer di receipt sudah
+  tercatat, menekan **Salin gambar** atau **Simpan receipt** menyalin
+  gambarnya lalu membuka chat WhatsApp customer itu — tinggal paste. Receipt
+  berisi beberapa customer memakai nomor customer pertama yang punya nomor.
+  Tanpa nomor, Salin gambar tetap menyalin seperti biasa dan Simpan cuma
+  menyimpan.
 
 ### Master item
 
