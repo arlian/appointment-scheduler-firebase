@@ -7045,7 +7045,12 @@ function simpanRc() {
   rc.id = isi.id;
   rc.dibuat = isi.dibuat;
   renderRcForm();
-  toast(lama ? 'Receipt No. ' + noRc(isi.id) + ' diperbarui.' : 'Receipt No. ' + noRc(isi.id) + ' tersimpan.');
+  const pesan = lama ? 'Receipt No. ' + noRc(isi.id) + ' diperbarui.' : 'Receipt No. ' + noRc(isi.id) + ' tersimpan.';
+  // Customer yang nomornya sudah tercatat langsung dikirimi: gambarnya
+  // disalin, chat WhatsApp-nya dibuka.
+  const nomor = nomorWaRc(data);
+  if (nomor) kirimRcKeWa(data, noRc(isi.id), nomor, pesan);
+  else toast(pesan);
 }
 
 function bukaRc(id) {
@@ -7588,11 +7593,48 @@ function jadwalkanPratinjau() {
   }, 120);
 }
 
+// Nomor WhatsApp tujuan receipt: customer pertama di receipt yang terhubung ke
+// data customer dan nomornya sudah tercatat. Receipt berisi beberapa orang
+// tetap cuma membuka satu chat — biasanya yang membayar ditulis paling atas.
+function nomorWaRc(data) {
+  for (const rcc of data.customers) {
+    const c = rcc.customerId && customers.find((x) => x.id === rcc.customerId);
+    if (c && c.phone) return c.phone;
+  }
+  return '';
+}
+
+// Seperti salinGambarReminder(): clipboard dulu selagi halaman ini masih
+// punya fokus dan masih dalam ketukan operator, baru WhatsApp dibuka. Tanpa
+// share sheet — di tengah alur kirim ia justru menghalangi chat-nya. Kalau
+// clipboard gambar tidak didukung, filenya diunduh untuk dilampirkan.
+function kirimRcKeWa(data, no, nomor, pesanAwal) {
+  const namaFile = 'receipt-' + data.tanggal + (no ? '-' + no : '') + '.png';
+  const awalan = pesanAwal ? pesanAwal + ' ' : '';
+  const janjiBlob = buatBlobRc(data, no);
+  janjiBlob.catch(() => {}); // ditangani di bawah
+  const unduh = () => janjiBlob
+    .then((b) => {
+      unduhBlob(b, namaFile);
+      toast(awalan + 'Gambar receipt tidak bisa disalin — filenya diunduh, lampirkan di chat.');
+    })
+    .catch((e) => toast('Gagal membuat gambar receipt: ' + e.message, true));
+  if (!navigator.clipboard || !window.ClipboardItem) unduh();
+  else {
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': janjiBlob })])
+      .then(() => toast(awalan + 'Gambar receipt tersalin — paste di chat WhatsApp.'))
+      .catch(unduh);
+  }
+  window.open('https://wa.me/' + nomor, '_blank', 'noopener');
+}
+
 // Menyalin tidak mensyaratkan disimpan dulu — yang belum disimpan cuma belum
 // punya nomor, jadi baris nomornya tidak ikut tercetak.
 $('rcSalin').addEventListener('click', () => {
   const data = dataRc();
   if (!data) return;
+  const nomor = nomorWaRc(data);
+  if (nomor) { kirimRcKeWa(data, rc.id ? noRc(rc.id) : '', nomor); return; }
   salinGambar(
     $('rcSalin'),
     'receipt-' + data.tanggal + (rc.id ? '-' + noRc(rc.id) : '') + '.png',
